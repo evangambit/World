@@ -1,7 +1,7 @@
 /**
  * Inventory cooking — uncooked steak → cooked steak at a stove.
  */
-import { Obj } from './tiles.js';
+import { Obj } from '../world/tiles.js';
 
 /**
  * @param {{ objType: number, count: number, buildingId?: number }[]} inventory

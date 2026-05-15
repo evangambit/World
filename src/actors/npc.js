@@ -2,12 +2,12 @@
  * NPC — task-driven movement and pathfinding.
  */
 import { Entity, DIR } from './entity.js';
-import { findPath } from './pathfinding.js';
-import { isPickableObject, Obj } from './tiles.js';
-import { NPCTaskRunner } from './npcTasks.js';
+import { findPath } from '../world/pathfinding.js';
+import { pickUpAtTile } from '../domain/entityActions.js';
+import { NPCTaskRunner } from '../npc/npcTasks.js';
 
-export { goTo, find } from './npcTasks.js';
-export { EAT_FOOD_PLAN } from './npcPlanTemplates.js';
+export { goTo, find } from '../npc/npcTasks.js';
+export { EAT_FOOD_PLAN } from '../npc/npcPlanTemplates.js';
 
 // NPC appearance presets (skin, hair, shirt, pants)
 const NPC_PRESETS = [
@@ -60,7 +60,7 @@ export class NPC extends Entity {
      * @param {number} gx
      * @param {number} gy
      * @param {number} gz
-     * @param {import('./world.js').World3D} world
+     * @param {import('../world/world.js').World3D} world
      * @returns {boolean}
      */
     setGoal(gx, gy, gz, world) {
@@ -87,7 +87,7 @@ export class NPC extends Entity {
      * @param {number} tx
      * @param {number} ty
      * @param {number} tz
-     * @param {import('./world.js').World3D} world
+     * @param {import('../world/world.js').World3D} world
      * @returns {Promise<void>}
      */
     travelToTile(tx, ty, tz, world) {
@@ -120,36 +120,15 @@ export class NPC extends Entity {
      * @param {number} tileX
      * @param {number} tileY
      * @param {number} tileZ
-     * @param {import('./world.js').World3D} world
+     * @param {import('../world/world.js').World3D} world
      * @returns {boolean}
      */
     pickUpAt(tileX, tileY, tileZ, world) {
-        if (tileZ !== this.z) return false;
-        const px = Math.floor(this.x);
-        const py = Math.floor(this.y);
-        if (Math.max(Math.abs(px - tileX), Math.abs(py - tileY)) > 1) return false;
-
-        const tile = world.getTile(tileX, tileY, tileZ);
-        if (!tile || !isPickableObject(tile.obj)) return false;
-
-        const objType = tile.obj;
-        const keyBuildingId = objType === Obj.KEY ? tile.keyBuildingId : undefined;
-        world.setTile(tileX, tileY, tileZ, { obj: 0, contents: [], keyBuildingId: null });
-
-        const stack = this.inventory.find(
-            (e) => e.objType === objType && (objType !== Obj.KEY || e.buildingId === keyBuildingId),
-        );
-        if (stack) stack.count += 1;
-        else {
-            const entry = { objType, count: 1 };
-            if (objType === Obj.KEY) entry.buildingId = keyBuildingId;
-            this.inventory.push(entry);
-        }
-        return true;
+        return pickUpAtTile(this, world, tileX, tileY, tileZ);
     }
 
     /**
-     * @param {import('./world.js').World3D} world
+     * @param {import('../world/world.js').World3D} world
      * @param {number} dt
      */
     update(world, dt) {

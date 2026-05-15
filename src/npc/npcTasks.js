@@ -4,7 +4,7 @@
 import { resolvePlanBindings } from './npcPlanBindings.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
 import { runFind, runGoTo } from './npcTaskPrimitives.js';
-import { findPath } from './pathfinding.js';
+import { findPath } from '../world/pathfinding.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 
@@ -44,7 +44,7 @@ export function find(objType, radius, opts) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
+ * @param {import('../actors/npc.js').NPC} npc
  * @param {NpcTask} task
  * @param {Error} err
  */
@@ -53,7 +53,7 @@ async function handleTaskFailure(npc, task, err) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
+ * @param {import('../actors/npc.js').NPC} npc
  * @param {PlanDocument} doc
  * @param {Error} err
  */
@@ -62,8 +62,8 @@ async function handlePlanFailure(npc, doc, err) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
- * @param {import('./world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
  * @param {NpcTask} task
  */
 async function executeTask(npc, world, task) {
@@ -79,8 +79,8 @@ async function executeTask(npc, world, task) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
- * @param {import('./world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
  * @param {PlanDocument} doc
  */
 async function executePlan(npc, world, doc) {
@@ -94,7 +94,7 @@ async function executePlan(npc, world, doc) {
 
 export class NPCTaskRunner {
     /**
-     * @param {import('./npc.js').NPC} npc
+     * @param {import('../actors/npc.js').NPC} npc
      */
     constructor(npc) {
         this.npc = npc;
@@ -118,7 +118,7 @@ export class NPCTaskRunner {
         this._queue.push({ kind: 'plan', doc });
     }
 
-    /** @param {import('./world.js').World3D} world */
+    /** @param {import('../world/world.js').World3D} world */
     update(world) {
         if (this._running) return;
         if (this._queue.length === 0) {
@@ -145,7 +145,7 @@ export class NPCTaskRunner {
 
     /**
      * Pick a random walkable tile near home and queue GoTo when idle.
-     * @param {import('./world.js').World3D} world
+     * @param {import('../world/world.js').World3D} world
      */
     _enqueueWander(world) {
         const npc = this.npc;

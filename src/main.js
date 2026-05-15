@@ -1,35 +1,27 @@
 /**
  * Main game entry point — game loop, system wiring, initialization.
  */
-import { Input } from './input.js';
-import { Camera } from './camera.js';
-import { Renderer } from './renderer.js';
-import { Player } from './entity.js';
-import { NPC, find } from './npc.js';
-import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './builder.js';
+import { Input } from './client/input.js';
+import { Camera } from './client/camera.js';
+import { Renderer } from './client/renderer.js';
+import { Player } from './actors/entity.js';
+import { NPC, find } from './actors/npc.js';
+import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
 import {
     Obj,
-    T,
     OBJ_NAMES,
     isContainerObject,
     canStashInContainer,
     formatItemStackLabel,
-    isTerrainDropSurface,
-    isTileWalkable,
     isStoveObject,
-} from './tiles.js';
-
-function mergeStackInto(list, objType, count, buildingId) {
-    const e = list.find(
-        (x) => x.objType === objType && (objType !== Obj.KEY || x.buildingId === buildingId),
-    );
-    if (e) e.count += count;
-    else {
-        const entry = { objType, count };
-        if (objType === Obj.KEY && buildingId != null) entry.buildingId = buildingId;
-        list.push(entry);
-    }
-}
+} from './world/tiles.js';
+import {
+    canOpenContainerAt,
+    dropFromInventory,
+    stashToContainer,
+    takeFromContainer,
+    toggleDoorLock,
+} from './domain/entityActions.js';
 
 class Game {
     constructor() {
@@ -191,7 +183,7 @@ class Game {
         this._msgTTL = 2.8;
     }
 
-    /** @returns {import('./npc.js').NPC|null} */
+    /** @returns {import('./actors/npc.js').NPC|null} */
     _npcUnderCursor(wx, wy, z) {
         let best = null;
         let bestD = Infinity;
@@ -205,148 +197,22 @@ class Game {
         return best;
     }
 
-    _playerHasKey(buildingId) {
-        return (this.player.inventory ?? []).some(
-            (s) => s.objType === Obj.KEY && s.buildingId === buildingId && s.count > 0,
-        );
-    }
-
-    /** @returns {{ tx: number, ty: number, tile: import('./world.js').TileData }|null} */
-    _findDoorNextToPlayer() {
-        const px = Math.floor(this.player.x);
-        const py = Math.floor(this.player.y);
-        const pz = this.player.z;
-        const tryTile = (tx, ty) => {
-            const t = this.world.getTile(tx, ty, pz);
-            if (t?.terrain === T.DOOR && t.buildingId != null) return { tx, ty, tile: t };
-            return null;
-        };
-        for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            const r = tryTile(px + dx, py + dy);
-            if (r) return r;
-        }
-        return null;
-    }
-
-    _playerCountsAsInsideForDoor(tile, doorX, doorY, buildingId) {
-        const px = Math.floor(this.player.x);
-        const py = Math.floor(this.player.y);
-        const pz = this.player.z;
-        const pt = this.world.getTile(px, py, pz);
-        if (pt?.interior && pt.buildingId === buildingId) return true;
-        const idx = tile.doorInsideDx ?? 0;
-        const idy = tile.doorInsideDy ?? 0;
-        const isx = doorX + idx;
-        const isy = doorY + idy;
-        if (px === isx && py === isy) return true;
-        const onDoor = px === doorX && py === doorY;
-        const adjInside = Math.max(Math.abs(px - isx), Math.abs(py - isy)) === 1;
-        return onDoor && adjInside;
-    }
-
     _tryDoorInteract() {
-        const hit = this._findDoorNextToPlayer();
-        if (!hit) return;
-        const { tx, ty, tile } = hit;
-        const bid = tile.buildingId;
-        const inside = this._playerCountsAsInsideForDoor(tile, tx, ty, bid);
-        const nextLocked = !tile.doorLocked;
-        if (nextLocked) {
-            const px = Math.floor(this.player.x);
-            const py = Math.floor(this.player.y);
-            if (px === tx && py === ty) {
-                this._showGameMessage('Step off the door to lock it');
-                return;
-            }
+        const result = toggleDoorLock(this.player, this.world);
+        if (result.message && result.message !== 'No door nearby') {
+            this._showGameMessage(result.message);
         }
-        if (inside) {
-            this.world.setTile(tx, ty, this.player.z, { doorLocked: nextLocked });
-            this._showGameMessage(nextLocked ? 'Door locked' : 'Door unlocked');
-            return;
-        }
-        if (this._playerHasKey(bid)) {
-            this.world.setTile(tx, ty, this.player.z, { doorLocked: nextLocked });
-            this._showGameMessage(nextLocked ? 'Door locked (key)' : 'Door unlocked (key)');
-            return;
-        }
-        this._showGameMessage("Need this building's key");
     }
 
-    /**
-     * @param {number} objType
-     * @param {number} [buildingId] - for keys
-     */
-    _canDropObjAtTile(tx, ty, z, objType, px, py) {
-        const t = this.world.getTile(tx, ty, z);
-        if (!t || t.obj) return false;
-        if (!isTerrainDropSurface(t.terrain)) return false;
-        if (!isTileWalkable(t.terrain, 0)) return false;
-        if (tx === px && ty === py && !isTileWalkable(t.terrain, objType)) return false;
-        return true;
-    }
-
-    /**
-     * Next empty tile near the player for dropping `objType`, skipping `used` keys "x,y,z".
-     * @param {Set<string>} used
-     */
-    _findDropSpot(objType, used) {
-        const px = Math.floor(this.player.x);
-        const py = Math.floor(this.player.y);
-        const pz = this.player.z;
-        for (let r = 0; r <= 8; r++) {
-            for (let dy = -r; dy <= r; dy++) {
-                for (let dx = -r; dx <= r; dx++) {
-                    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-                    const tx = px + dx;
-                    const ty = py + dy;
-                    const key = `${tx},${ty},${pz}`;
-                    if (used.has(key)) continue;
-                    if (!this._canDropObjAtTile(tx, ty, pz, objType, px, py)) continue;
-                    used.add(key);
-                    return { x: tx, y: ty, z: pz };
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Place one inventory stack on the ground (may use several adjacent tiles if count > 1).
-     */
     _dropFromInventory(objType, buildingId) {
-        const inv = this.player.inventory ?? [];
-        const i = inv.findIndex(
-            (e) => e.objType === objType && (objType !== Obj.KEY || e.buildingId === buildingId),
-        );
-        if (i < 0) return;
-        const stack = inv[i];
-        const used = new Set();
-        let placed = 0;
-        const n = stack.count;
-        while (placed < n) {
-            const spot = this._findDropSpot(objType, used);
-            if (!spot) break;
-            const patch = { obj: objType };
-            if (objType === Obj.KEY) patch.keyBuildingId = buildingId ?? null;
-            else patch.keyBuildingId = null;
-            this.world.setTile(spot.x, spot.y, spot.z, patch);
-            placed++;
-        }
-        if (placed === 0) {
-            this._showGameMessage('No place to drop');
-            return;
-        }
-        stack.count -= placed;
-        if (stack.count <= 0) inv.splice(i, 1);
+        const { message } = dropFromInventory(this.player, this.world, objType, buildingId);
         this._syncInventoryUI();
-        this._showGameMessage(placed === n ? 'Dropped' : `Dropped ${placed} (no room for rest)`);
+        this._showGameMessage(message);
     }
 
     _openContainerAt(tx, ty) {
         const z = this.player.z;
-        const tile = this.world.getTile(tx, ty, z);
-        if (!tile || !isContainerObject(tile.obj)) return;
-        if (!this.player.isAdjacentToTile(tx, ty)) return;
+        if (!canOpenContainerAt(this.player, this.world, tx, ty, z)) return;
         this.world.ensureTileContents(tx, ty, z);
         this.openContainer = { x: tx, y: ty, z };
         this._refreshContainerUI();
@@ -406,16 +272,10 @@ class Game {
 
     _takeFromContainer(objType, buildingId) {
         const open = this.openContainer;
-        if (!open || !this.player.isAdjacentToTile(open.x, open.y)) return;
-        const contents = this.world.ensureTileContents(open.x, open.y, open.z);
-        if (!contents) return;
-        const i = contents.findIndex(
-            (e) => e.objType === objType && (objType !== Obj.KEY || e.buildingId === buildingId),
-        );
-        if (i < 0) return;
-        const [stack] = contents.splice(i, 1);
-        if (!this.player.inventory) this.player.inventory = [];
-        mergeStackInto(this.player.inventory, stack.objType, stack.count, stack.buildingId);
+        if (!open) return;
+        if (!takeFromContainer(this.player, this.world, open.x, open.y, open.z, objType, buildingId)) {
+            return;
+        }
         this._syncContainerPanel();
         this._syncInventoryUI();
     }
@@ -423,16 +283,9 @@ class Game {
     _stashToContainer(objType, buildingId) {
         const open = this.openContainer;
         if (!open || !canStashInContainer(objType)) return;
-        if (!this.player.isAdjacentToTile(open.x, open.y)) return;
-        const inv = this.player.inventory ?? [];
-        const i = inv.findIndex(
-            (e) => e.objType === objType && (objType !== Obj.KEY || e.buildingId === buildingId),
-        );
-        if (i < 0) return;
-        const [stack] = inv.splice(i, 1);
-        const contents = this.world.ensureTileContents(open.x, open.y, open.z);
-        if (!contents) return;
-        mergeStackInto(contents, stack.objType, stack.count, stack.buildingId);
+        if (!stashToContainer(this.player, this.world, open.x, open.y, open.z, objType, buildingId)) {
+            return;
+        }
         this._syncContainerPanel();
         this._syncInventoryUI();
     }

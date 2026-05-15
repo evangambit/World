@@ -1,14 +1,21 @@
 /**
- * Low-level NPC task primitives (movement, pickup search).
+ * Low-level NPC task primitives (movement, pickup search, shared actions).
  */
-import { findPath } from './pathfinding.js';
-import { isPickableObject, Obj, OBJ_NAMES } from './tiles.js';
+import {
+    dropFromInventory,
+    findContainerStack,
+    stashToContainer,
+    takeFromContainer,
+    toggleDoorLock,
+} from '../domain/entityActions.js';
+import { findPath } from '../world/pathfinding.js';
+import { isPickableObject, Obj, OBJ_NAMES } from '../world/tiles.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 
 /**
- * @param {import('./npc.js').NPC} npc
- * @param {import('./world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
  * @param {number} gx
  * @param {number} gy
  * @param {number} gz
@@ -18,8 +25,8 @@ export async function runGoTo(npc, world, gx, gy, gz) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
- * @param {import('./world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
  * @param {number} objType
  * @param {number} radius
  * @param {number} [buildingId]
@@ -54,7 +61,59 @@ export async function runFind(npc, world, objType, radius, buildingId) {
 }
 
 /**
- * @param {import('./world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ */
+export async function runDoor(npc, world) {
+    const result = toggleDoorLock(npc, world);
+    if (!result.ok) throw new Error(result.message);
+}
+
+/**
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {number} objType
+ * @param {number} [buildingId]
+ * @param {number} [count]
+ */
+export async function runDrop(npc, world, objType, buildingId, count) {
+    const { placed } = dropFromInventory(npc, world, objType, buildingId, count);
+    if (placed === 0) throw new Error('Drop: no place to drop');
+}
+
+/**
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} cz
+ * @param {number[]} objTypes - first matching stack in container is taken
+ */
+export async function runTakeFromContainer(npc, world, cx, cy, cz, objTypes) {
+    const match = findContainerStack(world, cx, cy, cz, objTypes);
+    if (!match) throw new Error('Take: container empty or no matching item');
+    if (!takeFromContainer(npc, world, cx, cy, cz, match.objType, match.buildingId)) {
+        throw new Error('Take: failed (not adjacent or invalid container)');
+    }
+}
+
+/**
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} cz
+ * @param {number} objType
+ * @param {number} [buildingId]
+ */
+export async function runStashToContainer(npc, world, cx, cy, cz, objType, buildingId) {
+    if (!stashToContainer(npc, world, cx, cy, cz, objType, buildingId)) {
+        throw new Error('Stash: failed (not adjacent, not stashable, or missing item)');
+    }
+}
+
+/**
+ * @param {import('../world/world.js').World3D} world
  * @param {TileCoord} origin
  * @param {number} objType
  * @param {number} radius
@@ -84,8 +143,8 @@ function findObjectTilesInRadius(world, origin, objType, radius, buildingId) {
 }
 
 /**
- * @param {import('./world.js').World3D} world
- * @param {import('./npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
  * @param {TileCoord} target
  * @returns {TileCoord|null}
  */

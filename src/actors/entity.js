@@ -2,8 +2,12 @@
  * Entity system — base Entity class and Player subclass.
  * Entities have float positions in tile-space and smooth movement.
  */
-import { isPickableObject, Obj } from './tiles.js';
-import { cookUncookedSteakInInventory, inventoryHasUncookedSteak } from './cooking.js';
+import { inventoryHasUncookedSteak } from '../domain/cooking.js';
+import {
+    cookAtStove,
+    isAdjacentToTile as entityIsAdjacentToTile,
+    pickUpAtTile,
+} from '../domain/entityActions.js';
 
 // ── Sprite drawing helpers ──
 
@@ -178,6 +182,11 @@ export class Entity {
         return true;
     }
 
+    /** Chebyshev distance ≤ 1 from this entity's tile to (tileX, tileY). */
+    isAdjacentToTile(tileX, tileY) {
+        return entityIsAdjacentToTile(this, tileX, tileY);
+    }
+
     /** Check if hitbox centered at (cx, cy) can occupy that space. */
     _canOccupy(cx, cy, hw, hh, world) {
         // Check all tiles the hitbox overlaps
@@ -205,65 +214,31 @@ export class Player extends Entity {
 
     /**
      * If the clicked tile has a pickable object and is within 1 tile (Chebyshev), take it.
-     * @param {import('./world.js').World3D} world
+     * @param {import('../world/world.js').World3D} world
      * @param {number} tileX
      * @param {number} tileY
      * @returns {boolean} whether something was picked up
      */
     tryPickUp(world, tileX, tileY) {
         if (!this.inventory) this.inventory = [];
-        const px = Math.floor(this.x);
-        const py = Math.floor(this.y);
-        const dist = Math.max(Math.abs(px - tileX), Math.abs(py - tileY));
-        if (dist > 1) return false;
-
-        const tile = world.getTile(tileX, tileY, this.z);
-        if (!tile || !isPickableObject(tile.obj)) return false;
-
-        const objType = tile.obj;
-        const keyBuildingId = objType === Obj.KEY ? tile.keyBuildingId : undefined;
-        world.setTile(tileX, tileY, this.z, { obj: 0, contents: [], keyBuildingId: null });
-
-        const stack = this.inventory.find(
-            (e) => e.objType === objType && (objType !== Obj.KEY || e.buildingId === keyBuildingId),
-        );
-        if (stack) stack.count += 1;
-        else {
-            const entry = { objType, count: 1 };
-            if (objType === Obj.KEY) entry.buildingId = keyBuildingId;
-            this.inventory.push(entry);
-        }
-
-        return true;
+        return pickUpAtTile(this, world, tileX, tileY, this.z);
     }
 
     /**
      * Cook one uncooked steak in inventory while adjacent to a stove tile.
-     * @param {import('./world.js').World3D} world
+     * @param {import('../world/world.js').World3D} world
      * @param {number} tileX
      * @param {number} tileY
      * @returns {boolean}
      */
     tryCookAtStove(world, tileX, tileY) {
         if (!this.inventory) this.inventory = [];
-        if (!this.isAdjacentToTile(tileX, tileY)) return false;
-
-        const tile = world.getTile(tileX, tileY, this.z);
-        if (!tile || tile.obj !== Obj.STOVE) return false;
-
-        return cookUncookedSteakInInventory(this.inventory);
+        return cookAtStove(this, world, tileX, tileY);
     }
 
     /** @returns {boolean} */
     hasUncookedSteak() {
         return inventoryHasUncookedSteak(this.inventory ?? []);
-    }
-
-    /** Chebyshev distance ≤ 1 from the player's tile to (tileX, tileY). */
-    isAdjacentToTile(tileX, tileY) {
-        const px = Math.floor(this.x);
-        const py = Math.floor(this.y);
-        return Math.max(Math.abs(px - tileX), Math.abs(py - tileY)) <= 1;
     }
 
     update(input, world, dt) {

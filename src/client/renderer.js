@@ -2,7 +2,7 @@
  * Renderer — layer-aware tile + entity rendering pipeline.
  * Handles elevation shadows, roof occlusion, and Y-sorted entity drawing.
  */
-import { getTileCanvas, getObjCanvas, Obj, T, TERRAIN_NAMES, OBJ_NAMES, isContainerObject, formatItemStackLabel } from './tiles.js';
+import { getTileCanvas, getObjCanvas, Obj, T, TERRAIN_NAMES, OBJ_NAMES, isContainerObject, formatItemStackLabel } from '../world/tiles.js';
 
 export class Renderer {
     /**
@@ -28,11 +28,11 @@ export class Renderer {
 
     /**
      * Render the full frame.
-     * @param {import('./world.js').World3D} world
-     * @param {import('./entity.js').Player} player
-     * @param {Array<import('./npc.js').NPC>} npcs
+     * @param {import('../world/world.js').World3D} world
+     * @param {import('../actors/entity.js').Player} player
+     * @param {Array<import('../actors/npc.js').NPC>} npcs
      * @param {{x:number,y:number,z:number}|null} hoverTile
-     * @param {import('./npc.js').NPC|null} [hoverNpc]
+     * @param {import('../actors/npc.js').NPC|null} [hoverNpc]
      */
     render(world, player, npcs, hoverTile = null, hoverNpc = null) {
         const ctx = this.ctx;
@@ -223,9 +223,9 @@ export class Renderer {
 
     /**
      * Hover tooltip (draw after pause overlay so it stays visible).
-     * @param {import('./world.js').World3D} world
+     * @param {import('../world/world.js').World3D} world
      * @param {{x:number,y:number,z:number}} hoverTile
-     * @param {import('./npc.js').NPC|null} hoverNpc
+     * @param {import('../actors/npc.js').NPC|null} hoverNpc
      */
     drawHoverTooltip(world, hoverTile, hoverNpc = null) {
         const ctx = this.ctx;

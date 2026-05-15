@@ -1,8 +1,15 @@
 /**
  * Execute NPC plans — seq / sel combinators and leaf steps.
  */
+import {
+    dropFromInventory,
+    findContainerStack,
+    stashToContainer,
+    takeFromContainer,
+    toggleDoorLock,
+} from '../domain/entityActions.js';
 import { getObjectTagSpec } from './npcObjectTags.js';
-import { cookUncookedSteakInInventory } from './cooking.js';
+import { cookUncookedSteakInInventory } from '../domain/cooking.js';
 import { runGoTo, runFind } from './npcTaskPrimitives.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
@@ -22,11 +29,14 @@ import { runGoTo, runFind } from './npcTaskPrimitives.js';
  * @property {string} [from]
  * @property {string} [pick]
  * @property {number} [buildingId]
+ * @property {string} [from]
+ * @property {string} [to]
+ * @property {number} [count]
  */
 
 /** @typedef {{ ok: true } | { ok: false, error: Error }} PlanResult */
 
-const LEAF_TYPES = new Set(['goto', 'find', 'eat', 'cook']);
+const LEAF_TYPES = new Set(['goto', 'find', 'eat', 'cook', 'door', 'drop', 'take', 'stash']);
 const COMPOSITE_TYPES = new Set(['seq', 'sel']);
 
 /**
@@ -72,8 +82,16 @@ export function validatePlan(plan, limits = {}) {
             if (!node.object) return 'find requires object tag';
             if (node.radius == null) return 'find requires radius';
         }
-        if (node.type === 'eat' || node.type === 'cook') {
+        if (node.type === 'eat' || node.type === 'cook' || node.type === 'drop') {
             if (!node.object) return `${node.type} requires object tag`;
+        }
+        if (node.type === 'take') {
+            if (!node.object) return 'take requires object tag';
+            if (!node.from) return 'take requires from binding ref';
+        }
+        if (node.type === 'stash') {
+            if (!node.object) return 'stash requires object tag';
+            if (!node.to) return 'stash requires to binding ref';
         }
         return null;
     }
@@ -82,8 +100,8 @@ export function validatePlan(plan, limits = {}) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
- * @param {import('./world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} plan
  * @param {Record<string, TileRef | null>} bindings
  * @returns {Promise<PlanResult>}
@@ -93,8 +111,8 @@ export async function runPlan(npc, world, plan, bindings) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
- * @param {import('./world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} node
  * @param {Record<string, TileRef | null>} bindings
  * @returns {Promise<PlanResult>}
@@ -129,8 +147,8 @@ async function executeNode(npc, world, node, bindings) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
- * @param {import('./world.js').World3D} world
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} step
  * @param {Record<string, TileRef | null>} bindings
  */
@@ -168,6 +186,27 @@ async function executeLeaf(npc, world, step, bindings) {
         return;
     }
 
+    if (step.type === 'door') {
+        const result = toggleDoorLock(npc, world);
+        if (!result.ok) throw new Error(result.message);
+        return;
+    }
+
+    if (step.type === 'drop') {
+        dropFromInventoryByTag(npc, world, step.object, step.count);
+        return;
+    }
+
+    if (step.type === 'take') {
+        takeFromContainerByTag(npc, world, step.object, step.from, bindings);
+        return;
+    }
+
+    if (step.type === 'stash') {
+        stashToContainerByTag(npc, world, step.object, step.to, bindings);
+        return;
+    }
+
     throw new Error(`Unknown plan step type: ${step.type}`);
 }
 
@@ -187,7 +226,7 @@ function resolveGotoTarget(step, bindings) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
+ * @param {import('../actors/npc.js').NPC} npc
  * @param {string} objectTag
  */
 function cookFromInventory(npc, objectTag) {
@@ -221,10 +260,94 @@ function cookFromInventory(npc, objectTag) {
 }
 
 /**
- * @param {import('./npc.js').NPC} npc
+ * @param {import('../actors/npc.js').NPC} npc
  * @param {string} objectTag
  * @param {string} [pick]
  */
+/**
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {string} objectTag
+ * @param {number} [count]
+ */
+function dropFromInventoryByTag(npc, world, objectTag, count) {
+    const spec = getObjectTagSpec(objectTag);
+    const stack = (npc.inventory ?? []).find(
+        (e) => spec.inventoryTypes.includes(e.objType) && e.count > 0,
+    );
+    if (!stack) throw new Error(`drop: no ${objectTag} in inventory`);
+
+    const { placed, requested } = dropFromInventory(
+        npc,
+        world,
+        stack.objType,
+        stack.buildingId,
+        count,
+    );
+    if (placed === 0) throw new Error('drop: no place to drop');
+    if (placed < requested) {
+        throw new Error(`drop: only placed ${placed} of ${requested}`);
+    }
+}
+
+/**
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {string} objectTag
+ * @param {string} ref
+ * @param {Record<string, TileRef | null>} bindings
+ */
+function takeFromContainerByTag(npc, world, objectTag, ref, bindings) {
+    const container = bindings[ref];
+    if (!container) throw new Error(`take: unbound ref ${ref}`);
+
+    const spec = getObjectTagSpec(objectTag);
+    const match = findContainerStack(
+        world,
+        container.x,
+        container.y,
+        container.z,
+        spec.inventoryTypes,
+    );
+    if (!match) throw new Error(`take: no ${objectTag} in container ${ref}`);
+
+    if (
+        !takeFromContainer(
+            npc,
+            world,
+            container.x,
+            container.y,
+            container.z,
+            match.objType,
+            match.buildingId,
+        )
+    ) {
+        throw new Error(`take: failed at (${container.x}, ${container.y})`);
+    }
+}
+
+/**
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {string} objectTag
+ * @param {string} ref
+ * @param {Record<string, TileRef | null>} bindings
+ */
+function stashToContainerByTag(npc, world, objectTag, ref, bindings) {
+    const container = bindings[ref];
+    if (!container) throw new Error(`stash: unbound ref ${ref}`);
+
+    const spec = getObjectTagSpec(objectTag);
+    const stack = (npc.inventory ?? []).find(
+        (e) => spec.inventoryTypes.includes(e.objType) && e.count > 0,
+    );
+    if (!stack) throw new Error(`stash: no ${objectTag} in inventory`);
+
+    if (!stashToContainer(npc, world, container.x, container.y, container.z, stack.objType, stack.buildingId)) {
+        throw new Error(`stash: failed at (${container.x}, ${container.y})`);
+    }
+}
+
 function eatFromInventory(npc, objectTag, pick) {
     const spec = getObjectTagSpec(objectTag);
     const stacks = npc.inventory.filter(
