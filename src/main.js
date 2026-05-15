@@ -4,7 +4,7 @@
 import { Input } from './client/input.js';
 import { Camera } from './client/camera.js';
 import { Renderer } from './client/renderer.js';
-import { Player } from './actors/entity.js';
+import { Player } from './actors/player.js';
 import { NPC, find } from './actors/npc.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
 import {

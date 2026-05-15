@@ -15,7 +15,8 @@ src/
     cooking.js            # Inventory transforms (steak, etc.)
     entityActions.js      # Shared “actor did X in the world” API
   actors/                 # Bodies in the world
-    entity.js             # Entity + Player
+    entity.js             # Shared Entity base
+    player.js             # Player (input-driven)
     npc.js                # NPC movement + task runner hookup
   npc/                    # NPC control (scheduling, plans — not world rules)
     npcTasks.js
@@ -118,7 +119,7 @@ When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**
 | Path | Role |
 |------|------|
 | `domain/entityActions.js` | Shared actor ↔ world interactions |
-| `actors/entity.js`, `actors/npc.js` | Actor state and movement |
+| `actors/entity.js`, `actors/player.js`, `actors/npc.js` | Actor state and movement |
 | `main.js` | Player input and UI |
 | `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
 | `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |

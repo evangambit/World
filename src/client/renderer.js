@@ -29,7 +29,7 @@ export class Renderer {
     /**
      * Render the full frame.
      * @param {import('../world/world.js').World3D} world
-     * @param {import('../actors/entity.js').Player} player
+     * @param {import('../actors/player.js').Player} player
      * @param {Array<import('../actors/npc.js').NPC>} npcs
      * @param {{x:number,y:number,z:number}|null} hoverTile
      * @param {import('../actors/npc.js').NPC|null} [hoverNpc]
