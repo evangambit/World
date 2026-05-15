@@ -1,0 +1,98 @@
+
+# Aspirations
+
+- NPC can construct/deconstruct/extend houses!
+  - This means "Bob's house" is not a meaningful handle.
+- NPC can own land
+  - Land ownership is driven by community consensus -- i.e. people's memories and honesty
+- NPC can farm land
+- Day/night cycles
+  - NPCs must sleep!
+
+# Possible Land Implementation Stuff
+
+- Pre-defined plots of land (e.g. 5x5 chunks)
+- Land ownership is defined via rectangles. If you sell a chunk we re-rectanglify your remaining land
+
+# Possible Knowledge Implementation Stuff
+
+- Start with perfect memory (make it worse later if necessary)
+- You know the actions that people took in your line of sight
+- There is a DB of primitive observations you have made
+  - (subject, action, object, location, time)
+  - "I saw a flower at (x, y, z, t)"
+  - "alice hit bob at (x, y, z, t)"
+  - you can query the DB with various tools
+    - "nearest toothbrush to X, within last 2 days", etc.
+- There is also your past conversations, stored in text-form
+
+# Doing Stuff
+
+- AI gets asked ~4 times a day to take a look at the schedule and stuff that has happened and
+  make adjustments
+- There is primitive hard-coded AI that handles (e.g.) fight-or-flight, with hyperparameters that
+  the AI can tune
+- Whenever a task fails you ask the LLM what to do
+- Tasks are JSONS. Higher level tasks are composed of lower level tasks. Unclear how to stitch them
+  together. This may require a primitive language -- e.g. if/else/task
+
+# Eat food (routine plan — seq / sel, shallow nesting)
+
+Bindings the engine resolves before run (or goto fails):
+- my_kitchen: db.whereIsMyKitchen() -> tile ref, or unbound
+
+Object tags (map to Obj.* + inventory filters):
+- edible_food
+- uncooked_food
+
+On any step failure: abort plan; runner may ask LLM to replan.
+
+{
+  "goal": "eat_food",
+  "bindings": {
+    "my_kitchen": { "query": "whereIsMyKitchen" }
+  },
+  "plan": {
+    "type": "sel",
+    "steps": [
+      {
+        "type": "seq",
+        "steps": [
+          { "type": "eat", "from": "inventory", "object": "edible_food", "pick": "random" }
+        ]
+      },
+      {
+        "type": "seq",
+        "steps": [
+          { "type": "goto", "ref": "my_kitchen" },
+          {
+            "type": "sel",
+            "steps": [
+              {
+                "type": "seq",
+                "steps": [
+                  { "type": "find", "object": "edible_food", "radius": 8, "near": "self", "pickup": true },
+                  { "type": "eat", "from": "inventory", "object": "edible_food", "pick": "random" }
+                ]
+              },
+              {
+                "type": "seq",
+                "steps": [
+                  { "type": "find", "object": "uncooked_food", "radius": 8, "near": "self", "pickup": true },
+                  { "type": "cook", "object": "uncooked_food" },
+                  { "type": "eat", "from": "inventory", "object": "edible_food", "pick": "random" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+Maps to primitives: goto -> goTo; find+pickup -> boundedSearchAndPickup; cook / eat -> TBD.
+Pseudocode equivalent:
+- if inventory has edible_food: eat random edible
+- else if my_kitchen: goto; try find edible then eat, else find uncooked then cook then eat; else fail
+- else: fail (unbound my_kitchen or goto failure)
