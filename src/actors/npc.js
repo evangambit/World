@@ -4,6 +4,7 @@
 import { Entity, DIR } from './entity.js';
 import { findPath } from '../world/pathfinding.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
+import { tickVitality, tryEatFromInventoryIfHungry } from '../domain/vitality.js';
 import {
     NPCTaskRunner,
     goTo,
@@ -141,10 +142,13 @@ export class NPC extends Entity {
      * @param {number} dt
      */
     update(world, dt) {
+        tickVitality(this, dt);
+
         if (this.timedAction.isBusy()) {
             this.timedAction.tick(dt, world);
         } else {
             this._tickMovement(dt);
+            tryEatFromInventoryIfHungry(this, 55);
         }
         this.tasks.update(world);
     }

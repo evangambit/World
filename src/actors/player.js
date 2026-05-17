@@ -4,6 +4,7 @@
 import { inventoryHasUncookedSteak } from '../domain/cooking.js';
 import { cookAtStove, pickUpAtTile } from '../domain/entityActions.js';
 import { hasMovementInput } from '../client/input.js';
+import { tickVitality, consumeFoodFromInventory } from '../domain/vitality.js';
 import { Entity } from './entity.js';
 
 export class Player extends Entity {
@@ -48,7 +49,18 @@ export class Player extends Entity {
      * @param {import('../world/world.js').World3D} world
      * @param {number} dt
      */
+    /**
+     * @param {number} objType
+     * @param {number} [buildingId]
+     * @returns {boolean}
+     */
+    tryEatFromInventory(objType, buildingId) {
+        return consumeFoodFromInventory(this, objType, buildingId);
+    }
+
     update(input, world, dt) {
+        tickVitality(this, dt);
+
         if (this.timedAction.isBusy()) {
             if (hasMovementInput(input)) {
                 const { dx, dy } = input.getMovement();

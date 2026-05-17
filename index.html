@@ -30,7 +30,19 @@
                 <div id="container-items"></div>
             </div>
         </div>
-        <div id="controls-hint">WASD · click world to pick up / open storage · click pack to drop · E: doors</div>
+        <div id="vitals-panel">
+            <div class="vital-row">
+                <span class="vital-label">HP</span>
+                <div class="vital-track"><div id="health-fill" class="vital-fill vital-fill--health"></div></div>
+                <span id="health-text" class="vital-value">100</span>
+            </div>
+            <div class="vital-row">
+                <span class="vital-label">Hunger</span>
+                <div class="vital-track"><div id="hunger-fill" class="vital-fill vital-fill--hunger"></div></div>
+                <span id="hunger-text" class="vital-value">0</span>
+            </div>
+        </div>
+        <div id="controls-hint">WASD · click pack to eat / drop · E: doors</div>
     </div>
     <script type="module" src="src/main.js"></script>
 </body>

@@ -213,6 +213,10 @@ export class Entity {
         this._transitionCooldown = 0;
         /** @type {{ objType: number, count: number, buildingId?: number }[]} carried item stacks */
         this.inventory = [];
+        /** 0 = full, 100 = starving */
+        this.hunger = 0;
+        /** 100 = healthy, 0 = down */
+        this.health = 100;
         this.timedAction = new TimedActionRunner(this);
     }
 

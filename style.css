@@ -194,6 +194,58 @@ html, body {
     border: 1px solid rgba(196, 162, 101, 0.3);
 }
 
+#vitals-panel {
+    font-size: 0.42rem;
+    color: #e0d8c0;
+    background: rgba(10, 10, 18, 0.75);
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(196, 162, 101, 0.3);
+    min-width: 168px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vital-row {
+    display: grid;
+    grid-template-columns: 52px 1fr 28px;
+    align-items: center;
+    gap: 6px;
+}
+
+.vital-label {
+    color: #c4a265;
+}
+
+.vital-track {
+    height: 8px;
+    background: rgba(40, 36, 28, 0.9);
+    border-radius: 2px;
+    overflow: hidden;
+    border: 1px solid rgba(196, 162, 101, 0.2);
+}
+
+.vital-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.15s ease;
+}
+
+.vital-fill--health {
+    background: linear-gradient(90deg, #6a2020, #c44a4a);
+}
+
+.vital-fill--hunger {
+    background: linear-gradient(90deg, #6a5a20, #d8a848);
+}
+
+.vital-value {
+    text-align: right;
+    color: #d8d0c0;
+    font-size: 0.4rem;
+}
+
 #controls-hint {
     font-size: 0.45rem;
     color: #8a8070;
@@ -201,4 +253,5 @@ html, body {
     padding: 6px 10px;
     border-radius: 4px;
     transition: opacity 3s ease;
+    align-self: flex-end;
 }

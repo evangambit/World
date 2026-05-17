@@ -30,6 +30,7 @@ import {
     plantWheatSeedAtTile,
     updateCrops,
 } from './domain/crops.js';
+import { isEdible, VITALITY } from './domain/vitality.js';
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
@@ -47,6 +48,10 @@ class Game {
         this.containerPanelEl = document.getElementById('container-panel');
         this.containerTitleEl = document.getElementById('container-title');
         this.containerItemsEl = document.getElementById('container-items');
+        this.healthFillEl = document.getElementById('health-fill');
+        this.hungerFillEl = document.getElementById('hunger-fill');
+        this.healthTextEl = document.getElementById('health-text');
+        this.hungerTextEl = document.getElementById('hunger-text');
         /** Open storage UI target, or null */
         this.openContainer = null;
         /** Mouse position in screen pixels (null when not hovering) */
@@ -216,6 +221,20 @@ class Game {
                 return;
             }
 
+            if (row.dataset.eatObj != null) {
+                const ot = parseInt(row.dataset.eatObj, 10);
+                const bid =
+                    row.dataset.eatBuilding !== undefined
+                        ? parseInt(row.dataset.eatBuilding, 10)
+                        : undefined;
+                if (this.player.tryEatFromInventory(ot, bid)) {
+                    this._syncInventoryUI();
+                    this._syncVitalsUI();
+                    this._showGameMessage('Ate food.');
+                }
+                return;
+            }
+
             const ot = parseInt(row.dataset.dropObj, 10);
             if (Number.isNaN(ot)) return;
             const bid =
@@ -224,6 +243,7 @@ class Game {
         });
 
         this._refreshContainerUI();
+        this._syncVitalsUI();
 
         // Hide loading screen
         setTimeout(() => {
@@ -403,6 +423,21 @@ class Game {
         this._syncInventoryUI();
     }
 
+    _syncVitalsUI() {
+        const p = this.player;
+        if (!p) return;
+        const hp = Math.round(p.health);
+        const hunger = Math.round(p.hunger);
+        if (this.healthTextEl) this.healthTextEl.textContent = String(hp);
+        if (this.hungerTextEl) this.hungerTextEl.textContent = String(hunger);
+        if (this.healthFillEl) {
+            this.healthFillEl.style.width = `${(hp / VITALITY.MAX_HEALTH) * 100}%`;
+        }
+        if (this.hungerFillEl) {
+            this.hungerFillEl.style.width = `${(hunger / VITALITY.MAX_HUNGER) * 100}%`;
+        }
+    }
+
     _syncInventoryUI() {
         if (!this.inventoryEl || !this.player) return;
         this.inventoryEl.replaceChildren();
@@ -419,11 +454,17 @@ class Game {
             const { objType, count, buildingId } = stack;
             const row = document.createElement('div');
             const canStash = stashMode && canStashInContainer(objType);
+            const canEat = !stashMode && isEdible(objType);
             row.className =
-                'inventory-row inventory-row--drop' + (canStash ? ' inventory-row--clickable' : '');
+                'inventory-row inventory-row--drop' +
+                (canStash || canEat ? ' inventory-row--clickable' : '');
             row.dataset.dropObj = String(objType);
             if (objType === Obj.KEY && buildingId != null) row.dataset.dropBuilding = String(buildingId);
-            if (canStash) {
+            if (canEat) {
+                row.dataset.eatObj = String(objType);
+                if (objType === Obj.KEY && buildingId != null) row.dataset.eatBuilding = String(buildingId);
+                row.title = 'Click to eat';
+            } else if (canStash) {
                 row.dataset.stashObj = String(objType);
                 if (objType === Obj.KEY && buildingId != null) row.dataset.stashBuilding = String(buildingId);
                 row.title = 'Click to store · or close panel to drop';
@@ -484,6 +525,7 @@ class Game {
         // Update UI
         const floorNames = { '-1': 'Underground', '0': 'Ground', '1': 'Floor 1', '2': 'Floor 2' };
         this.layerIndicator.textContent = `Floor: ${floorNames[this.player.z] || this.player.z}`;
+        this._syncVitalsUI();
 
         // Update hovered tile
         if (this._mouseScreenX !== null) {

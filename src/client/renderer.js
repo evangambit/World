@@ -15,6 +15,50 @@ import {
     formatWheatCropLabel,
     isClearableGrassTerrain,
 } from '../world/tiles.js';
+import { VITALITY } from '../domain/vitality.js';
+
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ x: number, y: number }} screen
+ * @param {import('../actors/npc.js').NPC} npc
+ */
+function drawNpcOverheadLabels(ctx, screen, npc) {
+    const name = npc.name;
+    const hp = Math.round(npc.health);
+    const hunger = Math.round(npc.hunger);
+    const vitals = `HP ${hp}  Hunger ${hunger}`;
+
+    const fontName = '9px "Press Start 2P", monospace';
+    const fontVitals = '7px "Press Start 2P", monospace';
+    const lineH = 11;
+
+    ctx.textAlign = 'center';
+    ctx.font = fontName;
+    const nameW = ctx.measureText(name).width;
+    ctx.font = fontVitals;
+    const vitalsW = ctx.measureText(vitals).width;
+    const boxW = Math.max(nameW, vitalsW) + 8;
+    const boxH = lineH * 2 + 6;
+    const bx = screen.x - boxW / 2;
+    const by = screen.y - 4;
+
+    ctx.fillStyle = 'rgba(10, 10, 18, 0.65)';
+    ctx.fillRect(bx, by, boxW, boxH);
+
+    ctx.fillStyle = '#e0d8c0';
+    ctx.font = fontName;
+    ctx.fillText(name, screen.x, by + 9);
+
+    if (hunger >= VITALITY.MAX_HUNGER) {
+        ctx.fillStyle = '#e87878';
+    } else if (hunger >= VITALITY.MAX_HUNGER * 0.7) {
+        ctx.fillStyle = '#e8c070';
+    } else {
+        ctx.fillStyle = '#a8c878';
+    }
+    ctx.font = fontVitals;
+    ctx.fillText(vitals, screen.x, by + 9 + lineH);
+}
 
 export class Renderer {
     /**
@@ -203,16 +247,9 @@ export class Renderer {
                         const screen = cam.worldToScreen(ent.x - 0.5, ent.y - 0.9);
                         ctx.drawImage(sprite, screen.x, screen.y, ts, ts * 1.0);
                     }
-                    // Draw name label for NPCs
                     if (ent.name && ent !== allEntities[0]) {
-                        const screen = cam.worldToScreen(ent.x, ent.y - 1.3);
-                        ctx.fillStyle = 'rgba(10,10,18,0.6)';
-                        ctx.font = '9px "Press Start 2P", monospace';
-                        const tw = ctx.measureText(ent.name).width;
-                        ctx.fillRect(screen.x - tw / 2 - 2, screen.y - 4, tw + 4, 12);
-                        ctx.fillStyle = '#e0d8c0';
-                        ctx.textAlign = 'center';
-                        ctx.fillText(ent.name, screen.x, screen.y + 5);
+                        const labelPos = cam.worldToScreen(ent.x, ent.y - 1.35);
+                        drawNpcOverheadLabels(ctx, labelPos, ent);
                     }
                     ctx.globalAlpha = savedAlpha;
                 }

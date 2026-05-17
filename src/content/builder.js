@@ -101,8 +101,8 @@ export class WorldBuilder {
                 let dx, dy;
                 if (doorSide === 'south') { dx = x + doorOffset; dy = y + h - 1; }
                 else if (doorSide === 'north') { dx = x + doorOffset; dy = y; }
-                else if (doorSide === 'west') { dx = x; dy = y + Math.floor(h / 2); }
-                else { dx = x + w - 1; dy = y + Math.floor(h / 2); }
+                else if (doorSide === 'west') { dx = x; dy = y + doorOffset; }
+                else { dx = x + w - 1; dy = y + doorOffset; }
                 /** Unit step from door tile toward building interior (for inside/outside lock rules) */
                 let insideDx = 0, insideDy = 0;
                 if (doorSide === 'south') { insideDx = 0; insideDy = -1; }
@@ -178,7 +178,7 @@ export class WorldBuilder {
     /** Pantry chest with steaks — updates an existing chest or places a new one. */
     _placeHouseChest(x, y, w, h, bid) {
         const z = 0;
-        const steaks = [{ objType: Obj.UNCOOKED_STEAK, count: 20 }];
+        const steaks = [{ objType: Obj.UNCOOKED_STEAK, count: 2 }];
 
         for (let ty = y + 1; ty <= y + h - 2; ty++) {
             for (let tx = x + 1; tx <= x + w - 2; tx++) {
@@ -359,11 +359,11 @@ export function buildVillage() {
     b.placeBuilding(18, 20, 7, 6, 1, 'wood', { doorSide: 'south', doorOffset: 3, withStove: true });
     // Sage — beside the northwest cottage cluster
     b.placeBuilding(13, 12, 7, 6, 1, 'wood', { doorSide: 'east', doorOffset: 2, withStove: true });
-    // Nyx — east of the shop
-    b.placeBuilding(44, 26, 7, 6, 1, 'wood', { doorSide: 'west', doorOffset: 3, withStove: true });
-
-    // Shop — (east of market)
+    // Shop — (east of market); place before Nyx so the shared row is laid out first
     b.placeBuilding(36, 26, 8, 6, 1, 'wood', { doorSide: 'west', doorOffset: 3 });
+
+    // Nyx — east of the shop (south door — west wall adjoins the shop's east wall)
+    b.placeBuilding(44, 26, 7, 6, 1, 'wood', { doorSide: 'south', doorOffset: 3, withStove: true });
     b.placeObject(38, 28, 0, Obj.CRATE);
     b.placeObject(39, 28, 0, Obj.CRATE);
     b.placeObject(40, 28, 0, Obj.BARREL);
@@ -424,7 +424,7 @@ export function buildVillage() {
 
     // 11) Tall grass patches
     b.fillRect(2, 30, 4, 3, 0, T.TALL_GRASS);
-    // Keep x≥51 so the east wall of Nyx's cottage (44,26) at x=50 stays intact
+    // Keep x≥51 so the east wall of Nyx's cottage (x=50) stays intact
     b.fillRect(51, 28, 4, 4, 0, T.TALL_GRASS);
 
     return world;

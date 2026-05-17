@@ -10,6 +10,7 @@ import {
 } from '../domain/entityActions.js';
 import { getObjectTagSpec } from './npcObjectTags.js';
 import { cookUncookedSteakInInventory } from '../domain/cooking.js';
+import { applyFood } from '../domain/vitality.js';
 import { runGoTo, runFind, runTimedAction } from './npcTaskPrimitives.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
@@ -386,9 +387,11 @@ function eatFromInventory(npc, objectTag, pick) {
         stack = stacks[0];
     }
 
+    const objType = stack.objType;
     stack.count -= 1;
     if (stack.count <= 0) {
         const idx = npc.inventory.indexOf(stack);
         if (idx >= 0) npc.inventory.splice(idx, 1);
     }
+    applyFood(npc, objType);
 }
