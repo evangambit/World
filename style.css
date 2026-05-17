@@ -185,13 +185,18 @@ html, body {
     color: #f8f0d8;
 }
 
-#layer-indicator {
+#layer-indicator,
+#fps-indicator {
     font-size: 0.55rem;
     color: #e0d8c0;
     background: rgba(10, 10, 18, 0.75);
     padding: 6px 12px;
     border-radius: 4px;
     border: 1px solid rgba(196, 162, 101, 0.3);
+}
+
+#fps-indicator {
+    color: #a8c878;
 }
 
 #vitals-panel {

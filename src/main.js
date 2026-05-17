@@ -46,7 +46,10 @@ class Game {
         /** @type {NPC[]} */
         this.npcs = [];
         this.lastTime = 0;
+        /** Smoothed frames per second (exponential moving average) */
+        this._fpsEma = 60;
         this.layerIndicator = document.getElementById('layer-indicator');
+        this.fpsIndicator = document.getElementById('fps-indicator');
         this.inventoryEl = document.getElementById('inventory-items');
         this.inventoryPanelEl = document.getElementById('inventory-panel');
         this.containerPanelEl = document.getElementById('container-panel');
@@ -485,6 +488,14 @@ class Game {
     _loop(timestamp) {
         const dt = Math.min((timestamp - this.lastTime) / 1000, 0.05); // cap at 50ms
         this.lastTime = timestamp;
+
+        if (dt > 0) {
+            const instantFps = 1 / dt;
+            this._fpsEma = this._fpsEma * 0.9 + instantFps * 0.1;
+        }
+        if (this.fpsIndicator) {
+            this.fpsIndicator.textContent = `${Math.round(this._fpsEma)} FPS`;
+        }
 
         // ── Update ──
         this.input.update();
