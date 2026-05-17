@@ -12,9 +12,9 @@ src/
     tileTypes.js          # Terrain/object enums and gameplay rules
     index.js              # Re-exports tileTypes (optional barrel)
     pathfinding.js        # A* on walkable tiles
-  simulation/             # Per-frame world tick (crops, player, NPCs)
+  simulation/             # Per-frame world tick (crops, NPCs)
     tickSimulation.js
-    playerSimulation.js
+    playerSimulation.js   # Headless player body (tests); game uses playerController
   domain/                 # Actor-agnostic game logic
     cooking.js            # Inventory transforms (steak, etc.)
     entityActions.js      # Shared “actor did X in the world” API
@@ -24,6 +24,7 @@ src/
     npcLocomotion.js      # Pathfinding + path follow
     npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans — not world rules)
+    npcBrain.js           # Injectable brain (task queue vs no-op)
     npcTasks.js
     npcTaskPrimitives.js
     npcPlanRunner.js
@@ -119,7 +120,7 @@ When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**
 
 ### Tests
 
-`scripts/planRunnerSmoke.mjs` exercises plan leaves against stub worlds. `scripts/npcVitalitySmoke.mjs` runs starvation/death via `npcSimulation.js`. `scripts/simulationSmoke.mjs` uses `tickSimulation()` with `runNpcBrain: false`. For new actions, add a smoke case that calls the same `entityActions` entry point the game uses.
+`scripts/planRunnerSmoke.mjs` exercises plan leaves against stub worlds. `scripts/npcVitalitySmoke.mjs` runs starvation/death via `npcSimulation.js`. `scripts/simulationSmoke.mjs` uses `tickSimulation()` with the default no-op `npcBrain`. For new actions, add a smoke case that calls the same `entityActions` entry point the game uses.
 
 ---
 

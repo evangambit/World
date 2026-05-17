@@ -5,6 +5,8 @@ import { Input } from './client/input.js';
 import { Camera } from './client/camera.js';
 import { Renderer } from './client/renderer.js';
 import { Entity } from './actors/entity.js';
+import { updatePlayerFromInput } from './client/playerController.js';
+import { tickNpcTaskBrain } from './npc/npcBrain.js';
 import { tickSimulation } from './simulation/tickSimulation.js';
 import { NPC, find } from './actors/npc.js';
 import { clearGrass } from './npc/npcTasks.js';
@@ -520,13 +522,14 @@ class Game {
         }
 
         if (!this.paused) {
+            updatePlayerFromInput(this.player, this.input, this.world, dt);
+
             ({ gameTime: this.gameTime } = tickSimulation({
                 world: this.world,
                 gameTime: this.gameTime,
                 dt,
-                player: this.player,
-                playerInput: this.input,
                 npcs: this.npcs,
+                npcBrain: tickNpcTaskBrain,
             }));
 
             this.camera.follow(this.player.x, this.player.y, dt);

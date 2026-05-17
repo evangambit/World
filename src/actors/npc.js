@@ -4,6 +4,7 @@
  */
 import { Entity } from './entity.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
+import { tickNpcTaskBrain } from '../npc/npcBrain.js';
 import { initNpcEntity, tickNpcSimulation } from './npcSimulation.js';
 import {
     NPCTaskRunner,
@@ -48,7 +49,6 @@ export class NPC extends Entity {
      */
     update(world, dt) {
         tickNpcSimulation(/** @type {NpcEntity} */ (this), world, dt);
-        if (this._dead) return;
-        this.tasks.update(world);
+        tickNpcTaskBrain(/** @type {NpcEntity} */ (this), world, dt);
     }
 }
