@@ -16,8 +16,7 @@ src/
     cooking.js            # Inventory transforms (steak, etc.)
     entityActions.js      # Shared “actor did X in the world” API
   actors/                 # Bodies in the world
-    entity.js             # Shared Entity base
-    player.js             # Player (input-driven)
+    entity.js             # Shared body (movement, inventory, vitality)
     npc.js                # NPC movement + task runner hookup
   npc/                    # NPC control (scheduling, plans — not world rules)
     npcTasks.js
@@ -30,6 +29,9 @@ src/
     builder.js
   client/                 # Browser presentation
     tileArt.js            # Tile/object sprite pre-rendering (canvas)
+    entitySprites.js      # Character pixel art (canvas)
+    entityAppearance.js   # Entity sprite cache + animation
+    playerController.js   # Keyboard → player entity
     input.js
     camera.js
     renderer.js
@@ -47,10 +49,10 @@ Imports use explicit paths (e.g. `../domain/entityActions.js`). Entry point: `in
 
 3. **Entity actions** (`src/domain/entityActions.js`) — **The contract for “something an actor can do.”** Each function takes an `Entity` (player or NPC), a `World3D`, and coordinates or item ids. Pick up, cook at stove, toggle door, drop, take/stash in containers. If player and NPC should behave the same in the world, the rule lives here (or in domain logic it calls).
 
-4. **Actors** (`src/actors/`) — Bodies in the world: position, layer, inventory, movement. `Entity` holds shared state; `Player` and `NPC` add control (input vs pathfinding/tasks). Actor methods should be thin wrappers over `entityActions` when they represent world interactions.
+4. **Actors** (`src/actors/`) — Bodies in the world: position, layer, inventory, movement. `Entity` holds shared state; `NPC` adds AI control. The human player is an `Entity` updated from `client/playerController.js`. Actor methods should be thin wrappers over `entityActions` when they represent world interactions.
 
 5. **Control / presentation** — How an actor *chooses* to invoke actions:
-   - **Player:** `src/main.js` + `src/client/` — clicks, keys, inventory/container panels, messages.
+   - **Player:** `src/main.js` + `src/client/playerController.js` — clicks, keys, inventory/container panels, messages.
    - **NPC:** `src/npc/` — queued tasks, async travel, declarative plans (`seq` / `sel`), object tags, binding queries.
 
 6. **Content** (`src/content/`) — Maps, buildings, spawns. Not gameplay rules.
@@ -121,7 +123,7 @@ When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**
 | Path | Role |
 |------|------|
 | `domain/entityActions.js` | Shared actor ↔ world interactions |
-| `actors/entity.js`, `actors/player.js`, `actors/npc.js` | Actor state and movement |
+| `actors/entity.js`, `actors/npc.js`, `client/playerController.js` | Actor state and movement |
 | `main.js` | Player input and UI |
 | `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
 | `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |

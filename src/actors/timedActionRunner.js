@@ -67,7 +67,6 @@ export class TimedActionRunner {
             startPy: Math.floor(this.entity.y),
         };
         this.entity.faceTile(tx, ty);
-        this.entity.beginWorking();
         return { ok: true, message: def.label };
     }
 
@@ -94,8 +93,6 @@ export class TimedActionRunner {
             this._finish(false, new ActionInterruptedError('Moved'));
             return;
         }
-
-        this.entity.tickWorkingAnimation(dt);
 
         const def = getTimedAction(this.active.id);
         if (!def) {
@@ -130,7 +127,6 @@ export class TimedActionRunner {
      * @param {Error} [err]
      */
     _finish(success, err) {
-        this.entity.endWorking();
         const wait = this._wait;
         this.active = null;
         this._wait = null;

@@ -4,7 +4,8 @@
 import { Input } from './client/input.js';
 import { Camera } from './client/camera.js';
 import { Renderer } from './client/renderer.js';
-import { Player } from './actors/player.js';
+import { updatePlayerFromInput } from './client/playerController.js';
+import { Entity } from './actors/entity.js';
 import { NPC, find } from './actors/npc.js';
 import { clearGrass } from './npc/npcTasks.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
@@ -20,17 +21,20 @@ import {
 } from './world/tiles.js';
 import {
     canOpenContainerAt,
+    cookAtStove,
     dropFromInventory,
+    pickUpAtTile,
     stashToContainer,
     takeFromContainer,
     toggleDoorLock,
 } from './domain/entityActions.js';
+import { inventoryHasUncookedSteak } from './domain/cooking.js';
 import {
     harvestWheatAtTile,
     plantWheatSeedAtTile,
     updateCrops,
 } from './domain/crops.js';
-import { isEdible, VITALITY } from './domain/vitality.js';
+import { consumeFoodFromInventory, isEdible, VITALITY } from './domain/vitality.js';
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
@@ -38,6 +42,7 @@ class Game {
         this.camera = new Camera();
         this.renderer = new Renderer(this.canvas, this.camera);
         this.world = null;
+        /** @type {Entity|null} */
         this.player = null;
         /** @type {NPC[]} */
         this.npcs = [];
@@ -75,7 +80,9 @@ class Game {
         this.world = buildVillage();
 
         // Spawn player in the market square area
-        this.player = new Player(28.5, 23.5, 0);
+        this.player = new Entity(28.5, 23.5, 0);
+        this.player.speed = 4;
+        this.player.appearance = ['#e8c090', '#5a3020', '#2a5a8a', '#3a3a4a'];
         this.camera.snapTo(this.player.x, this.player.y);
 
         // Spawn NPCs inside their homes (see VILLAGE_NPC_SPAWNS in builder.js)
@@ -172,10 +179,10 @@ class Game {
                     }
                 }
                 if (tile && isStoveObject(tile.obj)) {
-                    if (this.player.tryCookAtStove(this.world, tx, ty)) {
+                    if (cookAtStove(this.player, this.world, tx, ty)) {
                         this._showGameMessage('Cooked a steak.');
                         this._syncInventoryUI();
-                    } else {
+                    } else if (!inventoryHasUncookedSteak(this.player.inventory ?? [])) {
                         this._showGameMessage('You need uncooked steak in your pack.');
                     }
                     return;
@@ -185,7 +192,7 @@ class Game {
                     return;
                 }
             }
-            if (this.player.tryPickUp(this.world, tx, ty)) {
+            if (pickUpAtTile(this.player, this.world, tx, ty, this.player.z)) {
                 this._syncInventoryUI();
             }
         });
@@ -227,7 +234,7 @@ class Game {
                     row.dataset.eatBuilding !== undefined
                         ? parseInt(row.dataset.eatBuilding, 10)
                         : undefined;
-                if (this.player.tryEatFromInventory(ot, bid)) {
+                if (consumeFoodFromInventory(this.player, ot, bid)) {
                     this._syncInventoryUI();
                     this._syncVitalsUI();
                     this._showGameMessage('Ate food.');
@@ -506,7 +513,7 @@ class Game {
             this.gameTime += dt;
             updateCrops(this.world, this.gameTime);
 
-            this.player.update(this.input, this.world, dt);
+            updatePlayerFromInput(this.player, this.input, this.world, dt);
 
             for (const npc of this.npcs) {
                 npc.update(this.world, dt);
@@ -551,7 +558,14 @@ class Game {
         }
 
         // ── Render ──
-        this.renderer.render(this.world, this.player, this.npcs, this.hoverTile, this.hoverNpc);
+        this.renderer.render(
+            this.world,
+            this.player,
+            this.npcs,
+            this.hoverTile,
+            this.hoverNpc,
+            this.paused ? 0 : dt,
+        );
 
         this._drawActionProgress();
 

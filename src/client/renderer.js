@@ -15,6 +15,7 @@ import {
     isClearableGrassTerrain,
 } from '../world/tileTypes.js';
 import { VITALITY } from '../domain/vitality.js';
+import { getEntitySprite, tickEntityAppearance } from './entityAppearance.js';
 
 /**
  * @param {CanvasRenderingContext2D} ctx
@@ -107,15 +108,23 @@ export class Renderer {
     /**
      * Render the full frame.
      * @param {import('../world/world.js').World3D} world
-     * @param {import('../actors/player.js').Player} player
+     * @param {import('../actors/entity.js').Entity} player
      * @param {Array<import('../actors/npc.js').NPC>} npcs
      * @param {{x:number,y:number,z:number}|null} hoverTile
      * @param {import('../actors/npc.js').NPC|null} [hoverNpc]
+     * @param {number} [dt] - frame delta (entity walk/work animation)
      */
-    render(world, player, npcs, hoverTile = null, hoverNpc = null) {
+    render(world, player, npcs, hoverTile = null, hoverNpc = null, dt = 0) {
         const ctx = this.ctx;
         const cam = this.camera;
         const ts = this.tileSize;
+
+        if (dt > 0) {
+            tickEntityAppearance(player, dt);
+            for (const npc of npcs) {
+                tickEntityAppearance(npc, dt);
+            }
+        }
 
         // Clear to dark background
         ctx.fillStyle = '#0a0a12';
@@ -265,7 +274,7 @@ export class Renderer {
                     ctx.globalAlpha = 1.0;
                     const ent = d.entity;
                     const isDeadNpc = ent.name && ent !== allEntities[0] && !ent.isAlive;
-                    const sprite = ent.getSprite();
+                    const sprite = getEntitySprite(ent);
                     if (sprite) {
                         const screen = cam.worldToScreen(ent.x - 0.5, ent.y - 0.9);
                         if (isDeadNpc) ctx.globalAlpha = 0.35;

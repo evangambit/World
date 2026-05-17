@@ -41,8 +41,7 @@ export class NPC extends Entity {
         super(x, y, z);
         this.name = name;
         this.speed = 2.0;
-        const preset = NPC_PRESETS[presetIndex % NPC_PRESETS.length];
-        this.initSprites(...preset);
+        this.appearance = NPC_PRESETS[presetIndex % NPC_PRESETS.length];
         this.inventory = inventory.map((s) => ({ ...s }));
 
         /** @type {Array<{x:number,y:number,z:number}>|null} current path */
@@ -75,7 +74,6 @@ export class NPC extends Entity {
         this.health = 0;
 
         this.timedAction.cancel();
-        this.endWorking();
 
         if (this._trip) {
             this._trip.reject(new Error('dead'));
@@ -193,14 +191,12 @@ export class NPC extends Entity {
      */
     _tickMovement(dt) {
         if (this._state === 'idle') {
-            this.updateAnimation(dt, false);
             return;
         }
 
         if (!this.path || this.pathIndex >= this.path.length) {
             this._state = 'idle';
             this._finishTripIfAtGoal();
-            this.updateAnimation(dt, false);
             return;
         }
 
@@ -235,8 +231,6 @@ export class NPC extends Entity {
                 this.dir = ny > 0 ? DIR.DOWN : DIR.UP;
             }
         }
-
-        this.updateAnimation(dt, this._state === 'walking');
     }
 
     _finishTripIfAtGoal() {
