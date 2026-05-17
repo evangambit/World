@@ -120,9 +120,9 @@ When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**
 
 ### Tests
 
-Run tests: `npm test` (`test/*.test.mjs` via `node:test`).
+Run tests: `npm test` (colocated `src/**/*.test.mjs` via `node:test`).
 
-Legacy smokes in `scripts/`: `planRunnerSmoke.mjs`, `npcVitalitySmoke.mjs`, `simulationSmoke.mjs`. For new rules, prefer `test/` cases that call the same `domain/` entry points the game uses.
+Legacy smokes in `scripts/`: `planRunnerSmoke.mjs`, `npcVitalitySmoke.mjs`, `simulationSmoke.mjs`. For new rules, add `*.test.mjs` next to the module under test (e.g. `domain/crops.test.mjs`).
 
 ---
 
