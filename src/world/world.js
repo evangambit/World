@@ -2,7 +2,7 @@
  * World3D — sparse 3D tile grid indexed by (x, y, z).
  * Multiple z-layers can exist at the same (x, y) coordinate.
  */
-import { isTileWalkable, T } from './tiles.js';
+import { isTileWalkable, T } from './tileTypes.js';
 
 /** @typedef {{ terrain: number, obj: number, transition: {tx:number,ty:number,tz:number,type:string}|null, ceiling: boolean, buildingId: number|null, interior: boolean, contents?: {objType:number, count:number, buildingId?:number}[], doorLocked?: boolean, doorInsideDx?: number, doorInsideDy?: number, keyBuildingId?: number|null, cropStage?: number, cropPlantedAt?: number }} TileData */
 

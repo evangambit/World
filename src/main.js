@@ -4,8 +4,8 @@
 import { Input } from './client/input.js';
 import { Camera } from './client/camera.js';
 import { Renderer } from './client/renderer.js';
-import { updatePlayerFromInput } from './client/playerController.js';
 import { Entity } from './actors/entity.js';
+import { tickSimulation } from './simulation/tickSimulation.js';
 import { NPC, find } from './actors/npc.js';
 import { clearGrass } from './npc/npcTasks.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
@@ -18,7 +18,7 @@ import {
     isStoveObject,
     isWheatCropObject,
     isClearableGrassTerrain,
-} from './world/tiles.js';
+} from './world/tileTypes.js';
 import {
     canOpenContainerAt,
     cookAtStove,
@@ -32,7 +32,6 @@ import { inventoryHasUncookedSteak } from './domain/cooking.js';
 import {
     harvestWheatAtTile,
     plantWheatSeedAtTile,
-    updateCrops,
 } from './domain/crops.js';
 import { consumeFoodFromInventory, isEdible, VITALITY } from './domain/vitality.js';
 class Game {
@@ -510,14 +509,14 @@ class Game {
         }
 
         if (!this.paused) {
-            this.gameTime += dt;
-            updateCrops(this.world, this.gameTime);
-
-            updatePlayerFromInput(this.player, this.input, this.world, dt);
-
-            for (const npc of this.npcs) {
-                npc.update(this.world, dt);
-            }
+            ({ gameTime: this.gameTime } = tickSimulation({
+                world: this.world,
+                gameTime: this.gameTime,
+                dt,
+                player: this.player,
+                playerInput: this.input,
+                npcs: this.npcs,
+            }));
 
             this.camera.follow(this.player.x, this.player.y, dt);
 

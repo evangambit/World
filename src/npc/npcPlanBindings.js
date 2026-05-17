@@ -1,7 +1,7 @@
 /**
  * Resolve plan binding queries into tile refs for goto / take / stash steps.
  */
-import { Obj, isContainerObject } from '../world/tiles.js';
+import { Obj, isContainerObject } from '../world/tileTypes.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
 

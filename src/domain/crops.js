@@ -7,7 +7,7 @@ import {
     WHEAT_CROP_STAGES,
     canPlaceAmbientPlantOnTerrain,
     isWheatCropObject,
-} from '../world/tiles.js';
+} from '../world/tileTypes.js';
 
 /** Seconds per growth stage (four stages → mature at 3 × duration). */
 export const WHEAT_STAGE_SECONDS = 18;

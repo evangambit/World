@@ -10,8 +10,11 @@ src/
   world/                  # Simulation substrate (no actors)
     world.js              # Tile grid, walkability, transitions
     tileTypes.js          # Terrain/object enums and gameplay rules
-    tiles.js              # Re-exports tileTypes (compat)
+    index.js              # Re-exports tileTypes (optional barrel)
     pathfinding.js        # A* on walkable tiles
+  simulation/             # Per-frame world tick (crops, player, NPCs)
+    tickSimulation.js
+    playerSimulation.js
   domain/                 # Actor-agnostic game logic
     cooking.js            # Inventory transforms (steak, etc.)
     entityActions.js      # Shared “actor did X in the world” API
@@ -96,7 +99,7 @@ Do **not** put world-changing logic in `main.js` or `npcPlanRunner.js` except to
 
 ### Adding a new capability (checklist)
 
-1. Add or extend types/rules in `world/tiles.js` / `world/world.js` if the world model changes.
+1. Add or extend types/rules in `world/tileTypes.js` / `world/world.js` if the world model changes.
 2. Add pure logic in a domain module if it is inventory-only and actor-agnostic.
 3. Add **`entityActions.yourAction(entity, world, …)`** with all placement, adjacency, and permission checks.
 4. **Player:** hook input in `main.js` → call the action → refresh UI.
@@ -116,7 +119,7 @@ When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**
 
 ### Tests
 
-`scripts/planRunnerSmoke.mjs` exercises plan leaves against stub worlds. `scripts/npcVitalitySmoke.mjs` runs starvation/death via `npcSimulation.js` (no task runner). For new actions, add a smoke case that calls the same `entityActions` entry point the game uses.
+`scripts/planRunnerSmoke.mjs` exercises plan leaves against stub worlds. `scripts/npcVitalitySmoke.mjs` runs starvation/death via `npcSimulation.js`. `scripts/simulationSmoke.mjs` uses `tickSimulation()` with `runNpcBrain: false`. For new actions, add a smoke case that calls the same `entityActions` entry point the game uses.
 
 ---
 

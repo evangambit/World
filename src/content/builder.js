@@ -2,7 +2,7 @@
  * WorldBuilder — high-level helpers for constructing the world,
  * plus the village map definition.
  */
-import { T, Obj, canPlaceAmbientPlantOnTerrain } from '../world/tiles.js';
+import { T, Obj, canPlaceAmbientPlantOnTerrain } from '../world/tileTypes.js';
 import { World3D } from '../world/world.js';
 
 export class WorldBuilder {

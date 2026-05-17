@@ -9,7 +9,7 @@ import {
     toggleDoorLock,
 } from '../domain/entityActions.js';
 import { findPath } from '../world/pathfinding.js';
-import { isPickableObject, Obj, OBJ_NAMES } from '../world/tiles.js';
+import { isPickableObject, Obj, OBJ_NAMES } from '../world/tileTypes.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 

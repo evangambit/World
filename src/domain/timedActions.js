@@ -3,7 +3,7 @@
  * Player and NPC runners call these; add new actions here.
  */
 import { isAdjacentToTile } from './entityActions.js';
-import { T, isClearableGrassTerrain } from '../world/tiles.js';
+import { T, isClearableGrassTerrain } from '../world/tileTypes.js';
 
 /** @typedef {import('../actors/entity.js').Entity} Entity */
 /** @typedef {import('../world/world.js').World3D} World3D */

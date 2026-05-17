@@ -12,7 +12,7 @@ import {
     isStoveObject,
     isTerrainDropSurface,
     isTileWalkable,
-} from '../world/tiles.js';
+} from '../world/tileTypes.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 /** @typedef {{ objType: number, count: number, buildingId?: number }} ItemStack */
