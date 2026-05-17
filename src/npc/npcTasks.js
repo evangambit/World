@@ -67,7 +67,9 @@ export function clearGrass(x, y, z) {
  * @param {Error} err
  */
 async function handleTaskFailure(npc, task, err) {
+    if (!npc.isAlive) return;
     if (err?.name === 'ActionInterruptedError') return;
+    if (err?.message === 'dead') return;
     console.log(`[NPC ${npc.name}] task failed`, task, err?.message ?? err);
 }
 
@@ -77,7 +79,9 @@ async function handleTaskFailure(npc, task, err) {
  * @param {Error} err
  */
 async function handlePlanFailure(npc, doc, err) {
+    if (!npc.isAlive) return;
     if (err?.name === 'ActionInterruptedError') return;
+    if (err?.message === 'dead') return;
     console.log(`[NPC ${npc.name}] plan failed`, doc.goal, err?.message ?? err);
 }
 
@@ -142,8 +146,13 @@ export class NPCTaskRunner {
         this._queue.push({ kind: 'plan', doc });
     }
 
+    clear() {
+        this._queue = [];
+    }
+
     /** @param {import('../world/world.js').World3D} world */
     update(world) {
+        if (!this.npc.isAlive) return;
         if (this._running) return;
         if (this._queue.length === 0) {
             this._enqueueWander(world);
@@ -173,6 +182,7 @@ export class NPCTaskRunner {
      */
     _enqueueWander(world) {
         const npc = this.npc;
+        if (!npc.isAlive) return;
         const radius = npc.wanderRadius ?? 10;
         for (let attempt = 0; attempt < 10; attempt++) {
             const gx = npc.homeX + Math.floor(Math.random() * radius * 2 - radius);

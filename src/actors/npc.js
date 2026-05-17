@@ -61,6 +61,31 @@ export class NPC extends Entity {
         this._trip = null;
 
         this.tasks = new NPCTaskRunner(this);
+        this._dead = false;
+    }
+
+    get isAlive() {
+        return !this._dead;
+    }
+
+    /** Stop AI, movement, and tasks when health reaches zero. */
+    _die() {
+        if (this._dead) return;
+        this._dead = true;
+        this.health = 0;
+
+        this.timedAction.cancel();
+        this.endWorking();
+
+        if (this._trip) {
+            this._trip.reject(new Error('dead'));
+            this._trip = null;
+        }
+        this.path = null;
+        this.pathIndex = 0;
+        this._state = 'idle';
+
+        this.tasks.clear();
     }
 
     /**
@@ -98,6 +123,9 @@ export class NPC extends Entity {
      * @returns {Promise<void>}
      */
     travelToTile(tx, ty, tz, world) {
+        if (!this.isAlive) {
+            return Promise.reject(new Error('dead'));
+        }
         if (this.timedAction.isBusy()) {
             this.timedAction.cancel();
         }
@@ -142,7 +170,14 @@ export class NPC extends Entity {
      * @param {number} dt
      */
     update(world, dt) {
+        if (this._dead) return;
+
         tickVitality(this, dt);
+
+        if (this.health <= 0) {
+            this._die();
+            return;
+        }
 
         if (this.timedAction.isBusy()) {
             this.timedAction.tick(dt, world);

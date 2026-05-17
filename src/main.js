@@ -321,7 +321,7 @@ class Game {
         let best = null;
         let bestD = Infinity;
         for (const npc of this.npcs) {
-            if (npc.z !== z) continue;
+            if (!npc.isAlive || npc.z !== z) continue;
             const dist = Math.hypot(npc.x - wx, npc.y - wy);
             if (dist > 0.65 || dist >= bestD) continue;
             best = npc;

@@ -23,16 +23,39 @@ import { VITALITY } from '../domain/vitality.js';
  * @param {import('../actors/npc.js').NPC} npc
  */
 function drawNpcOverheadLabels(ctx, screen, npc) {
+    const fontName = '9px "Press Start 2P", monospace';
+    const fontVitals = '7px "Press Start 2P", monospace';
+    const lineH = 11;
     const name = npc.name;
+
+    ctx.textAlign = 'center';
+
+    if (!npc.isAlive) {
+        const status = 'DEAD';
+        ctx.font = fontName;
+        const nameW = ctx.measureText(name).width;
+        ctx.font = fontVitals;
+        const statusW = ctx.measureText(status).width;
+        const boxW = Math.max(nameW, statusW) + 8;
+        const boxH = lineH * 2 + 6;
+        const bx = screen.x - boxW / 2;
+        const by = screen.y - 4;
+
+        ctx.fillStyle = 'rgba(10, 10, 18, 0.7)';
+        ctx.fillRect(bx, by, boxW, boxH);
+        ctx.fillStyle = '#8a8070';
+        ctx.font = fontName;
+        ctx.fillText(name, screen.x, by + 9);
+        ctx.fillStyle = '#c44a4a';
+        ctx.font = fontVitals;
+        ctx.fillText(status, screen.x, by + 9 + lineH);
+        return;
+    }
+
     const hp = Math.round(npc.health);
     const hunger = Math.round(npc.hunger);
     const vitals = `HP ${hp}  Hunger ${hunger}`;
 
-    const fontName = '9px "Press Start 2P", monospace';
-    const fontVitals = '7px "Press Start 2P", monospace';
-    const lineH = 11;
-
-    ctx.textAlign = 'center';
     ctx.font = fontName;
     const nameW = ctx.measureText(name).width;
     ctx.font = fontVitals;
@@ -242,10 +265,13 @@ export class Renderer {
                     const savedAlpha = ctx.globalAlpha;
                     ctx.globalAlpha = 1.0;
                     const ent = d.entity;
+                    const isDeadNpc = ent.name && ent !== allEntities[0] && !ent.isAlive;
                     const sprite = ent.getSprite();
                     if (sprite) {
                         const screen = cam.worldToScreen(ent.x - 0.5, ent.y - 0.9);
+                        if (isDeadNpc) ctx.globalAlpha = 0.35;
                         ctx.drawImage(sprite, screen.x, screen.y, ts, ts * 1.0);
+                        if (isDeadNpc) ctx.globalAlpha = savedAlpha;
                     }
                     if (ent.name && ent !== allEntities[0]) {
                         const labelPos = cam.worldToScreen(ent.x, ent.y - 1.35);
@@ -298,6 +324,11 @@ export class Renderer {
         const lines = [];
         if (hoverNpc) {
             lines.push(hoverNpc.name);
+            if (!hoverNpc.isAlive) {
+                lines.push('Dead');
+            } else {
+                lines.push(`HP ${Math.round(hoverNpc.health)} · Hunger ${Math.round(hoverNpc.hunger)}`);
+            }
             lines.push('Inventory:');
             const items = hoverNpc.inventory ?? [];
             if (items.length === 0) {
