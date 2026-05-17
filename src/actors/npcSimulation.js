@@ -1,0 +1,135 @@
+/**
+ * NPC body simulation — vitality, eating, movement, death.
+ * No task queue or plans; safe to import from headless tests.
+ */
+import { tickVitality, tryEatFromInventoryIfHungry } from '../domain/vitality.js';
+import {
+    clearNpcLocomotion,
+    initNpcLocomotion,
+    setNpcGoal,
+    tickNpcLocomotion,
+    travelNpcToTile,
+} from './npcLocomotion.js';
+import { Entity } from './entity.js';
+
+/** NPC appearance presets (skin, hair, shirt, pants). */
+export const NPC_PRESETS = [
+    ['#e8c090', '#8B4513', '#8B2252', '#4a4a3a'],
+    ['#d4a070', '#2a2a2a', '#2a6e2a', '#5a4a3a'],
+    ['#e8c090', '#c4a265', '#6a4a8a', '#3a3a5a'],
+    ['#c49060', '#1a1a1a', '#8a6a2a', '#4a3a2a'],
+    ['#e8c090', '#aa4444', '#3a5a7a', '#3a3a4a'],
+    ['#d4a070', '#e0c080', '#7a2a2a', '#4a4a4a'],
+    ['#e8c090', '#5a3a2a', '#5a7a5a', '#4a4a3a'],
+    ['#c49060', '#3a3a3a', '#aa8a40', '#3a3020'],
+];
+
+/** @typedef {import('./entity.js').Entity} Entity */
+/** @typedef {import('./npcLocomotion.js').NpcLocomotionState} NpcLocomotionState */
+/** @typedef {import('../world/world.js').World3D} World3D */
+
+/**
+ * Entity with NPC village fields (no brain).
+ * @typedef {Entity & NpcLocomotionState & {
+ *   name: string,
+ *   homeX: number,
+ *   homeY: number,
+ *   homeZ: number,
+ *   wanderRadius: number,
+ *   isAlive: boolean,
+ *   setGoal: (gx: number, gy: number, gz: number, world: World3D) => boolean,
+ *   travelToTile: (tx: number, ty: number, tz: number, world: World3D) => Promise<void>,
+ * }} NpcEntity
+ */
+
+/**
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ * @param {object} [opts]
+ * @param {number} [opts.presetIndex]
+ * @param {string} [opts.name]
+ * @param {{ objType: number, count: number, buildingId?: number }[]} [opts.inventory]
+ * @returns {NpcEntity}
+ */
+export function createNpcEntity(x, y, z, opts = {}) {
+    const entity = new Entity(x, y, z);
+    initNpcEntity(entity, opts);
+    return /** @type {NpcEntity} */ (entity);
+}
+
+/**
+ * @param {Entity} entity
+ * @param {object} [opts]
+ * @param {number} [opts.presetIndex]
+ * @param {string} [opts.name]
+ * @param {{ objType: number, count: number, buildingId?: number }[]} [opts.inventory]
+ */
+export function initNpcEntity(entity, opts = {}) {
+    const {
+        presetIndex = 0,
+        name = 'Villager',
+        inventory = [],
+    } = opts;
+
+    entity.speed = 2.0;
+    entity.name = name;
+    entity.appearance = NPC_PRESETS[presetIndex % NPC_PRESETS.length];
+    entity.inventory = inventory.map((s) => ({ ...s }));
+    entity._dead = false;
+    entity.homeX = Math.floor(entity.x);
+    entity.homeY = Math.floor(entity.y);
+    entity.homeZ = entity.z;
+    entity.wanderRadius = 10;
+
+    initNpcLocomotion(/** @type {Entity & NpcLocomotionState} */ (entity));
+
+    const loco = /** @type {NpcEntity} */ (entity);
+    loco.setGoal = (gx, gy, gz, world) => setNpcGoal(loco, gx, gy, gz, world);
+    loco.travelToTile = (tx, ty, tz, world) => travelNpcToTile(loco, tx, ty, tz, world);
+
+    Object.defineProperty(entity, 'isAlive', {
+        get() {
+            return !this._dead;
+        },
+        configurable: true,
+    });
+}
+
+/**
+ * @param {NpcEntity} entity
+ */
+export function markNpcDead(entity) {
+    if (entity._dead) return;
+    entity._dead = true;
+    entity.health = 0;
+    entity.timedAction.cancel();
+    clearNpcLocomotion(entity);
+    if (entity.tasks?.clear) {
+        entity.tasks.clear();
+    }
+}
+
+/**
+ * Vitality, timed actions, path following, and auto-eat — no task/plan AI.
+ * @param {NpcEntity} entity
+ * @param {World3D} world
+ * @param {number} dt
+ */
+export function tickNpcSimulation(entity, world, dt) {
+    if (entity._dead) return;
+
+    tickVitality(entity, dt);
+
+    if (entity.health <= 0) {
+        markNpcDead(entity);
+        return;
+    }
+
+    if (entity.timedAction.isBusy()) {
+        entity.timedAction.tick(dt, world);
+    } else {
+        tickNpcLocomotion(entity, dt);
+        tryEatFromInventoryIfHungry(entity, 55);
+    }
+}

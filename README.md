@@ -120,7 +120,9 @@ When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**
 
 ### Tests
 
-`scripts/planRunnerSmoke.mjs` exercises plan leaves against stub worlds. `scripts/npcVitalitySmoke.mjs` runs starvation/death via `npcSimulation.js`. `scripts/simulationSmoke.mjs` uses `tickSimulation()` with the default no-op `npcBrain`. For new actions, add a smoke case that calls the same `entityActions` entry point the game uses.
+Run tests: `npm test` (`test/*.test.mjs` via `node:test`).
+
+Legacy smokes in `scripts/`: `planRunnerSmoke.mjs`, `npcVitalitySmoke.mjs`, `simulationSmoke.mjs`. For new rules, prefer `test/` cases that call the same `domain/` entry points the game uses.
 
 ---
 
