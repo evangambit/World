@@ -13,6 +13,7 @@ import {
     isWheatCropObject,
     formatItemStackLabel,
     formatWheatCropLabel,
+    isClearableGrassTerrain,
 } from '../world/tiles.js';
 
 export class Renderer {
@@ -279,6 +280,9 @@ export class Renderer {
                     }
                     lines.push(tile.doorLocked ? 'Door: locked' : 'Door: unlocked');
                     lines.push('E: toggle (inside, or key outside)');
+                }
+                if (!tile.obj && isClearableGrassTerrain(tile.terrain)) {
+                    lines.push('Click to clear grass (5s)');
                 }
                 if (tile.obj) {
                     let objLine;

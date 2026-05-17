@@ -4,9 +4,15 @@
 import { Entity, DIR } from './entity.js';
 import { findPath } from '../world/pathfinding.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
-import { NPCTaskRunner } from '../npc/npcTasks.js';
+import {
+    NPCTaskRunner,
+    goTo,
+    find,
+    clearGrass,
+    timedAction,
+} from '../npc/npcTasks.js';
 
-export { goTo, find } from '../npc/npcTasks.js';
+export { goTo, find, clearGrass, timedAction };
 export { EAT_FOOD_PLAN } from '../npc/npcPlanTemplates.js';
 
 // NPC appearance presets (skin, hair, shirt, pants)
@@ -91,6 +97,9 @@ export class NPC extends Entity {
      * @returns {Promise<void>}
      */
     travelToTile(tx, ty, tz, world) {
+        if (this.timedAction.isBusy()) {
+            this.timedAction.cancel();
+        }
         if (this._trip) {
             this._trip.reject(new Error('travel superseded'));
             this._trip = null;
@@ -132,7 +141,11 @@ export class NPC extends Entity {
      * @param {number} dt
      */
     update(world, dt) {
-        this._tickMovement(dt);
+        if (this.timedAction.isBusy()) {
+            this.timedAction.tick(dt, world);
+        } else {
+            this._tickMovement(dt);
+        }
         this.tasks.update(world);
     }
 

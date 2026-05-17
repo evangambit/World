@@ -6,6 +6,7 @@ import { Camera } from './client/camera.js';
 import { Renderer } from './client/renderer.js';
 import { Player } from './actors/player.js';
 import { NPC, find } from './actors/npc.js';
+import { clearGrass } from './npc/npcTasks.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
 import {
     Obj,
@@ -15,6 +16,7 @@ import {
     formatItemStackLabel,
     isStoveObject,
     isWheatCropObject,
+    isClearableGrassTerrain,
 } from './world/tiles.js';
 import {
     canOpenContainerAt,
@@ -83,9 +85,17 @@ class Game {
             this.npcs.push(npc);
         }
 
+        // Finn clears a grass patch outside his house, then resumes wandering
+        const finn = this.npcs.find((n) => n.name === 'Finn');
+        if (finn) finn.tasks.enqueue(clearGrass(13, 32, 0));
+
         // Handle resize
         this._resize();
         window.addEventListener('resize', () => this._resize());
+
+        this.canvas.addEventListener('mousedown', () => {
+            this.canvas.focus({ preventScroll: true });
+        });
 
         // Mouse tracking
         this.canvas.addEventListener('mousemove', (e) => {
@@ -108,8 +118,28 @@ class Game {
             const worldPos = this.camera.screenToWorld(sx, sy);
             const tx = Math.floor(worldPos.x);
             const ty = Math.floor(worldPos.y);
+            this._interruptPlayerWork();
+
             if (this.player.isAdjacentToTile(tx, ty)) {
                 const tile = this.world.getTile(tx, ty, this.player.z);
+                if (
+                    tile &&
+                    !tile.obj &&
+                    isClearableGrassTerrain(tile.terrain)
+                ) {
+                    const result = this.player.timedAction.start(
+                        'clear_grass',
+                        this.world,
+                        tx,
+                        ty,
+                    );
+                    if (result.ok) {
+                        this._showGameMessage(result.message);
+                    } else if (result.message) {
+                        this._showGameMessage(result.message);
+                    }
+                    return;
+                }
                 if (tile && isWheatCropObject(tile.obj)) {
                     const result = harvestWheatAtTile(
                         this.player,
@@ -156,6 +186,8 @@ class Game {
         });
 
         this.containerItemsEl?.addEventListener('click', (e) => {
+            if (this.paused) return;
+            this._interruptPlayerWork();
             const row = e.target.closest('[data-take-obj]');
             if (!row || !this.openContainer) return;
             const ot = parseInt(row.dataset.takeObj, 10);
@@ -166,6 +198,7 @@ class Game {
 
         this.inventoryEl?.addEventListener('click', (e) => {
             if (this.paused) return;
+            this._interruptPlayerWork();
             const row = e.target.closest('.inventory-row');
             if (!row || !this.player) return;
 
@@ -197,6 +230,8 @@ class Game {
             document.getElementById('loading-screen').classList.add('hidden');
         }, 400);
 
+        this.canvas.focus({ preventScroll: true });
+
         // Start game loop
         this.lastTime = performance.now();
         requestAnimationFrame((t) => this._loop(t));
@@ -214,6 +249,51 @@ class Game {
     _showGameMessage(text) {
         this._msgText = text;
         this._msgTTL = 2.8;
+    }
+
+    /** @returns {boolean} whether a timed action was cancelled */
+    _interruptPlayerWork() {
+        if (!this.player?.timedAction.isBusy()) return false;
+        this.player.timedAction.cancel();
+        return true;
+    }
+
+    _drawActionProgress() {
+        const runner = this.player?.timedAction;
+        if (!runner?.isBusy()) return;
+
+        const ctx = this.canvas.getContext('2d');
+        const label = runner.getLabel();
+        const progress = runner.getProgress();
+        const barW = Math.min(220, this.canvas.width - 48);
+        const barH = 10;
+        const bx = (this.canvas.width - barW) / 2;
+        const by = this.canvas.height - 108;
+
+        ctx.save();
+        ctx.font = '9px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(10, 10, 18, 0.8)';
+        ctx.beginPath();
+        ctx.roundRect(bx - 8, by - 22, barW + 16, 40, 4);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(196, 162, 101, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#c4a265';
+        ctx.fillText(label, this.canvas.width / 2, by - 8);
+
+        ctx.fillStyle = 'rgba(40, 36, 28, 0.9)';
+        ctx.fillRect(bx, by, barW, barH);
+        ctx.fillStyle = '#6a9a40';
+        ctx.fillRect(bx, by, barW * progress, barH);
+        ctx.strokeStyle = 'rgba(224, 216, 192, 0.35)';
+        ctx.strokeRect(bx, by, barW, barH);
+
+        ctx.fillStyle = 'rgba(224, 216, 192, 0.55)';
+        ctx.fillText('Move or click elsewhere to stop', this.canvas.width / 2, by + barH + 14);
+        ctx.restore();
     }
 
     /** @returns {import('./actors/npc.js').NPC|null} */
@@ -365,13 +445,20 @@ class Game {
         if (this.input.isPressed('escape')) {
             if (this.openContainer) {
                 this._closeContainer();
+            } else if (this.player?.timedAction.isBusy()) {
+                this.player.timedAction.cancel();
+                this._showGameMessage('Cancelled');
             } else {
                 this.paused = !this.paused;
             }
         }
 
         if (!this.paused && this.input.isPressed('e') && !this.openContainer) {
-            this._tryDoorInteract();
+            if (this.player.timedAction.isBusy()) {
+                this._interruptPlayerWork();
+            } else {
+                this._tryDoorInteract();
+            }
         }
 
         if (!this.paused) {
@@ -423,6 +510,8 @@ class Game {
 
         // ── Render ──
         this.renderer.render(this.world, this.player, this.npcs, this.hoverTile, this.hoverNpc);
+
+        this._drawActionProgress();
 
         if (this._msgTTL > 0) {
             this._msgTTL -= Math.min(dt, 0.05);

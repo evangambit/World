@@ -3,14 +3,15 @@
  */
 import { resolvePlanBindings } from './npcPlanBindings.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
-import { runFind, runGoTo } from './npcTaskPrimitives.js';
+import { runFind, runGoTo, runTimedAction } from './npcTaskPrimitives.js';
 import { findPath } from '../world/pathfinding.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 
 /** @typedef {{ type: 'goTo', x: number, y: number, z: number }} GoToTask */
 /** @typedef {{ type: 'find', objType: number, radius: number, buildingId?: number }} FindTask */
-/** @typedef {GoToTask | FindTask} NpcTask */
+/** @typedef {{ type: 'action', action: string, x: number, y: number, z: number }} ActionTask */
+/** @typedef {GoToTask | FindTask | ActionTask} NpcTask */
 
 /**
  * @typedef {Object} PlanDocument
@@ -44,11 +45,29 @@ export function find(objType, radius, opts) {
 }
 
 /**
+ * Timed world action at a tile (NPC walks adjacent first).
+ * @param {string} actionId - e.g. `clear_grass`
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ * @returns {ActionTask}
+ */
+export function timedAction(actionId, x, y, z) {
+    return { type: 'action', action: actionId, x, y, z };
+}
+
+/** @returns {ActionTask} */
+export function clearGrass(x, y, z) {
+    return timedAction('clear_grass', x, y, z);
+}
+
+/**
  * @param {import('../actors/npc.js').NPC} npc
  * @param {NpcTask} task
  * @param {Error} err
  */
 async function handleTaskFailure(npc, task, err) {
+    if (err?.name === 'ActionInterruptedError') return;
     console.log(`[NPC ${npc.name}] task failed`, task, err?.message ?? err);
 }
 
@@ -58,6 +77,7 @@ async function handleTaskFailure(npc, task, err) {
  * @param {Error} err
  */
 async function handlePlanFailure(npc, doc, err) {
+    if (err?.name === 'ActionInterruptedError') return;
     console.log(`[NPC ${npc.name}] plan failed`, doc.goal, err?.message ?? err);
 }
 
@@ -73,6 +93,10 @@ async function executeTask(npc, world, task) {
     }
     if (task.type === 'find') {
         await runFind(npc, world, task.objType, task.radius, task.buildingId);
+        return;
+    }
+    if (task.type === 'action') {
+        await runTimedAction(npc, world, task.action, task.x, task.y, task.z);
         return;
     }
     throw new Error(`Unknown task type: ${task.type}`);

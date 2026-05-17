@@ -1,3 +1,25 @@
+const MOVEMENT_KEYS = new Set([
+    'w', 'a', 's', 'd',
+    'arrowup', 'arrowdown', 'arrowleft', 'arrowright',
+]);
+
+/** @param {string} key - e.key */
+function normalizeKey(key) {
+    const k = key.toLowerCase();
+    switch (k) {
+        case 'up': return 'arrowup';
+        case 'down': return 'arrowdown';
+        case 'left': return 'arrowleft';
+        case 'right': return 'arrowright';
+        default: return k;
+    }
+}
+
+const GAME_KEYS = new Set([
+    ...MOVEMENT_KEYS,
+    'e', ' ', 'escape',
+]);
+
 /** Keyboard input manager — tracks key states per frame. */
 export class Input {
   constructor() {
@@ -11,26 +33,33 @@ export class Input {
       this._nextPressed = new Set();
       this._nextReleased = new Set();
 
-      window.addEventListener('keydown', (e) => {
+      const onKeyDown = (e) => {
+          const k = normalizeKey(e.key);
+          if (MOVEMENT_KEYS.has(k)) {
+              // Always track movement keys (repeat re-adds after blur cleared held)
+              this.held.add(k);
+              if (!e.repeat) this._nextPressed.add(k);
+              e.preventDefault();
+              return;
+          }
           if (e.repeat) return;
-          const k = e.key.toLowerCase();
           this.held.add(k);
           this._nextPressed.add(k);
-          // Prevent default for game keys
-          if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',
-               'e',' ','escape'].includes(k)) {
-              e.preventDefault();
-          }
-      });
+          if (GAME_KEYS.has(k)) e.preventDefault();
+      };
 
-      window.addEventListener('keyup', (e) => {
-          const k = e.key.toLowerCase();
+      const onKeyUp = (e) => {
+          const k = normalizeKey(e.key);
           this.held.delete(k);
           this._nextReleased.add(k);
-      });
+      };
 
-      // Clear held keys when window loses focus
-      window.addEventListener('blur', () => this.held.clear());
+      window.addEventListener('keydown', onKeyDown);
+      window.addEventListener('keyup', onKeyUp);
+      // Blur can fire on canvas click and drop held keys while WASD is still down
+      document.addEventListener('visibilitychange', () => {
+          if (document.hidden) this.held.clear();
+      });
   }
 
   /** Call at the start of each frame to refresh per-frame sets. */
@@ -62,4 +91,16 @@ export class Input {
       }
       return { dx, dy };
   }
+}
+
+/**
+ * @param {Input} input
+ * @returns {boolean}
+ */
+export function hasMovementInput(input) {
+    if (!input || typeof input.isHeld !== 'function') return false;
+    for (const k of MOVEMENT_KEYS) {
+        if (input.isHeld(k) || input.isPressed(k)) return true;
+    }
+    return false;
 }

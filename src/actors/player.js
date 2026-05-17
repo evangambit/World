@@ -3,6 +3,7 @@
  */
 import { inventoryHasUncookedSteak } from '../domain/cooking.js';
 import { cookAtStove, pickUpAtTile } from '../domain/entityActions.js';
+import { hasMovementInput } from '../client/input.js';
 import { Entity } from './entity.js';
 
 export class Player extends Entity {
@@ -48,11 +49,25 @@ export class Player extends Entity {
      * @param {number} dt
      */
     update(input, world, dt) {
+        if (this.timedAction.isBusy()) {
+            if (hasMovementInput(input)) {
+                const { dx, dy } = input.getMovement();
+                this.timedAction.cancel();
+                if (dx !== 0 || dy !== 0) {
+                    this.tryMove(dx, dy, world, dt);
+                }
+                this.updateAnimation(dt, true);
+                return;
+            }
+            this.timedAction.tick(dt, world);
+            return;
+        }
+
         const { dx, dy } = input.getMovement();
-        const moved = dx !== 0 || dy !== 0;
-        if (moved) {
+        const wantsMove = dx !== 0 || dy !== 0;
+        if (wantsMove) {
             this.tryMove(dx, dy, world, dt);
         }
-        this.updateAnimation(dt, moved);
+        this.updateAnimation(dt, wantsMove);
     }
 }

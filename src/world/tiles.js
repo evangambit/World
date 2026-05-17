@@ -130,6 +130,11 @@ export function canPlaceAmbientPlantOnTerrain(terrain) {
     return AMBIENT_PLANT_TERRAIN.has(terrain);
 }
 
+/** Grass / tall grass that can be cleared to dirt with a timed action. */
+export function isClearableGrassTerrain(terrain) {
+    return terrain === T.GRASS || terrain === T.TALL_GRASS;
+}
+
 // ── Color palette ──
 const C = {
     grassA: '#4a8c2a', grassB: '#3d7a22', grassC: '#5a9c35',

@@ -10,7 +10,7 @@ import {
 } from '../domain/entityActions.js';
 import { getObjectTagSpec } from './npcObjectTags.js';
 import { cookUncookedSteakInInventory } from '../domain/cooking.js';
-import { runGoTo, runFind } from './npcTaskPrimitives.js';
+import { runGoTo, runFind, runTimedAction } from './npcTaskPrimitives.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
 
@@ -32,11 +32,12 @@ import { runGoTo, runFind } from './npcTaskPrimitives.js';
  * @property {string} [from]
  * @property {string} [to]
  * @property {number} [count]
+ * @property {string} [action]
  */
 
 /** @typedef {{ ok: true } | { ok: false, error: Error }} PlanResult */
 
-const LEAF_TYPES = new Set(['goto', 'find', 'eat', 'cook', 'door', 'drop', 'take', 'stash']);
+const LEAF_TYPES = new Set(['goto', 'find', 'eat', 'cook', 'door', 'drop', 'take', 'stash', 'action']);
 const COMPOSITE_TYPES = new Set(['seq', 'sel']);
 
 /**
@@ -92,6 +93,12 @@ export function validatePlan(plan, limits = {}) {
         if (node.type === 'stash') {
             if (!node.object) return 'stash requires object tag';
             if (!node.to) return 'stash requires to binding ref';
+        }
+        if (node.type === 'action') {
+            if (!node.action) return 'action requires action id';
+            if (node.ref == null && (node.x == null || node.y == null || node.z == null)) {
+                return 'action requires ref or x, y, z';
+            }
         }
         return null;
     }
@@ -204,6 +211,13 @@ async function executeLeaf(npc, world, step, bindings) {
 
     if (step.type === 'stash') {
         stashToContainerByTag(npc, world, step.object, step.to, bindings);
+        return;
+    }
+
+    if (step.type === 'action') {
+        const target = resolveGotoTarget(step, bindings);
+        if (!target) throw new Error(`action: unbound ref ${step.ref}`);
+        await runTimedAction(npc, world, step.action, target.x, target.y, target.z);
         return;
     }
 

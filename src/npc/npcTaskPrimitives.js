@@ -143,12 +143,33 @@ function findObjectTilesInRadius(world, origin, objType, radius, buildingId) {
 }
 
 /**
+ * @param {string} actionId
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {number} tx
+ * @param {number} ty
+ * @param {number} tz
+ */
+export async function runTimedAction(npc, world, actionId, tx, ty, tz) {
+    if (!npc.isAdjacentToTile(tx, ty) || npc.z !== tz) {
+        const approach = findApproachTile(world, npc, { x: tx, y: ty, z: tz });
+        if (!approach) throw new Error(`action: no approach tile for (${tx}, ${ty})`);
+        await npc.travelToTile(approach.x, approach.y, approach.z, world);
+    }
+
+    const start = npc.timedAction.start(actionId, world, tx, ty, tz);
+    if (!start.ok) throw new Error(start.message);
+
+    await npc.timedAction.waitForCompletion();
+}
+
+/**
  * @param {import('../world/world.js').World3D} world
  * @param {import('../actors/npc.js').NPC} npc
  * @param {TileCoord} target
  * @returns {TileCoord|null}
  */
-function findApproachTile(world, npc, target) {
+export function findApproachTile(world, npc, target) {
     const sx = Math.floor(npc.x);
     const sy = Math.floor(npc.y);
     const sz = npc.z;
