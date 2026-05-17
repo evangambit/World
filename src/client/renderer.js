@@ -2,7 +2,18 @@
  * Renderer — layer-aware tile + entity rendering pipeline.
  * Handles elevation shadows, roof occlusion, and Y-sorted entity drawing.
  */
-import { getTileCanvas, getObjCanvas, Obj, T, TERRAIN_NAMES, OBJ_NAMES, isContainerObject, formatItemStackLabel } from '../world/tiles.js';
+import {
+    getTileCanvas,
+    getObjCanvas,
+    Obj,
+    T,
+    TERRAIN_NAMES,
+    OBJ_NAMES,
+    isContainerObject,
+    isWheatCropObject,
+    formatItemStackLabel,
+    formatWheatCropLabel,
+} from '../world/tiles.js';
 
 export class Renderer {
     /**
@@ -152,7 +163,16 @@ export class Renderer {
                         continue;
                     }
 
-                    drawables.push({ type: 'obj', x: x, y: y + 0.5, z, objType: tile.obj, tileX: x, tileY: y });
+                    drawables.push({
+                        type: 'obj',
+                        x: x,
+                        y: y + 0.5,
+                        z,
+                        objType: tile.obj,
+                        objVariant: isWheatCropObject(tile.obj) ? (tile.cropStage ?? 0) : 0,
+                        tileX: x,
+                        tileY: y,
+                    });
                 }
             }
 
@@ -168,7 +188,7 @@ export class Renderer {
 
             for (const d of drawables) {
                 if (d.type === 'obj') {
-                    const objCanvas = getObjCanvas(d.objType);
+                    const objCanvas = getObjCanvas(d.objType, d.objVariant ?? 0);
                     if (objCanvas) {
                         const screen = cam.worldToScreen(d.tileX, d.tileY);
                         ctx.drawImage(objCanvas, Math.floor(screen.x), Math.floor(screen.y), ts, ts);
@@ -261,10 +281,20 @@ export class Renderer {
                     lines.push('E: toggle (inside, or key outside)');
                 }
                 if (tile.obj) {
-                    const objLine = tile.obj === Obj.KEY
-                        ? `Object: ${formatItemStackLabel(tile.obj, 1, tile.keyBuildingId)}`
-                        : `Object: ${OBJ_NAMES[tile.obj] || 'Unknown'}`;
+                    let objLine;
+                    if (tile.obj === Obj.KEY) {
+                        objLine = `Object: ${formatItemStackLabel(tile.obj, 1, tile.keyBuildingId)}`;
+                    } else if (isWheatCropObject(tile.obj)) {
+                        objLine = `Object: ${formatWheatCropLabel(tile.cropStage ?? 0)}`;
+                    } else {
+                        objLine = `Object: ${OBJ_NAMES[tile.obj] || 'Unknown'}`;
+                    }
                     lines.push(objLine);
+                    if (isWheatCropObject(tile.obj) && (tile.cropStage ?? 0) < 3) {
+                        lines.push('Click when mature to harvest');
+                    } else if (isWheatCropObject(tile.obj)) {
+                        lines.push('Click to harvest');
+                    }
                 }
                 if (isContainerObject(tile.obj)) {
                     const n = (tile.contents ?? []).reduce((s, e) => s + e.count, 0);

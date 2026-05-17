@@ -4,7 +4,7 @@
  */
 import { isTileWalkable, T } from './tiles.js';
 
-/** @typedef {{ terrain: number, obj: number, transition: {tx:number,ty:number,tz:number,type:string}|null, ceiling: boolean, buildingId: number|null, interior: boolean, contents?: {objType:number, count:number, buildingId?:number}[], doorLocked?: boolean, doorInsideDx?: number, doorInsideDy?: number, keyBuildingId?: number|null }} TileData */
+/** @typedef {{ terrain: number, obj: number, transition: {tx:number,ty:number,tz:number,type:string}|null, ceiling: boolean, buildingId: number|null, interior: boolean, contents?: {objType:number, count:number, buildingId?:number}[], doorLocked?: boolean, doorInsideDx?: number, doorInsideDy?: number, keyBuildingId?: number|null, cropStage?: number, cropPlantedAt?: number }} TileData */
 
 export class World3D {
     constructor() {

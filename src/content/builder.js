@@ -38,6 +38,22 @@ export class WorldBuilder {
     }
 
     /**
+     * Place wheat at a given growth stage (for map authoring).
+     * @param {number} stage 0–3
+     * @param {number} [cropPlantedAt] - game time offset so stage matches at t=0
+     */
+    placeWheatCrop(x, y, z, stage, cropPlantedAt = 0) {
+        const t = this.world.getTile(x, y, z);
+        if (!t || t.obj) return;
+        if (!canPlaceAmbientPlantOnTerrain(t.terrain)) return;
+        this.world.setTile(x, y, z, {
+            obj: Obj.WHEAT_CROP,
+            cropStage: stage,
+            cropPlantedAt,
+        });
+    }
+
+    /**
      * Place a container object with initial item stacks.
      * @param {{objType: number, count: number}[]} contents
      */
@@ -377,7 +393,19 @@ export function buildVillage() {
 
     // 9) Well in market square + public stash chest
     b.placeObject(28, 22, 0, Obj.WELL);
-    b.placeContainer(26, 23, 0, Obj.CHEST, [{ objType: Obj.FLOWER, count: 3 }]);
+    b.placeContainer(26, 23, 0, Obj.CHEST, [
+        { objType: Obj.FLOWER, count: 3 },
+        { objType: Obj.WHEAT_SEED, count: 8 },
+    ]);
+
+    // Wheat field south of the market (dirt patch)
+    b.fillRect(24, 30, 6, 4, 0, T.DIRT);
+    b.placeWheatCrop(24, 30, 0, 3, -3 * 18);
+    b.placeWheatCrop(25, 30, 0, 2, -2 * 18);
+    b.placeWheatCrop(26, 30, 0, 1, -1 * 18);
+    b.placeWheatCrop(27, 30, 0, 0, 0);
+    b.placeWheatCrop(28, 31, 0, 3, -3 * 18);
+    b.placeWheatCrop(29, 31, 0, 3, -3 * 18);
 
     // 10) Some bushes and flowers for ambiance
     const bushPositions = [

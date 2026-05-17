@@ -14,6 +14,7 @@ import {
     canStashInContainer,
     formatItemStackLabel,
     isStoveObject,
+    isWheatCropObject,
 } from './world/tiles.js';
 import {
     canOpenContainerAt,
@@ -22,7 +23,11 @@ import {
     takeFromContainer,
     toggleDoorLock,
 } from './domain/entityActions.js';
-
+import {
+    harvestWheatAtTile,
+    plantWheatSeedAtTile,
+    updateCrops,
+} from './domain/crops.js';
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
@@ -54,6 +59,8 @@ class Game {
         /** Transient UI message (e.g. door feedback) */
         this._msgText = '';
         this._msgTTL = 0;
+        /** Elapsed simulation seconds (crop growth, etc.) */
+        this.gameTime = 0;
     }
 
     init() {
@@ -103,6 +110,32 @@ class Game {
             const ty = Math.floor(worldPos.y);
             if (this.player.isAdjacentToTile(tx, ty)) {
                 const tile = this.world.getTile(tx, ty, this.player.z);
+                if (tile && isWheatCropObject(tile.obj)) {
+                    const result = harvestWheatAtTile(
+                        this.player,
+                        this.world,
+                        tx,
+                        ty,
+                        this.gameTime,
+                    );
+                    if (result.message) this._showGameMessage(result.message);
+                    if (result.ok) this._syncInventoryUI();
+                    return;
+                }
+                if (tile && !tile.obj) {
+                    const plant = plantWheatSeedAtTile(
+                        this.player,
+                        this.world,
+                        tx,
+                        ty,
+                        this.gameTime,
+                    );
+                    if (plant.ok) {
+                        this._showGameMessage(plant.message);
+                        this._syncInventoryUI();
+                        return;
+                    }
+                }
                 if (tile && isStoveObject(tile.obj)) {
                     if (this.player.tryCookAtStove(this.world, tx, ty)) {
                         this._showGameMessage('Cooked a steak.');
@@ -342,6 +375,9 @@ class Game {
         }
 
         if (!this.paused) {
+            this.gameTime += dt;
+            updateCrops(this.world, this.gameTime);
+
             this.player.update(this.input, this.world, dt);
 
             for (const npc of this.npcs) {

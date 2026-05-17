@@ -45,7 +45,14 @@ export const Obj = {
     STOVE: 15,
     UNCOOKED_STEAK: 16,
     STEAK: 17,
+    /** Growing wheat — use `cropStage` 0–3 on the tile */
+    WHEAT_CROP: 18,
+    WHEAT: 19,
+    WHEAT_SEED: 20,
 };
+
+/** Wheat growth stages (0 = sprout … 3 = mature). */
+export const WHEAT_CROP_STAGES = 4;
 
 /** Reverse-lookup name maps for UI display */
 const _buildNames = (obj) => { const m = {}; for (const [k, v] of Object.entries(obj)) m[v] = k.charAt(0) + k.slice(1).toLowerCase().replace('_', ' '); return m; };
@@ -55,6 +62,7 @@ export const OBJ_NAMES = _buildNames(Obj);
 /** Objects the player can pick up into inventory (world tile `obj` is cleared). */
 const PICKABLE_OBJ = new Set([
     Obj.FLOWER, Obj.BUSH, Obj.ROCK, Obj.BARREL, Obj.CRATE, Obj.KEY, Obj.UNCOOKED_STEAK,
+    Obj.WHEAT, Obj.WHEAT_SEED,
 ]);
 
 /** Furniture / storage that can hold `contents` stacks on the tile. */
@@ -70,6 +78,16 @@ export function isPickableObject(objType) {
 
 export function isStoveObject(objType) {
     return objType === Obj.STOVE;
+}
+
+export function isWheatCropObject(objType) {
+    return objType === Obj.WHEAT_CROP;
+}
+
+/** @param {number} cropStage */
+export function formatWheatCropLabel(cropStage) {
+    const names = ['Wheat sprout', 'Young wheat', 'Growing wheat', 'Mature wheat'];
+    return names[Math.min(cropStage, WHEAT_CROP_STAGES - 1)] ?? 'Wheat';
 }
 
 /** Items allowed inside a container (no nesting furniture). */
@@ -546,6 +564,75 @@ const objectRenderers = {
         ctx.fillStyle = '#4a3018';
         ctx.fillRect(4, 11, 8, 1);
     },
+    [Obj.WHEAT](ctx) {
+        ctx.fillStyle = '#c4a035';
+        ctx.fillRect(5, 4, 6, 10);
+        ctx.fillStyle = '#d8b848';
+        ctx.fillRect(6, 5, 4, 8);
+        ctx.fillStyle = '#8a7020';
+        ctx.fillRect(4, 12, 8, 2);
+        ctx.fillStyle = '#e8d060';
+        ctx.fillRect(6, 3, 1, 3);
+        ctx.fillRect(9, 3, 1, 3);
+        ctx.fillRect(7, 2, 2, 2);
+    },
+    [Obj.WHEAT_SEED](ctx) {
+        ctx.fillStyle = '#6a5028';
+        ctx.fillRect(4, 8, 8, 5);
+        ctx.fillStyle = '#8a6840';
+        for (let i = 0; i < 6; i++) {
+            px(ctx, 5 + (i % 3) * 2, 9 + Math.floor(i / 3) * 2, '#a07848');
+        }
+        ctx.fillStyle = '#4a3818';
+        ctx.fillRect(3, 12, 10, 2);
+    },
+};
+
+/** @param {CanvasRenderingContext2D} ctx @param {number} stage 0–3 */
+function drawWheatCropStage(ctx, stage) {
+    const stem = '#4a8a28';
+    const stemHi = '#5a9a35';
+    const head = '#c4a035';
+    const headHi = '#e0c050';
+    if (stage <= 0) {
+        px(ctx, 7, 12, stem);
+        px(ctx, 8, 11, stemHi);
+        px(ctx, 7, 11, stem);
+    } else if (stage === 1) {
+        ctx.fillStyle = stem;
+        ctx.fillRect(7, 8, 2, 6);
+        ctx.fillStyle = stemHi;
+        ctx.fillRect(7, 6, 2, 3);
+        px(ctx, 6, 9, stemHi);
+        px(ctx, 9, 10, stem);
+    } else if (stage === 2) {
+        ctx.fillStyle = stem;
+        ctx.fillRect(6, 4, 2, 10);
+        ctx.fillRect(9, 5, 2, 9);
+        ctx.fillStyle = stemHi;
+        ctx.fillRect(6, 3, 2, 3);
+        ctx.fillRect(9, 4, 2, 2);
+        ctx.fillStyle = '#6a9a40';
+        ctx.fillRect(5, 7, 1, 3);
+        ctx.fillRect(10, 8, 1, 2);
+    } else {
+        ctx.fillStyle = stem;
+        ctx.fillRect(5, 2, 2, 12);
+        ctx.fillRect(8, 3, 2, 11);
+        ctx.fillRect(11, 4, 2, 10);
+        ctx.fillStyle = head;
+        ctx.fillRect(4, 1, 4, 4);
+        ctx.fillRect(7, 0, 4, 5);
+        ctx.fillRect(10, 1, 4, 4);
+        ctx.fillStyle = headHi;
+        px(ctx, 5, 1, headHi);
+        px(ctx, 8, 0, headHi);
+        px(ctx, 11, 1, headHi);
+    }
+}
+
+objectRenderers[Obj.WHEAT_CROP] = (ctx, stage = 0) => {
+    drawWheatCropStage(ctx, stage);
 };
 
 // ── Tile cache: pre-rendered canvases ──
@@ -572,14 +659,16 @@ export function getTileCanvas(tileType, seed = 0) {
 /**
  * Get a pre-rendered 16×16 canvas for an object type.
  * @param {number} objType - Obj.* constant
+ * @param {number} [variant] - e.g. wheat crop stage 0–3
  * @returns {HTMLCanvasElement}
  */
-export function getObjCanvas(objType) {
-    if (objCache.has(objType)) return objCache.get(objType);
+export function getObjCanvas(objType, variant = 0) {
+    const key = isWheatCropObject(objType) ? `${objType}_${variant}` : String(objType);
+    if (objCache.has(key)) return objCache.get(key);
 
     const { canvas, ctx } = makeTile();
     const renderer = objectRenderers[objType];
-    if (renderer) renderer(ctx);
-    objCache.set(objType, canvas);
+    if (renderer) renderer(ctx, variant);
+    objCache.set(key, canvas);
     return canvas;
 }
