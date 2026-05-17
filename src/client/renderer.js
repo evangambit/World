@@ -2,9 +2,8 @@
  * Renderer — layer-aware tile + entity rendering pipeline.
  * Handles elevation shadows, roof occlusion, and Y-sorted entity drawing.
  */
+import { getTileCanvas, getObjCanvas } from './tileArt.js';
 import {
-    getTileCanvas,
-    getObjCanvas,
     Obj,
     T,
     TERRAIN_NAMES,
@@ -14,7 +13,7 @@ import {
     formatItemStackLabel,
     formatWheatCropLabel,
     isClearableGrassTerrain,
-} from '../world/tiles.js';
+} from '../world/tileTypes.js';
 import { VITALITY } from '../domain/vitality.js';
 
 /**

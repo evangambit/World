@@ -9,7 +9,8 @@ src/
   main.js                 # Entry: game loop, player UI wiring
   world/                  # Simulation substrate (no actors)
     world.js              # Tile grid, walkability, transitions
-    tiles.js              # Terrain/object types, rendering, rules
+    tileTypes.js          # Terrain/object enums and gameplay rules
+    tiles.js              # Re-exports tileTypes (compat)
     pathfinding.js        # A* on walkable tiles
   domain/                 # Actor-agnostic game logic
     cooking.js            # Inventory transforms (steak, etc.)
@@ -28,6 +29,7 @@ src/
   content/                # Maps and spawns (data, not rules)
     builder.js
   client/                 # Browser presentation
+    tileArt.js            # Tile/object sprite pre-rendering (canvas)
     input.js
     camera.js
     renderer.js
