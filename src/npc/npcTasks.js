@@ -62,7 +62,7 @@ export function clearGrass(x, y, z) {
 }
 
 /**
- * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../actors/npcSimulation.js').NpcEntity} npc
  * @param {NpcTask} task
  * @param {Error} err
  */
@@ -74,7 +74,7 @@ async function handleTaskFailure(npc, task, err) {
 }
 
 /**
- * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../actors/npcSimulation.js').NpcEntity} npc
  * @param {PlanDocument} doc
  * @param {Error} err
  */
@@ -86,7 +86,7 @@ async function handlePlanFailure(npc, doc, err) {
 }
 
 /**
- * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../actors/npcSimulation.js').NpcEntity} npc
  * @param {import('../world/world.js').World3D} world
  * @param {NpcTask} task
  */
@@ -107,7 +107,7 @@ async function executeTask(npc, world, task) {
 }
 
 /**
- * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../actors/npcSimulation.js').NpcEntity} npc
  * @param {import('../world/world.js').World3D} world
  * @param {PlanDocument} doc
  */
@@ -122,7 +122,7 @@ async function executePlan(npc, world, doc) {
 
 export class NPCTaskRunner {
     /**
-     * @param {import('../actors/npc.js').NPC} npc
+     * @param {import('../actors/npcSimulation.js').NpcEntity} npc
      */
     constructor(npc) {
         this.npc = npc;

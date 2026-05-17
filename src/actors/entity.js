@@ -1,6 +1,6 @@
 /**
  * Entity base class — position, movement, inventory, vitality.
- * NPC extends this; the human player is an Entity driven from client/playerController.js.
+ * Village NPCs use npcSimulation.js; full AI uses actors/npc.js. Player is an Entity + playerController.
  * Sprites: set `appearance` (four colors); client/entityAppearance.js draws them.
  */
 import { isAdjacentToTile as entityIsAdjacentToTile } from '../domain/entityActions.js';

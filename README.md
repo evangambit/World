@@ -17,7 +17,9 @@ src/
     entityActions.js      # Shared “actor did X in the world” API
   actors/                 # Bodies in the world
     entity.js             # Shared body (movement, inventory, vitality)
-    npc.js                # NPC movement + task runner hookup
+    npcSimulation.js      # NPC vitality/movement/death (no AI — use in tests)
+    npcLocomotion.js      # Pathfinding + path follow
+    npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans — not world rules)
     npcTasks.js
     npcTaskPrimitives.js
@@ -114,7 +116,7 @@ When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**
 
 ### Tests
 
-`scripts/planRunnerSmoke.mjs` exercises plan leaves against stub worlds. For new actions, add a smoke case that calls the same `entityActions` entry point the game uses.
+`scripts/planRunnerSmoke.mjs` exercises plan leaves against stub worlds. `scripts/npcVitalitySmoke.mjs` runs starvation/death via `npcSimulation.js` (no task runner). For new actions, add a smoke case that calls the same `entityActions` entry point the game uses.
 
 ---
 
@@ -123,7 +125,7 @@ When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**
 | Path | Role |
 |------|------|
 | `domain/entityActions.js` | Shared actor ↔ world interactions |
-| `actors/entity.js`, `actors/npc.js`, `client/playerController.js` | Actor state and movement |
+| `actors/entity.js`, `actors/npcSimulation.js`, `actors/npc.js`, `client/playerController.js` | Actor state and movement |
 | `main.js` | Player input and UI |
 | `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
 | `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |
