@@ -47,6 +47,12 @@ import { Obj } from '../world/tileTypes.js';
 
 /** @typedef {{ ok: true } | { ok: false, error: Error }} PlanResult */
 
+/**
+ * @typedef {Object} PlanRunHooks
+ * @property {(path: number[], step: PlanStep) => void} [onStepStart]
+ * @property {(path: number[], step: PlanStep) => void} [onStepEnd]
+ */
+
 const LEAF_TYPES = new Set(['goto', 'find', 'eat', 'cook', 'door', 'drop', 'take', 'stash', 'action']);
 const COMPOSITE_TYPES = new Set(['seq', 'sel']);
 
@@ -120,33 +126,42 @@ export function validatePlan(plan, limits = {}) {
  * @param {import('../actors/npc.js').NPC} npc
  * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} plan
+ * @param {PlanRunHooks} [hooks]
  * @returns {Promise<PlanResult>}
  */
-export async function runPlan(npc, world, plan) {
-    return executeNode(npc, world, plan);
+export async function runPlan(npc, world, plan, hooks = {}) {
+    return executeNode(npc, world, plan, [], hooks);
 }
 
 /**
  * @param {import('../actors/npc.js').NPC} npc
  * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} node
+ * @param {number[]} path
+ * @param {PlanRunHooks} hooks
  * @returns {Promise<PlanResult>}
  */
-async function executeNode(npc, world, node) {
+async function executeNode(npc, world, node, path, hooks) {
+    hooks.onStepStart?.(path, node);
+
     if (node.type === 'seq') {
-        for (const step of node.steps ?? []) {
-            const result = await executeNode(npc, world, step);
+        for (let i = 0; i < (node.steps ?? []).length; i++) {
+            const result = await executeNode(npc, world, node.steps[i], [...path, i], hooks);
             if (!result.ok) return result;
         }
+        hooks.onStepEnd?.(path, node);
         return { ok: true };
     }
 
     if (node.type === 'sel') {
         /** @type {PlanResult | null} */
         let lastFailure = null;
-        for (const step of node.steps ?? []) {
-            const result = await executeNode(npc, world, step);
-            if (result.ok) return result;
+        for (let i = 0; i < (node.steps ?? []).length; i++) {
+            const result = await executeNode(npc, world, node.steps[i], [...path, i], hooks);
+            if (result.ok) {
+                hooks.onStepEnd?.(path, node);
+                return result;
+            }
             lastFailure = result;
         }
         return lastFailure ?? { ok: false, error: new Error('sel: no branches') };
@@ -154,6 +169,7 @@ async function executeNode(npc, world, node) {
 
     try {
         await executeLeaf(npc, world, node);
+        hooks.onStepEnd?.(path, node);
         return { ok: true };
     } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));

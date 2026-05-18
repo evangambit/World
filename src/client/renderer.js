@@ -114,7 +114,7 @@ export class Renderer {
      * @param {import('../actors/npc.js').NPC|null} [hoverNpc]
      * @param {number} [dt] - frame delta (entity walk/work animation)
      */
-    render(world, player, npcs, hoverTile = null, hoverNpc = null, dt = 0) {
+    render(world, player, npcs, hoverTile = null, hoverNpc = null, dt = 0, selectedNpc = null) {
         const ctx = this.ctx;
         const cam = this.camera;
         const ts = this.tileSize;
@@ -283,6 +283,14 @@ export class Renderer {
                     }
                     if (ent.name && ent !== allEntities[0]) {
                         const labelPos = cam.worldToScreen(ent.x, ent.y - 1.35);
+                        if (ent === selectedNpc) {
+                            const ring = cam.worldToScreen(ent.x, ent.y - 0.2);
+                            ctx.strokeStyle = 'rgba(232, 192, 112, 0.9)';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.ellipse(ring.x, ring.y, ts * 0.42, ts * 0.22, 0, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
                         drawNpcOverheadLabels(ctx, labelPos, ent);
                     }
                     ctx.globalAlpha = savedAlpha;

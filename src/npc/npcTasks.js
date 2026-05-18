@@ -7,6 +7,8 @@ import {
     logPlannerResponse,
 } from './llm/npcPrompt.js';
 import { parsePlanDocument } from './llm/npcPlanner.js';
+import { describePlanStep, formatPlanOutline, getPlanStepAt } from './npcPlanDescribe.js';
+import { MAX_PLAN_HISTORY } from './npcPlanHistory.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
 import { runFind, runGoTo, runTimedAction } from './npcTaskPrimitives.js';
 import { findPath } from '../world/pathfinding.js';
@@ -118,13 +120,35 @@ async function executeTask(npc, world, task) {
  * @param {import('../actors/npcSimulation.js').NpcEntity} npc
  * @param {import('../world/world.js').World3D} world
  * @param {PlanDocument} doc
+ * @param {NPCTaskRunner} runner
  */
-async function executePlan(npc, world, doc) {
+async function executePlan(npc, world, doc, runner) {
     const validationError = validatePlan(doc.plan);
     if (validationError) throw new Error(validationError);
 
-    const result = await runPlan(npc, world, doc.plan);
+    runner._activePlanDoc = doc;
+    runner._activeTask = null;
+    runner._planPath = [];
+
+    const result = await runPlan(npc, world, doc.plan, {
+        onStepStart(path) {
+            runner._planPath = path;
+        },
+    });
     if (!result.ok) throw result.error;
+}
+
+/**
+ * @param {NpcTask} task
+ * @returns {string}
+ */
+function describeTask(task) {
+    if (task.type === 'goTo') return `go to (${task.x}, ${task.y}, ${task.z})`;
+    if (task.type === 'find') return `find object #${task.objType} (radius ${task.radius})`;
+    if (task.type === 'action') {
+        return `${task.action} at (${task.x}, ${task.y}, ${task.z})`;
+    }
+    return task.type;
 }
 
 export class NPCTaskRunner {
@@ -143,6 +167,86 @@ export class NPCTaskRunner {
         this._wanderOnPlannerFailure = opts.wanderOnPlannerFailure !== false;
         this._lastPlannerAt = 0;
         this._awaitingPlanner = false;
+        /** @type {PlanDocument | null} */
+        this._activePlanDoc = null;
+        /** @type {number[]} */
+        this._planPath = [];
+        /** @type {NpcTask | null} */
+        this._activeTask = null;
+        /** @type {import('./npcPlanHistory.js').PlanHistoryRecord[]} */
+        this._planHistory = [];
+    }
+
+    /**
+     * @param {PlanDocument} doc
+     * @param {'completed' | 'failed'} outcome
+     * @param {unknown} [err]
+     */
+    _recordPlanOutcome(doc, outcome, err) {
+        const npc = this.npc;
+        const step = getPlanStepAt(doc.plan, this._planPath);
+        /** @type {import('./npcPlanHistory.js').PlanHistoryRecord} */
+        const record = {
+            goal: doc.goal,
+            outcome,
+            position: `(${Math.floor(npc.x)}, ${Math.floor(npc.y)}, ${npc.z})`,
+        };
+        if (outcome === 'failed') {
+            record.error = err instanceof Error ? err.message : String(err);
+            if (step) record.failedStep = describePlanStep(step);
+        }
+        this._planHistory.push(record);
+        if (this._planHistory.length > MAX_PLAN_HISTORY) {
+            this._planHistory.splice(0, this._planHistory.length - MAX_PLAN_HISTORY);
+        }
+    }
+
+    /**
+     * @param {PlannerEvent} event
+     * @returns {PlannerEvent}
+     */
+    _plannerEventWithHistory(event) {
+        return {
+            ...event,
+            recentPlans: [...this._planHistory],
+        };
+    }
+
+    /** Snapshot for UI — goal, plan outline, current step. */
+    getPlanStatus() {
+        if (this._awaitingPlanner) {
+            return { phase: 'planning', lines: ['Planning next goal…'] };
+        }
+        if (this._activePlanDoc) {
+            const { goal, plan } = this._activePlanDoc;
+            const current = getPlanStepAt(plan, this._planPath);
+            /** @type {string[]} */
+            const lines = [`Goal: ${goal}`];
+            if (current) {
+                lines.push(`Now: ${describePlanStep(current)}`);
+            }
+            lines.push(...formatPlanOutline(plan, this._planPath));
+            if (this._queue.length > 0) {
+                lines.push(`(+${this._queue.length} queued)`);
+            }
+            return { phase: 'plan', goal, lines };
+        }
+        if (this._activeTask) {
+            return {
+                phase: 'task',
+                lines: [
+                    describeTask(this._activeTask),
+                    ...(this._queue.length > 0 ? [`(+${this._queue.length} queued)`] : []),
+                ],
+            };
+        }
+        if (this._running) {
+            return { phase: 'busy', lines: ['Working…'] };
+        }
+        if (this._queue.length > 0) {
+            return { phase: 'queued', lines: [`${this._queue.length} item(s) queued`] };
+        }
+        return { phase: 'idle', lines: ['Idle'] };
     }
 
     /** @param {NpcTask} task */
@@ -172,7 +276,10 @@ export class NPCTaskRunner {
         if (this._queue.length === 0) {
             if (this._planner) {
                 if (this._canRequestPlanner()) {
-                    this._schedulePlanner(world, { reason: 'idle' });
+                    this._schedulePlanner(
+                        world,
+                        this._plannerEventWithHistory({ reason: 'idle' }),
+                    );
                 }
                 return;
             }
@@ -182,14 +289,22 @@ export class NPCTaskRunner {
 
         const item = this._queue.shift();
         this._running = true;
+        if (item.kind === 'task') {
+            this._activeTask = item.task;
+            this._activePlanDoc = null;
+            this._planPath = [];
+        }
         const run = item.kind === 'plan'
-            ? executePlan(this.npc, world, item.doc)
+            ? executePlan(this.npc, world, item.doc, this)
             : executeTask(this.npc, world, item.task);
 
         let succeeded = false;
         run
             .then(() => {
                 succeeded = true;
+                if (item.kind === 'plan') {
+                    this._recordPlanOutcome(item.doc, 'completed');
+                }
             })
             .catch((err) => {
                 if (item.kind === 'plan') return this._onPlanFailure(world, item.doc, err);
@@ -197,15 +312,21 @@ export class NPCTaskRunner {
             })
             .finally(() => {
                 this._running = false;
+                this._activePlanDoc = null;
+                this._activeTask = null;
+                this._planPath = [];
                 if (this._queue.length > 0) {
                     this.update(world);
                     return;
                 }
                 if (item.kind === 'plan' && succeeded && this._planner && this._canRequestPlanner()) {
-                    this._schedulePlanner(world, {
-                        reason: 'plan_completed',
-                        goal: item.doc.goal,
-                    });
+                    this._schedulePlanner(
+                        world,
+                        this._plannerEventWithHistory({
+                            reason: 'plan_completed',
+                            goal: item.doc.goal,
+                        }),
+                    );
                     return;
                 }
                 if (this._queue.length === 0) this.update(world);
@@ -230,7 +351,7 @@ export class NPCTaskRunner {
         this._awaitingPlanner = true;
         this._lastPlannerAt = Date.now();
 
-        const messages = buildPlannerMessages(this.npc, event);
+        const messages = buildPlannerMessages(this.npc, this._plannerEventWithHistory(event));
         logPlannerMessages(this.npc, event, messages);
         const request = {
             npc: this.npc,
@@ -288,14 +409,24 @@ export class NPCTaskRunner {
         if (/** @type {Error} */ (err)?.message === 'dead') return;
 
         const message = err instanceof Error ? err.message : String(err);
+        const failedStep = getPlanStepAt(doc.plan, this._planPath);
+        const failedStepLabel = failedStep ? describePlanStep(failedStep) : undefined;
+        const position = `(${Math.floor(this.npc.x)}, ${Math.floor(this.npc.y)}, ${this.npc.z})`;
+
+        this._recordPlanOutcome(doc, 'failed', err);
         console.log(`[NPC ${this.npc.name}] plan failed`, doc.goal, message);
 
         if (this._planner && this._canRequestPlanner()) {
-            this._schedulePlanner(world, {
-                reason: 'plan_failed',
-                goal: doc.goal,
-                error: message,
-            });
+            this._schedulePlanner(
+                world,
+                this._plannerEventWithHistory({
+                    reason: 'plan_failed',
+                    goal: doc.goal,
+                    error: message,
+                    failedStep: failedStepLabel,
+                    position,
+                }),
+            );
         }
     }
 

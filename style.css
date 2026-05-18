@@ -93,6 +93,46 @@ html, body {
     max-width: min(240px, 42vw);
 }
 
+.ui-right-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    max-width: min(360px, 52vw);
+}
+
+#npc-panel {
+    font-size: 0.4rem;
+    color: #e0d8c0;
+    background: rgba(10, 10, 18, 0.88);
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(196, 162, 101, 0.45);
+    min-width: 168px;
+    max-height: min(50vh, 420px);
+    overflow: auto;
+}
+
+#npc-panel.hidden {
+    display: none;
+}
+
+#npc-panel-name {
+    font-size: 0.52rem;
+    color: #e8c070;
+    margin-bottom: 6px;
+}
+
+#npc-panel-plan {
+    margin: 0;
+    font-family: "Press Start 2P", monospace;
+    font-size: 0.38rem;
+    line-height: 1.5;
+    color: #c8c0a8;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 #inventory-panel {
     font-size: 0.45rem;
     color: #e0d8c0;

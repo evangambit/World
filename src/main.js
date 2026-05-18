@@ -72,6 +72,11 @@ class Game {
         this.hoverTile = null;
         /** NPC under the hovered tile, if any */
         this.hoverNpc = null;
+        /** NPC selected by click (plan panel) */
+        this.selectedNpc = null;
+        this.npcPanelEl = document.getElementById('npc-panel');
+        this.npcPanelNameEl = document.getElementById('npc-panel-name');
+        this.npcPanelPlanEl = document.getElementById('npc-panel-plan');
         /** Whether the game is paused */
         this.paused = false;
         /** Transient UI message (e.g. door feedback) */
@@ -154,6 +159,14 @@ class Game {
             const worldPos = this.camera.screenToWorld(sx, sy);
             const tx = Math.floor(worldPos.x);
             const ty = Math.floor(worldPos.y);
+            const clickedNpc = this._npcUnderCursor(worldPos.x, worldPos.y, this.player.z);
+            if (clickedNpc) {
+                this.selectedNpc = clickedNpc;
+                this._syncNpcPanel();
+                return;
+            }
+            this.selectedNpc = null;
+            this._syncNpcPanel();
             this._interruptPlayerWork();
 
             if (this.player.isAdjacentToTile(tx, ty)) {
@@ -454,6 +467,22 @@ class Game {
         this._syncInventoryUI();
     }
 
+    _syncNpcPanel() {
+        const panel = this.npcPanelEl;
+        if (!panel || !this.npcPanelNameEl || !this.npcPanelPlanEl) return;
+
+        const npc = this.selectedNpc;
+        if (!npc) {
+            panel.classList.add('hidden');
+            return;
+        }
+
+        panel.classList.remove('hidden');
+        this.npcPanelNameEl.textContent = npc.name;
+        const status = npc.tasks.getPlanStatus();
+        this.npcPanelPlanEl.textContent = status.lines.join('\n');
+    }
+
     _syncVitalsUI() {
         const p = this.player;
         if (!p) return;
@@ -566,6 +595,7 @@ class Game {
         const floorNames = { '-1': 'Underground', '0': 'Ground', '1': 'Floor 1', '2': 'Floor 2' };
         this.layerIndicator.textContent = `Floor: ${floorNames[this.player.z] || this.player.z}`;
         this._syncVitalsUI();
+        this._syncNpcPanel();
 
         // Update hovered tile
         if (this._mouseScreenX !== null) {
@@ -598,6 +628,7 @@ class Game {
             this.hoverTile,
             this.hoverNpc,
             this.paused ? 0 : dt,
+            this.selectedNpc,
         );
 
         this._drawActionProgress();

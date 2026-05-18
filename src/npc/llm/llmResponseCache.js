@@ -5,7 +5,7 @@
 /** @typedef {import('./llmTypes.js').LlmCompletionRequest} LlmCompletionRequest */
 
 /** Bump when planner prompts change materially so stale plans are not reused. */
-export const LLM_CACHE_VERSION = 1;
+export const LLM_CACHE_VERSION = 2;
 
 const STORAGE_PREFIX = 'world.llm.';
 const INDEX_KEY = `${STORAGE_PREFIX}cache.v${LLM_CACHE_VERSION}.index`;

@@ -40,6 +40,39 @@ describe('buildUserPrompt', () => {
         assert.match(user, new RegExp(`\\/ ${VITALITY.MAX_HUNGER}`));
         assert.match(user, /reason: idle/);
     });
+
+    it('includes recent plan history and failure context', () => {
+        const npc = {
+            hunger: 80,
+            health: 100,
+            homeX: 0,
+            homeY: 0,
+            homeZ: 0,
+            inventory: [],
+        };
+        const user = buildUserPrompt(npc, {
+            reason: 'plan_failed',
+            goal: 'gather_food',
+            error: 'Find: no edible_food within radius 8',
+            failedStep: 'find edible_food (r=8, pickup)',
+            position: '(9, 30, 0)',
+            recentPlans: [
+                { goal: 'eat_food', outcome: 'completed', position: '(8, 28, 0)' },
+                {
+                    goal: 'gather_food',
+                    outcome: 'failed',
+                    failedStep: 'find edible_food (r=8, pickup)',
+                    error: 'Find: no edible_food within radius 8',
+                    position: '(9, 30, 0)',
+                },
+            ],
+        });
+        assert.match(user, /failed_step: find edible_food/);
+        assert.match(user, /position: \(9, 30, 0\)/);
+        assert.match(user, /Recent plans/);
+        assert.match(user, /1\. eat_food — completed/);
+        assert.match(user, /2\. gather_food — failed/);
+    });
 });
 
 describe('summarizeInventoryByTag', () => {

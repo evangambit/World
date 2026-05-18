@@ -31,19 +31,25 @@
                 <div id="container-items"></div>
             </div>
         </div>
-        <div id="vitals-panel">
-            <div class="vital-row">
-                <span class="vital-label">HP</span>
-                <div class="vital-track"><div id="health-fill" class="vital-fill vital-fill--health"></div></div>
-                <span id="health-text" class="vital-value">100</span>
+        <div class="ui-right-col">
+            <div id="vitals-panel">
+                <div class="vital-row">
+                    <span class="vital-label">HP</span>
+                    <div class="vital-track"><div id="health-fill" class="vital-fill vital-fill--health"></div></div>
+                    <span id="health-text" class="vital-value">100</span>
+                </div>
+                <div class="vital-row">
+                    <span class="vital-label">Hunger</span>
+                    <div class="vital-track"><div id="hunger-fill" class="vital-fill vital-fill--hunger"></div></div>
+                    <span id="hunger-text" class="vital-value">0</span>
+                </div>
             </div>
-            <div class="vital-row">
-                <span class="vital-label">Hunger</span>
-                <div class="vital-track"><div id="hunger-fill" class="vital-fill vital-fill--hunger"></div></div>
-                <span id="hunger-text" class="vital-value">0</span>
+            <div id="npc-panel" class="hidden">
+                <div id="npc-panel-name"></div>
+                <pre id="npc-panel-plan"></pre>
             </div>
         </div>
-        <div id="controls-hint">WASD · click pack to eat / drop · E: doors · ?llm=openrouter for AI NPCs</div>
+        <div id="controls-hint">WASD · click pack to eat / drop · E: doors · click NPC for plan · ?llm=openrouter for AI NPCs</div>
     </div>
     <script type="module" src="src/main.js"></script>
 </body>

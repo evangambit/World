@@ -12,6 +12,9 @@ import {
     describeObjectTag,
     listObjectTagNames,
 } from './npcActionCatalog.js';
+import { formatPlanHistorySection } from '../npcPlanHistory.js';
+
+/** @typedef {import('../npcPlanHistory.js').PlanHistoryRecord} PlanHistoryRecord */
 
 /** @typedef {import('../npcTasks.js').PlanDocument} PlanDocument */
 
@@ -24,6 +27,9 @@ import {
  * @property {PlannerReason} reason
  * @property {string} [goal]
  * @property {string} [error]
+ * @property {string} [failedStep] - human-readable step that failed (latest attempt)
+ * @property {string} [position] - NPC tile at failure, e.g. "(12, 30, 0)"
+ * @property {PlanHistoryRecord[]} [recentPlans] - prior plan outcomes, oldest first
  */
 
 /**
@@ -123,13 +129,23 @@ export function buildUserPrompt(npc, event) {
 
     if (event.goal) lines.push(`goal: ${event.goal}`);
     if (event.error) lines.push(`error: ${event.error}`);
+    if (event.failedStep) lines.push(`failed_step: ${event.failedStep}`);
+    if (event.position) lines.push(`position: ${event.position}`);
 
     if (event.reason === 'idle') {
         lines.push('', 'The queue is empty. Choose a new plan or the character will wander.');
     } else if (event.reason === 'plan_completed') {
         lines.push('', 'Your last plan finished successfully. Choose what to do next.');
     } else if (event.reason === 'plan_failed') {
-        lines.push('', 'Your last plan failed. Choose a different plan.');
+        lines.push(
+            '',
+            'Your last plan failed (see recent plans and error above). Choose a different plan that avoids the same mistake.',
+        );
+    }
+
+    const historyLines = formatPlanHistorySection(event.recentPlans ?? []);
+    if (historyLines.length > 0) {
+        lines.push('', ...historyLines);
     }
 
     return lines.join('\n');
