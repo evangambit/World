@@ -3,7 +3,7 @@
  */
 import { buildSpriteSheet } from './entitySprites.js';
 
-/** @typedef {[string, string, string, string]} EntityAppearance */
+/** @typedef {import('../actors/entity.js').EntityAppearance} EntityAppearance */
 
 /** @type {Map<string, { sprites: Record<number, HTMLCanvasElement[]>, workSprites: Record<number, HTMLCanvasElement[]> }>} */
 const sheetCache = new Map();

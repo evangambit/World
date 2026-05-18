@@ -3,6 +3,9 @@
  * Village NPCs use npcSimulation.js; full AI uses actors/npc.js. Player is an Entity + playerController.
  * Sprites: set `appearance` (four colors); client/entityAppearance.js draws them.
  */
+
+/** @typedef {[string, string, string, string]} EntityAppearance */
+
 import { isAdjacentToTile as entityIsAdjacentToTile } from '../domain/entityActions.js';
 import { TimedActionRunner } from './timedActionRunner.js';
 
@@ -20,7 +23,7 @@ export class Entity {
         this.z = z;
         this.dir = DIR.DOWN;
         this.speed = 3.5; // tiles per second
-        /** @type {import('../client/entityAppearance.js').EntityAppearance|undefined} */
+        /** @type {EntityAppearance|undefined} */
         this.appearance = undefined;
         /** Cooldown after a transition to prevent immediate re-trigger */
         this._transitionCooldown = 0;

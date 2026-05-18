@@ -36,7 +36,8 @@ src/
     llm/                  # LLM planner + prompts
   content/                # Maps and spawns (data, not rules)
     builder.js
-  client/                 # Browser presentation
+  architecture/           # Import-boundary tests (logic vs client)
+  client/                 # Browser presentation (must not be imported by logic/tests)
     tileArt.js            # Tile/object sprite pre-rendering (canvas)
     entitySprites.js      # Character pixel art (canvas)
     entityAppearance.js   # Entity sprite cache + animation
@@ -130,6 +131,14 @@ NPCs record tiles within **5 tiles** on their current floor each frame (`tileMem
 Run tests: `npm test` (colocated `src/**/*.test.mjs` via `node:test`).
 
 Legacy smokes in `scripts/`: `planRunnerSmoke.mjs`, `npcVitalitySmoke.mjs`, `simulationSmoke.mjs`. For new rules, add `*.test.mjs` next to the module under test (e.g. `domain/crops.test.mjs`).
+
+### Layer boundaries (presentation vs logic)
+
+**Rule:** `world/`, `domain/`, `actors/`, `simulation/`, `npc/`, `content/`, all `src/**/*.test.mjs` (except under `client/`), and `scripts/` must **not** import `client/` or `main.js`. Rendering, input, and canvas code live in `client/`; the game entry `main.js` wires UI to simulation.
+
+**Enforced by:** `src/architecture/importLayers.test.mjs` (runs with `npm test`). Presentation must not import `main.js` either.
+
+Allowed direction: `main.js` → `client/` + logic layers; `client/` → logic layers only (e.g. `tileTypes`, `vitality` for HUD colors — not `Renderer` from npc code).
 
 ---
 
