@@ -23,14 +23,17 @@ src/
     npcSimulation.js      # NPC vitality/movement/death (no AI — use in tests)
     npcLocomotion.js      # Pathfinding + path follow
     npc.js                # Full NPC (sim + task/plan brain)
-  npc/                    # NPC control (scheduling, plans — not world rules)
+  npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
     npcBrain.js           # Injectable brain (task queue vs no-op)
+    npcMemory.js          # Per-tile perception + reachability
+    npcMemoryTravel.js    # Adaptive travel toward memory refs
+    npcPlanRefs.js        # rememberLocationsOfNearby(...) in plan steps
     npcTasks.js
     npcTaskPrimitives.js
     npcPlanRunner.js
     npcPlanTemplates.js
-    npcPlanBindings.js
     npcObjectTags.js
+    llm/                  # LLM planner + prompts
   content/                # Maps and spawns (data, not rules)
     builder.js
   client/                 # Browser presentation
@@ -59,7 +62,7 @@ Imports use explicit paths (e.g. `../domain/entityActions.js`). Entry point: `in
 
 5. **Control / presentation** — How an actor *chooses* to invoke actions:
    - **Player:** `src/main.js` + `src/client/playerController.js` — clicks, keys, inventory/container panels, messages.
-   - **NPC:** `src/npc/` — queued tasks, async travel, declarative plans (`seq` / `sel`), object tags, binding queries.
+   - **NPC:** `src/npc/` — queued tasks, async travel, declarative plans (`seq` / `sel`), object tags, **tile memory** and plan location refs (`rememberLocationsOfNearby`). Details: [`src/npc/README.md`](src/npc/README.md).
 
 6. **Content** (`src/content/`) — Maps, buildings, spawns. Not gameplay rules.
 
@@ -96,7 +99,7 @@ Do **not** put world-changing logic in `main.js` or `npcPlanRunner.js` except to
 
 - **`domain/entityActions.js`** — Adjacency checks, door key rules, drop placement, container transfer. Returns success/failure (and optional messages for UI).
 - **`main.js`** — *When* the player tries (clicked tile, pressed E), *what* to show (open chest panel, toast). Opening a container UI is presentation; moving items uses `takeFromContainer` / `stashToContainer`.
-- **`npc/`** — *When* and *in what order* (go to tile, then door; find stove, then cook). Plans use **object tags** (`npcObjectTags.js`) and **bindings** (`npcPlanBindings.js`) so JSON plans stay abstract; leaves resolve tags and call the same actions as the player.
+- **`npc/`** — *When* and *in what order* (go to tile, then door; find stove, then cook). Plans use **object tags** (`npcObjectTags.js`) and **memory refs** (`rememberLocationsOfNearby(stove)` in plan `ref` fields) so JSON stays abstract; leaves resolve tags and call the same actions as the player. See [`src/npc/README.md`](src/npc/README.md).
 
 ### Adding a new capability (checklist)
 
@@ -105,7 +108,7 @@ Do **not** put world-changing logic in `main.js` or `npcPlanRunner.js` except to
 3. Add **`entityActions.yourAction(entity, world, …)`** with all placement, adjacency, and permission checks.
 4. **Player:** hook input in `main.js` → call the action → refresh UI.
 5. **NPC:** add a plan leaf type (and/or `runYourAction` in `npcTaskPrimitives.js`) that calls the **same** function after `travelToTile` if needed.
-6. If NPCs need to refer to the action abstractly, add an object tag or binding query; do not reimplement the effect in the plan runner.
+6. If NPCs need to refer to a place or thing abstractly, add an object tag and/or a memory ref query; do not reimplement the effect in the plan runner.
 
 ### Movement is separate (on purpose)
 
@@ -116,7 +119,11 @@ Movement uses two paths today: player `tryMove` (continuous input) vs NPC pathfi
 - **Tasks** (`goTo`, `find`) — imperative queue, good for simple scripts and spawn behavior.
 - **Plans** (`seq`, `sel`, leaves like `eat`, `door`, `take`) — composable behavior; still must bottom out in `entityActions`.
 
-When a plan step needs a tile (kitchen, home chest), resolve it via **bindings**, not hard-coded coordinates in JSON.
+When a plan step needs a remembered place (stove, chest), use **`ref`: `rememberLocationsOfNearby(tag)`** — not hard-coded coordinates. The NPC must have perceived that tile first.
+
+### NPC tile memory (summary)
+
+NPCs record tiles within **5 tiles** on their current floor each frame (`tileMemory`: snapshot + `seenAt`). Failed pathfinding marks a tile **`reachable: false`** until the tile’s remembered **state** changes. Plan `goto` / `take` / `stash` / `action` steps can use `rememberLocationsOfNearby(stove)` to walk to the nearest **reachable** remembered match, retargeting if a closer one is seen while traveling. Full behavior: [`src/npc/README.md`](src/npc/README.md). Tests: `npcMemory.test.mjs`, `npcMemoryTravel.test.mjs`, `npcPlanRefs.test.mjs`, `npcPlanRunner.test.mjs`.
 
 ### Tests
 
@@ -136,5 +143,8 @@ Legacy smokes in `scripts/`: `planRunnerSmoke.mjs`, `npcVitalitySmoke.mjs`, `sim
 | `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
 | `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |
 | `npc/npcObjectTags.js` | Abstract names for plan JSON |
-| `npc/npcPlanBindings.js` | Resolve “my kitchen”, “home chest”, etc. |
+| `npc/npcMemory.js` | Perception + `tileMemory` / reachability |
+| `npc/npcPlanRefs.js` | `rememberLocationsOfNearby(tag)` → tile list |
+| `npc/npcMemoryTravel.js` | Adaptive pathing to memory refs |
+| `npc/README.md` | NPC memory, refs, plans (detail) |
 | `domain/cooking.js` | Inventory-only cooking transform |
