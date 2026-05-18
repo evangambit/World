@@ -1,0 +1,9 @@
+{
+  "name": "world",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'src/**/*.test.mjs'",
+    "llm:smoke": "node scripts/llmPlanSmoke.mjs"
+  }
+}
