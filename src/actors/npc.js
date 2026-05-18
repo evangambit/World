@@ -6,6 +6,7 @@ import { Entity } from './entity.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
 import { tickNpcTaskBrain } from '../npc/npcBrain.js';
 import { initNpcEntity, tickNpcSimulation } from './npcSimulation.js';
+import { mockRequestPlan } from '../npc/llm/mockPlanner.js';
 import {
     NPCTaskRunner,
     goTo,
@@ -28,11 +29,16 @@ export class NPC extends Entity {
      * @param {number} presetIndex
      * @param {string} name
      * @param {{ objType: number, count: number, buildingId?: number }[]} [inventory]
+     * @param {{ planner?: import('../npc/llm/npcPlanner.js').NpcPlannerFn | null, plannerCooldownMs?: number }} [brainOpts]
      */
-    constructor(x, y, z, presetIndex = 0, name = 'Villager', inventory = []) {
+    constructor(x, y, z, presetIndex = 0, name = 'Villager', inventory = [], brainOpts = {}) {
         super(x, y, z);
         initNpcEntity(this, { presetIndex, name, inventory });
-        this.tasks = new NPCTaskRunner(this);
+        const planner = brainOpts.planner === undefined ? mockRequestPlan : brainOpts.planner;
+        this.tasks = new NPCTaskRunner(this, {
+            planner: planner ?? undefined,
+            plannerCooldownMs: brainOpts.plannerCooldownMs,
+        });
     }
 
     get isAlive() {

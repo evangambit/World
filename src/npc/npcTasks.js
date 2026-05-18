@@ -1,10 +1,22 @@
 /**
  * NPC task queue — legacy primitives plus seq/sel plans.
  */
+import { buildPlannerMessages } from './llm/npcPrompt.js';
+import { parsePlanDocument } from './llm/npcPlanner.js';
 import { resolvePlanBindings } from './npcPlanBindings.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
 import { runFind, runGoTo, runTimedAction } from './npcTaskPrimitives.js';
 import { findPath } from '../world/pathfinding.js';
+
+/** @typedef {import('./llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
+/** @typedef {import('./llm/npcPrompt.js').PlannerEvent} PlannerEvent */
+
+/**
+ * @typedef {Object} NpcTaskRunnerOptions
+ * @property {NpcPlannerFn} [planner]
+ * @property {number} [plannerCooldownMs]
+ * @property {boolean} [wanderOnPlannerFailure]
+ */
 
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 
@@ -78,12 +90,6 @@ async function handleTaskFailure(npc, task, err) {
  * @param {PlanDocument} doc
  * @param {Error} err
  */
-async function handlePlanFailure(npc, doc, err) {
-    if (!npc.isAlive) return;
-    if (err?.name === 'ActionInterruptedError') return;
-    if (err?.message === 'dead') return;
-    console.log(`[NPC ${npc.name}] plan failed`, doc.goal, err?.message ?? err);
-}
 
 /**
  * @param {import('../actors/npcSimulation.js').NpcEntity} npc
@@ -123,12 +129,19 @@ async function executePlan(npc, world, doc) {
 export class NPCTaskRunner {
     /**
      * @param {import('../actors/npcSimulation.js').NpcEntity} npc
+     * @param {NpcTaskRunnerOptions} [opts]
      */
-    constructor(npc) {
+    constructor(npc, opts = {}) {
         this.npc = npc;
         /** @type {QueueItem[]} */
         this._queue = [];
         this._running = false;
+        /** @type {NpcPlannerFn | null} */
+        this._planner = opts.planner ?? null;
+        this._plannerCooldownMs = opts.plannerCooldownMs ?? 10_000;
+        this._wanderOnPlannerFailure = opts.wanderOnPlannerFailure !== false;
+        this._lastPlannerAt = 0;
+        this._awaitingPlanner = false;
     }
 
     /** @param {NpcTask} task */
@@ -153,8 +166,15 @@ export class NPCTaskRunner {
     /** @param {import('../world/world.js').World3D} world */
     update(world) {
         if (!this.npc.isAlive) return;
-        if (this._running) return;
+        if (this._running || this._awaitingPlanner) return;
+
         if (this._queue.length === 0) {
+            if (this._planner) {
+                if (this._canRequestPlanner()) {
+                    this._schedulePlanner(world, { reason: 'idle' });
+                }
+                return;
+            }
             this._enqueueWander(world);
         }
         if (this._queue.length === 0) return;
@@ -165,15 +185,111 @@ export class NPCTaskRunner {
             ? executePlan(this.npc, world, item.doc)
             : executeTask(this.npc, world, item.task);
 
+        let succeeded = false;
         run
+            .then(() => {
+                succeeded = true;
+            })
             .catch((err) => {
-                if (item.kind === 'plan') return handlePlanFailure(this.npc, item.doc, err);
+                if (item.kind === 'plan') return this._onPlanFailure(world, item.doc, err);
                 return handleTaskFailure(this.npc, item.task, err);
             })
             .finally(() => {
                 this._running = false;
-                if (this._queue.length > 0) this.update(world);
+                if (this._queue.length > 0) {
+                    this.update(world);
+                    return;
+                }
+                if (item.kind === 'plan' && succeeded && this._planner && this._canRequestPlanner()) {
+                    this._schedulePlanner(world, {
+                        reason: 'plan_completed',
+                        goal: item.doc.goal,
+                    });
+                    return;
+                }
+                if (this._queue.length === 0) this.update(world);
             });
+    }
+
+    /** @returns {boolean} */
+    _canRequestPlanner() {
+        if (!this._planner) return false;
+        if (this._plannerCooldownMs <= 0) return true;
+        return Date.now() - this._lastPlannerAt >= this._plannerCooldownMs;
+    }
+
+    /**
+     * @param {import('../world/world.js').World3D} world
+     * @param {PlannerEvent} event
+     */
+    _schedulePlanner(world, event) {
+        const planner = this._planner;
+        if (!planner || this._awaitingPlanner) return;
+
+        this._awaitingPlanner = true;
+        this._lastPlannerAt = Date.now();
+
+        const messages = buildPlannerMessages(this.npc, event);
+        const request = {
+            npc: this.npc,
+            world,
+            event,
+            messages,
+        };
+
+        Promise.resolve(planner(request))
+            .then((raw) => {
+                if (!this.npc.isAlive) return;
+                if (raw == null) {
+                    this._lastPlannerAt = Date.now();
+                    if (this._wanderOnPlannerFailure) this._enqueueWander(world);
+                    return;
+                }
+                const parsed = parsePlanDocument(raw);
+                if (!parsed.ok) {
+                    this._lastPlannerAt = Date.now();
+                    console.log(
+                        `[NPC ${this.npc.name}] planner returned invalid plan`,
+                        parsed.error,
+                    );
+                    if (this._wanderOnPlannerFailure) this._enqueueWander(world);
+                    return;
+                }
+                this.enqueuePlan(parsed.doc);
+            })
+            .catch((err) => {
+                console.log(
+                    `[NPC ${this.npc.name}] planner error`,
+                    err instanceof Error ? err.message : err,
+                );
+                if (this._wanderOnPlannerFailure) this._enqueueWander(world);
+            })
+            .finally(() => {
+                this._awaitingPlanner = false;
+                if (this.npc.isAlive) this.update(world);
+            });
+    }
+
+    /**
+     * @param {import('../world/world.js').World3D} world
+     * @param {PlanDocument} doc
+     * @param {unknown} err
+     */
+    _onPlanFailure(world, doc, err) {
+        if (!this.npc.isAlive) return;
+        if (/** @type {Error} */ (err)?.name === 'ActionInterruptedError') return;
+        if (/** @type {Error} */ (err)?.message === 'dead') return;
+
+        const message = err instanceof Error ? err.message : String(err);
+        console.log(`[NPC ${this.npc.name}] plan failed`, doc.goal, message);
+
+        if (this._planner && this._canRequestPlanner()) {
+            this._schedulePlanner(world, {
+                reason: 'plan_failed',
+                goal: doc.goal,
+                error: message,
+            });
+        }
     }
 
     /**
