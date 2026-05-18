@@ -146,3 +146,28 @@ export function buildPlannerMessages(npc, event) {
         user: buildUserPrompt(npc, event),
     };
 }
+
+/**
+ * Log outbound planner prompts (mock and real LLM share this path).
+ * @param {import('../../actors/npcSimulation.js').NpcEntity} npc
+ * @param {PlannerEvent} event
+ * @param {{ system: string, user: string }} messages
+ */
+export function logPlannerMessages(npc, event, messages) {
+    const name = npc.name ?? 'NPC';
+    const label = `[NPC ${name}] planner → LLM (${event.reason})`;
+
+    if (typeof console.groupCollapsed === 'function') {
+        console.groupCollapsed(label);
+        console.log('event', event);
+        console.log('system\n', messages.system);
+        console.log('user\n', messages.user);
+        console.groupEnd();
+        return;
+    }
+
+    console.log(label);
+    console.log('event', event);
+    console.log('system\n', messages.system);
+    console.log('user\n', messages.user);
+}

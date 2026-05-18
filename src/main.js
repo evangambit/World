@@ -9,6 +9,8 @@ import { updatePlayerFromInput } from './client/playerController.js';
 import { tickNpcTaskBrain } from './npc/npcBrain.js';
 import { tickSimulation } from './simulation/tickSimulation.js';
 import { NPC, find } from './actors/npc.js';
+import { createNpcPlannerFromConfig } from './npc/llm/createLlmPlanner.js';
+import { resolveBrowserPlannerConfig } from './npc/llm/plannerRuntime.js';
 import { clearGrass } from './npc/npcTasks.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
 import {
@@ -89,10 +91,28 @@ class Game {
         this.player.appearance = ['#e8c090', '#5a3020', '#2a5a8a', '#3a3a4a'];
         this.camera.snapTo(this.player.x, this.player.y);
 
+        /** @type {import('./npc/llm/npcPlanner.js').NpcPlannerFn | undefined} */
+        let llmPlanner;
+        const llmConfig = resolveBrowserPlannerConfig();
+        if (llmConfig) {
+            try {
+                llmPlanner = createNpcPlannerFromConfig(llmConfig);
+                const modelLabel = llmConfig.model ?? 'default model';
+                console.log(`[World] LLM planner: ${llmConfig.providerId} (${modelLabel})`);
+                const hint = document.getElementById('controls-hint');
+                if (hint) {
+                    hint.textContent += ` · LLM: ${llmConfig.providerId}`;
+                }
+            } catch (err) {
+                console.warn('[World] LLM planner failed to start', err);
+            }
+        }
+
         // Spawn NPCs inside their homes (see VILLAGE_NPC_SPAWNS in builder.js)
         for (const def of VILLAGE_NPC_SPAWNS) {
             const inventory = [...NPC_DEFAULT_INVENTORY, ...(def.inventory ?? [])];
-            const npc = new NPC(def.x, def.y, def.z, def.preset, def.name, inventory);
+            const brainOpts = llmPlanner ? { planner: llmPlanner } : {};
+            const npc = new NPC(def.x, def.y, def.z, def.preset, def.name, inventory, brainOpts);
             const homeBid = this.world.getBuildingId(Math.floor(def.x), Math.floor(def.y), def.z);
             if (homeBid != null) {
                 npc.tasks.enqueue(find(Obj.KEY, 16, { buildingId: homeBid }));

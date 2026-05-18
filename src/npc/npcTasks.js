@@ -1,7 +1,7 @@
 /**
  * NPC task queue — legacy primitives plus seq/sel plans.
  */
-import { buildPlannerMessages } from './llm/npcPrompt.js';
+import { buildPlannerMessages, logPlannerMessages } from './llm/npcPrompt.js';
 import { parsePlanDocument } from './llm/npcPlanner.js';
 import { resolvePlanBindings } from './npcPlanBindings.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
@@ -230,6 +230,7 @@ export class NPCTaskRunner {
         this._lastPlannerAt = Date.now();
 
         const messages = buildPlannerMessages(this.npc, event);
+        logPlannerMessages(this.npc, event, messages);
         const request = {
             npc: this.npc,
             world,
