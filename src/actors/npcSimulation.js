@@ -11,6 +11,7 @@ import {
     travelNpcToTile,
 } from './npcLocomotion.js';
 import { Entity } from './entity.js';
+import { initNpcMemory } from '../npc/npcMemory.js';
 
 /** NPC appearance presets (skin, hair, shirt, pants). */
 export const NPC_PRESETS = [
@@ -39,6 +40,7 @@ export const NPC_PRESETS = [
  *   isAlive: boolean,
  *   setGoal: (gx: number, gy: number, gz: number, world: World3D) => boolean,
  *   travelToTile: (tx: number, ty: number, tz: number, world: World3D) => Promise<void>,
+ *   tileMemory: Map<string, import('../npc/npcMemory.js').TileMemoryEntry>,
  * }} NpcEntity
  */
 
@@ -83,6 +85,7 @@ export function initNpcEntity(entity, opts = {}) {
     entity.wanderRadius = 10;
 
     initNpcLocomotion(/** @type {Entity & NpcLocomotionState} */ (entity));
+    initNpcMemory(/** @type {NpcEntity} */ (entity));
 
     const loco = /** @type {NpcEntity} */ (entity);
     loco.setGoal = (gx, gy, gz, world) => setNpcGoal(loco, gx, gy, gz, world);
