@@ -25,6 +25,10 @@ export function clearNpcLocomotion(npc) {
         npc._trip.reject(new Error('dead'));
         npc._trip = null;
     }
+    if (npc._memoryRefTravel) {
+        npc._memoryRefTravel.reject(new Error('dead'));
+        npc._memoryRefTravel = null;
+    }
     npc.path = null;
     npc.pathIndex = 0;
     npc._state = 'idle';

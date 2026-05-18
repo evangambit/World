@@ -15,6 +15,14 @@ export const OBJECT_TAGS = {
         inventoryTypes: [Obj.UNCOOKED_STEAK],
         worldTypes: [Obj.UNCOOKED_STEAK],
     },
+    stove: {
+        inventoryTypes: [],
+        worldTypes: [Obj.STOVE],
+    },
+    chest: {
+        inventoryTypes: [],
+        worldTypes: [Obj.CHEST],
+    },
 };
 
 /**

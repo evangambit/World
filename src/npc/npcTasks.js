@@ -3,7 +3,6 @@
  */
 import { buildPlannerMessages, logPlannerMessages } from './llm/npcPrompt.js';
 import { parsePlanDocument } from './llm/npcPlanner.js';
-import { resolvePlanBindings } from './npcPlanBindings.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
 import { runFind, runGoTo, runTimedAction } from './npcTaskPrimitives.js';
 import { findPath } from '../world/pathfinding.js';
@@ -28,7 +27,6 @@ import { findPath } from '../world/pathfinding.js';
 /**
  * @typedef {Object} PlanDocument
  * @property {string} goal
- * @property {Record<string, { query: string }>} [bindings]
  * @property {import('./npcPlanRunner.js').PlanStep} plan
  */
 
@@ -121,8 +119,7 @@ async function executePlan(npc, world, doc) {
     const validationError = validatePlan(doc.plan);
     if (validationError) throw new Error(validationError);
 
-    const bindings = resolvePlanBindings(npc, world, doc.bindings);
-    const result = await runPlan(npc, world, doc.plan, bindings);
+    const result = await runPlan(npc, world, doc.plan);
     if (!result.ok) throw result.error;
 }
 

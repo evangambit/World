@@ -4,12 +4,9 @@
 
 /** @typedef {import('./npcPlanRunner.js').PlanStep} PlanStep */
 
-/** @type {{ goal: string, bindings: Record<string, { query: string }>, plan: PlanStep }} */
+/** @type {{ goal: string, plan: PlanStep }} */
 export const EAT_FOOD_PLAN = {
   goal: 'eat_food',
-  bindings: {
-      my_kitchen: { query: 'whereIsMyKitchen' },
-  },
   plan: {
       type: 'sel',
       steps: [
@@ -22,7 +19,7 @@ export const EAT_FOOD_PLAN = {
           {
               type: 'seq',
               steps: [
-                  { type: 'goto', ref: 'my_kitchen' },
+                  { type: 'goto', ref: 'rememberLocationsOfNearby(stove)' },
                   {
                       type: 'sel',
                       steps: [

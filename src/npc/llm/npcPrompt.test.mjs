@@ -20,7 +20,7 @@ describe('buildSystemPrompt', () => {
         assert.match(prompt, /\bsel\b/);
         assert.match(prompt, /\beat\b/);
         assert.match(prompt, /edible_food/);
-        assert.match(prompt, /whereIsMyKitchen/);
+        assert.match(prompt, /rememberLocationsOfNearby/);
     });
 });
 

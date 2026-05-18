@@ -6,6 +6,7 @@ import { updateCrops } from '../domain/crops.js';
 import { tickNpcSimulation } from '../actors/npcSimulation.js';
 import { noopNpcBrain } from '../npc/npcBrain.js';
 import { tickNpcPerception } from '../npc/npcMemory.js';
+import { syncMemoryRefTravelGoal } from '../npc/npcMemoryTravel.js';
 
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../world/world.js').World3D} World3D */
@@ -29,6 +30,7 @@ export function tickSimulation(opts) {
     for (const npc of npcs) {
         tickNpcSimulation(npc, world, dt);
         tickNpcPerception(npc, world, gameTime);
+        syncMemoryRefTravelGoal(npc, world);
         npcBrain(npc, world, dt);
     }
 

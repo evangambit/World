@@ -5,7 +5,7 @@ import { VITALITY } from '../../domain/vitality.js';
 import { EAT_FOOD_PLAN } from '../npcPlanTemplates.js';
 import { OBJECT_TAGS } from '../npcObjectTags.js';
 import {
-    BINDING_QUERIES,
+    PLAN_REF_QUERIES,
     PLAN_LEAF_ACTIONS,
     PLAN_LIMITS,
     VITALITY_RULES,
@@ -56,7 +56,7 @@ export function buildSystemPrompt(name = 'Villager') {
     const leaves = PLAN_LEAF_ACTIONS.map(
         (a) => `- ${a.type}: ${a.summary} Fields: ${a.fields ?? 'none'}.`,
     ).join('\n');
-    const bindings = BINDING_QUERIES.map((q) => `- ${q}`).join('\n');
+    const refQueries = PLAN_REF_QUERIES.map((q) => `- ${q}`).join('\n');
     const example = JSON.stringify(EAT_FOOD_PLAN, null, 2);
 
     return [
@@ -79,13 +79,13 @@ export function buildSystemPrompt(name = 'Villager') {
         '## Object tags (use these in object fields, not raw type ids)',
         tags,
         '',
-        '## Binding queries (declare in bindings, reference with ref in steps)',
-        bindings,
-        'Example: "my_kitchen": { "query": "whereIsMyKitchen" } then { "type": "goto", "ref": "my_kitchen" }.',
+        '## Location refs (use in ref fields for goto, take, stash, action)',
+        refQueries,
+        'Example: { "type": "goto", "ref": "rememberLocationsOfNearby(stove)" } walks to the nearest reachable remembered stove and retargets if a closer one is seen while traveling.',
         '',
         '## Output',
         'Reply with a single JSON object only (no markdown):',
-        '{ "goal": string, "bindings"?: { [name]: { "query": string } }, "plan": { "type": "seq"|"sel", "steps": [...] } }',
+        '{ "goal": string, "plan": { "type": "seq"|"sel", "steps": [...] } }',
         '',
         'Example plan for eating when hungry:',
         example,

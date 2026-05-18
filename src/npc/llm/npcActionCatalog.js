@@ -1,5 +1,5 @@
 /**
- * Machine-readable NPC plan DSL — kept in sync with npcPlanRunner / npcPlanBindings.
+ * Machine-readable NPC plan DSL — kept in sync with npcPlanRunner / npcPlanRefs.
  */
 import { OBJECT_TAGS } from '../npcObjectTags.js';
 
@@ -9,14 +9,16 @@ export const PLAN_LIMITS = {
 };
 
 /** @type {readonly string[]} */
-export const BINDING_QUERIES = ['whereIsMyKitchen', 'whereIsHomeChest'];
+export const PLAN_REF_QUERIES = [
+    'rememberLocationsOfNearby(objectTag) — walks to the nearest reachable remembered match; retargets mid-travel if a closer reachable match appears in memory',
+];
 
 /** @type {readonly { type: string, summary: string, fields?: string }[]} */
 export const PLAN_LEAF_ACTIONS = [
     {
         type: 'goto',
         summary: 'Walk to a tile (adjacent if needed).',
-        fields: 'ref (binding name) OR x, y, z',
+        fields: 'ref (memory query or x, y, z)',
     },
     {
         type: 'find',
@@ -45,13 +47,13 @@ export const PLAN_LEAF_ACTIONS = [
     },
     {
         type: 'take',
-        summary: 'Take tagged items from a container at a binding ref.',
-        fields: 'object (tag), from (binding ref)',
+        summary: 'Take tagged items from a container at a ref.',
+        fields: 'object (tag), from (ref)',
     },
     {
         type: 'stash',
-        summary: 'Put tagged items from inventory into a container at a binding ref.',
-        fields: 'object (tag), to (binding ref)',
+        summary: 'Put tagged items from inventory into a container at a ref.',
+        fields: 'object (tag), to (ref)',
     },
     {
         type: 'action',

@@ -10,6 +10,7 @@ import {
 } from '../domain/entityActions.js';
 import { findPath } from '../world/pathfinding.js';
 import { isPickableObject, Obj, OBJ_NAMES } from '../world/tileTypes.js';
+import { travelNpcToMemoryRef } from './npcMemoryTravel.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 
@@ -22,6 +23,16 @@ import { isPickableObject, Obj, OBJ_NAMES } from '../world/tileTypes.js';
  */
 export async function runGoTo(npc, world, gx, gy, gz) {
     await npc.travelToTile(gx, gy, gz, world);
+}
+
+/**
+ * @param {import('../actors/npcSimulation.js').NpcEntity} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {string} ref
+ * @param {{ excludeKeys?: Set<string> }} [opts]
+ */
+export async function runGoToMemoryRef(npc, world, ref, opts) {
+    await travelNpcToMemoryRef(npc, ref, world, opts);
 }
 
 /**

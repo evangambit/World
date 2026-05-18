@@ -11,7 +11,9 @@ import {
 import { getObjectTagSpec } from './npcObjectTags.js';
 import { cookUncookedSteakInInventory } from '../domain/cooking.js';
 import { applyFood } from '../domain/vitality.js';
-import { runGoTo, runFind, runTimedAction } from './npcTaskPrimitives.js';
+import { runFind, runGoTo, runGoToMemoryRef, runTimedAction } from './npcTaskPrimitives.js';
+import { isKnownPlanRef, resolvePlanRefTargets, resolvePlanRefs } from './npcPlanRefs.js';
+import { World3D } from '../world/world.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
 
@@ -89,11 +91,11 @@ export function validatePlan(plan, limits = {}) {
         }
         if (node.type === 'take') {
             if (!node.object) return 'take requires object tag';
-            if (!node.from) return 'take requires from binding ref';
+            if (!node.from) return 'take requires from ref';
         }
         if (node.type === 'stash') {
             if (!node.object) return 'stash requires object tag';
-            if (!node.to) return 'stash requires to binding ref';
+            if (!node.to) return 'stash requires to ref';
         }
         if (node.type === 'action') {
             if (!node.action) return 'action requires action id';
@@ -111,24 +113,22 @@ export function validatePlan(plan, limits = {}) {
  * @param {import('../actors/npc.js').NPC} npc
  * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} plan
- * @param {Record<string, TileRef | null>} bindings
  * @returns {Promise<PlanResult>}
  */
-export async function runPlan(npc, world, plan, bindings) {
-    return executeNode(npc, world, plan, bindings);
+export async function runPlan(npc, world, plan) {
+    return executeNode(npc, world, plan);
 }
 
 /**
  * @param {import('../actors/npc.js').NPC} npc
  * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} node
- * @param {Record<string, TileRef | null>} bindings
  * @returns {Promise<PlanResult>}
  */
-async function executeNode(npc, world, node, bindings) {
+async function executeNode(npc, world, node) {
     if (node.type === 'seq') {
         for (const step of node.steps ?? []) {
-            const result = await executeNode(npc, world, step, bindings);
+            const result = await executeNode(npc, world, step);
             if (!result.ok) return result;
         }
         return { ok: true };
@@ -138,7 +138,7 @@ async function executeNode(npc, world, node, bindings) {
         /** @type {PlanResult | null} */
         let lastFailure = null;
         for (const step of node.steps ?? []) {
-            const result = await executeNode(npc, world, step, bindings);
+            const result = await executeNode(npc, world, step);
             if (result.ok) return result;
             lastFailure = result;
         }
@@ -146,7 +146,7 @@ async function executeNode(npc, world, node, bindings) {
     }
 
     try {
-        await executeLeaf(npc, world, node, bindings);
+        await executeLeaf(npc, world, node);
         return { ok: true };
     } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
@@ -158,13 +158,10 @@ async function executeNode(npc, world, node, bindings) {
  * @param {import('../actors/npc.js').NPC} npc
  * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} step
- * @param {Record<string, TileRef | null>} bindings
  */
-async function executeLeaf(npc, world, step, bindings) {
+async function executeLeaf(npc, world, step) {
     if (step.type === 'goto') {
-        const target = resolveGotoTarget(step, bindings);
-        if (!target) throw new Error(`goto: unbound ref ${step.ref}`);
-        await runGoTo(npc, world, target.x, target.y, target.z);
+        await runGoToWithFallback(npc, world, step);
         return;
     }
 
@@ -206,38 +203,126 @@ async function executeLeaf(npc, world, step, bindings) {
     }
 
     if (step.type === 'take') {
-        takeFromContainerByTag(npc, world, step.object, step.from, bindings);
+        await takeFromContainerByTag(npc, world, step.object, step.from);
         return;
     }
 
     if (step.type === 'stash') {
-        stashToContainerByTag(npc, world, step.object, step.to, bindings);
+        await stashToContainerByTag(npc, world, step.object, step.to);
         return;
     }
 
     if (step.type === 'action') {
-        const target = resolveGotoTarget(step, bindings);
-        if (!target) throw new Error(`action: unbound ref ${step.ref}`);
-        await runTimedAction(npc, world, step.action, target.x, target.y, target.z);
-        return;
+        if (step.ref != null && isKnownPlanRef(step.ref)) {
+            await runWithMemoryRefFallback(npc, world, step.ref, (target) =>
+                runTimedAction(npc, world, step.action, target.x, target.y, target.z));
+            return;
+        }
+
+        const targets = resolvePlanRefTargets(npc, world, step);
+        if (targets.length === 0) {
+            throw new Error(`action: unresolved ref ${step.ref}`);
+        }
+
+        /** @type {Error | null} */
+        let lastErr = null;
+        for (const target of targets) {
+            try {
+                await runTimedAction(npc, world, step.action, target.x, target.y, target.z);
+                return;
+            } catch (err) {
+                lastErr = err instanceof Error ? err : new Error(String(err));
+            }
+        }
+        throw lastErr ?? new Error('action: all targets failed');
     }
 
     throw new Error(`Unknown plan step type: ${step.type}`);
 }
 
 /**
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
  * @param {PlanStep} step
- * @param {Record<string, TileRef | null>} bindings
- * @returns {TileRef | null}
  */
-function resolveGotoTarget(step, bindings) {
-    if (step.ref != null) {
-        return bindings[step.ref] ?? null;
+async function runGoToWithFallback(npc, world, step) {
+    if (step.ref != null && isKnownPlanRef(step.ref)) {
+        const tried = new Set();
+        /** @type {Error | null} */
+        let lastErr = null;
+
+        for (let attempt = 0; attempt < 16; attempt++) {
+            try {
+                await runGoToMemoryRef(npc, world, step.ref, { excludeKeys: tried });
+                return;
+            } catch (err) {
+                lastErr = err instanceof Error ? err : new Error(String(err));
+                const failedKey = /** @type {{ failedKey?: string }} */ (lastErr).failedKey;
+                if (failedKey) {
+                    tried.add(failedKey);
+                    continue;
+                }
+                if (tried.size === 0) break;
+            }
+        }
+
+        if (tried.size > 0) {
+            throw lastErr ?? new Error(`goto: all remembered targets failed for ${step.ref}`);
+        }
+        throw lastErr ?? new Error(`goto: unresolved ref ${step.ref}`);
     }
-    if (step.x != null && step.y != null && step.z != null) {
-        return { x: step.x, y: step.y, z: step.z };
+
+    const targets = resolvePlanRefTargets(npc, world, step);
+    if (targets.length === 0) {
+        throw new Error(`goto: unresolved ref ${step.ref}`);
     }
-    return null;
+
+    /** @type {Error | null} */
+    let lastErr = null;
+    for (const target of targets) {
+        try {
+            await runGoTo(npc, world, target.x, target.y, target.z);
+            return;
+        } catch (err) {
+            lastErr = err instanceof Error ? err : new Error(String(err));
+        }
+    }
+    throw lastErr ?? new Error('goto: all targets failed');
+}
+
+/**
+ * Re-query memory after each failure so newly perceived locations are tried.
+ * @param {import('../actors/npc.js').NPC} npc
+ * @param {import('../world/world.js').World3D} world
+ * @param {string} ref
+ * @param {(target: TileRef) => Promise<void>} tryTarget
+ */
+async function runWithMemoryRefFallback(npc, world, ref, tryTarget) {
+    const tried = new Set();
+    /** @type {Error | null} */
+    let lastErr = null;
+
+    for (;;) {
+        const pending = resolvePlanRefs(npc, world, ref).filter(
+            (t) => !tried.has(World3D.key(t.x, t.y, t.z)),
+        );
+        if (pending.length === 0) break;
+
+        for (const target of pending) {
+            tried.add(World3D.key(target.x, target.y, t.z));
+            try {
+                await tryTarget(target);
+                return;
+            } catch (err) {
+                lastErr = err instanceof Error ? err : new Error(String(err));
+            }
+        }
+    }
+
+    if (tried.size === 0) {
+        throw new Error(`unresolved ref ${ref}`);
+    }
+    throw lastErr ?? new Error(`all remembered targets failed for ${ref}`);
 }
 
 /**
@@ -310,35 +395,75 @@ function dropFromInventoryByTag(npc, world, objectTag, count) {
  * @param {import('../world/world.js').World3D} world
  * @param {string} objectTag
  * @param {string} ref
- * @param {Record<string, TileRef | null>} bindings
  */
-function takeFromContainerByTag(npc, world, objectTag, ref, bindings) {
-    const container = bindings[ref];
-    if (!container) throw new Error(`take: unbound ref ${ref}`);
-
+async function takeFromContainerByTag(npc, world, objectTag, ref) {
     const spec = getObjectTagSpec(objectTag);
-    const match = findContainerStack(
-        world,
-        container.x,
-        container.y,
-        container.z,
-        spec.inventoryTypes,
-    );
-    if (!match) throw new Error(`take: no ${objectTag} in container ${ref}`);
 
-    if (
-        !takeFromContainer(
-            npc,
+    if (isKnownPlanRef(ref)) {
+        await runWithMemoryRefFallback(npc, world, ref, async (container) => {
+            const match = findContainerStack(
+                world,
+                container.x,
+                container.y,
+                container.z,
+                spec.inventoryTypes,
+            );
+            if (!match) {
+                throw new Error(`take: no ${objectTag} at (${container.x}, ${container.y})`);
+            }
+            if (
+                !takeFromContainer(
+                    npc,
+                    world,
+                    container.x,
+                    container.y,
+                    container.z,
+                    match.objType,
+                    match.buildingId,
+                )
+            ) {
+                throw new Error(`take: failed at (${container.x}, ${container.y})`);
+            }
+        });
+        return;
+    }
+
+    const containers = resolvePlanRefTargets(npc, world, { ref });
+    if (containers.length === 0) throw new Error(`take: unresolved ref ${ref}`);
+
+    /** @type {Error | null} */
+    let lastErr = null;
+
+    for (const container of containers) {
+        const match = findContainerStack(
             world,
             container.x,
             container.y,
             container.z,
-            match.objType,
-            match.buildingId,
-        )
-    ) {
-        throw new Error(`take: failed at (${container.x}, ${container.y})`);
+            spec.inventoryTypes,
+        );
+        if (!match) {
+            lastErr = new Error(`take: no ${objectTag} at (${container.x}, ${container.y})`);
+            continue;
+        }
+
+        if (
+            takeFromContainer(
+                npc,
+                world,
+                container.x,
+                container.y,
+                container.z,
+                match.objType,
+                match.buildingId,
+            )
+        ) {
+            return;
+        }
+        lastErr = new Error(`take: failed at (${container.x}, ${container.y})`);
     }
+
+    throw lastErr ?? new Error(`take: no ${objectTag} in remembered containers`);
 }
 
 /**
@@ -346,21 +471,36 @@ function takeFromContainerByTag(npc, world, objectTag, ref, bindings) {
  * @param {import('../world/world.js').World3D} world
  * @param {string} objectTag
  * @param {string} ref
- * @param {Record<string, TileRef | null>} bindings
  */
-function stashToContainerByTag(npc, world, objectTag, ref, bindings) {
-    const container = bindings[ref];
-    if (!container) throw new Error(`stash: unbound ref ${ref}`);
-
+async function stashToContainerByTag(npc, world, objectTag, ref) {
     const spec = getObjectTagSpec(objectTag);
     const stack = (npc.inventory ?? []).find(
         (e) => spec.inventoryTypes.includes(e.objType) && e.count > 0,
     );
     if (!stack) throw new Error(`stash: no ${objectTag} in inventory`);
 
-    if (!stashToContainer(npc, world, container.x, container.y, container.z, stack.objType, stack.buildingId)) {
-        throw new Error(`stash: failed at (${container.x}, ${container.y})`);
+    if (isKnownPlanRef(ref)) {
+        await runWithMemoryRefFallback(npc, world, ref, async (container) => {
+            if (!stashToContainer(npc, world, container.x, container.y, container.z, stack.objType, stack.buildingId)) {
+                throw new Error(`stash: failed at (${container.x}, ${container.y})`);
+            }
+        });
+        return;
     }
+
+    const containers = resolvePlanRefTargets(npc, world, { ref });
+    if (containers.length === 0) throw new Error(`stash: unresolved ref ${ref}`);
+
+    /** @type {Error | null} */
+    let lastErr = null;
+    for (const container of containers) {
+        if (stashToContainer(npc, world, container.x, container.y, container.z, stack.objType, stack.buildingId)) {
+            return;
+        }
+        lastErr = new Error(`stash: failed at (${container.x}, ${container.y})`);
+    }
+
+    throw lastErr ?? new Error('stash: all remembered containers failed');
 }
 
 function eatFromInventory(npc, objectTag, pick) {
