@@ -269,7 +269,7 @@ async function runGoToWithFallback(npc, world, step) {
         if (tried.size > 0) {
             throw lastErr ?? new Error(`goto: all remembered targets failed for ${step.ref}`);
         }
-        throw lastErr ?? new Error(`goto: unresolved ref ${step.ref}`);
+        throw lastErr ?? new Error(`goto: no reachable remembered target for ${step.ref}`);
     }
 
     const targets = resolvePlanRefTargets(npc, world, step);
