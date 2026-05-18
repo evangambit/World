@@ -5,8 +5,12 @@ import { createNpcEntity } from '../actors/npcSimulation.js';
 import { snapshotTileState } from './npcMemory.js';
 import { World3D } from '../world/world.js';
 import {
+    normalizePlanRef,
+    parsePlanRefAsTile,
     rememberLocationsOfNearby,
     resolvePlanRef,
+    resolvePlanRefs,
+    resolvePlanRefTargets,
     tileMemoryMatchesObjectTag,
 } from './npcPlanRefs.js';
 
@@ -41,6 +45,46 @@ describe('rememberLocationsOfNearby', () => {
         });
 
         assert.deepEqual(rememberLocationsOfNearby(npc, 'stove'), []);
+    });
+});
+
+describe('normalizePlanRef', () => {
+    it('accepts legacy binding objects with a query field', () => {
+        assert.equal(
+            normalizePlanRef({ query: 'rememberLocationsOfNearby(chest)' }),
+            'rememberLocationsOfNearby(chest)',
+        );
+    });
+
+    it('resolves legacy binding objects via resolvePlanRefs', () => {
+        const npc = createNpcEntity(0, 0, 0);
+        npc.tileMemory.set(World3D.key(2, 0, 0), {
+            seenAt: 1,
+            state: snapshotTileState({ terrain: T.GRASS, obj: Obj.CHEST }),
+        });
+
+        const refs = resolvePlanRefs(npc, {}, {
+            query: 'rememberLocationsOfNearby(chest)',
+        });
+        assert.deepEqual(refs, [{ x: 2, y: 0, z: 0 }]);
+    });
+});
+
+describe('parsePlanRefAsTile', () => {
+    it('accepts coordinate objects on ref', () => {
+        assert.deepEqual(parsePlanRefAsTile({ x: 9, y: 30, z: 0 }), { x: 9, y: 30, z: 0 });
+    });
+
+    it('does not treat legacy query objects as tiles', () => {
+        assert.equal(parsePlanRefAsTile({ query: 'rememberLocationsOfNearby(chest)' }), null);
+    });
+
+    it('resolves goto steps with coordinate ref objects', () => {
+        const npc = createNpcEntity(0, 0, 0);
+        const targets = resolvePlanRefTargets(npc, {}, {
+            ref: { x: 9, y: 30, z: 0 },
+        });
+        assert.deepEqual(targets, [{ x: 9, y: 30, z: 0 }]);
     });
 });
 

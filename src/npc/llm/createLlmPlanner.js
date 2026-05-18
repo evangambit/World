@@ -2,6 +2,8 @@
  * Build an NPC planner from a generic LlmProvider.
  */
 import { extractJsonFromText } from './extractJson.js';
+import { logPlannerResponse } from './npcPrompt.js';
+import { isLlmCacheEnabled, wrapProviderWithLlmCache } from './llmResponseCache.js';
 import { createLlmProvider } from './providers/createLlmProvider.js';
 import { parsePlanDocument } from './npcPlanner.js';
 
@@ -32,7 +34,7 @@ export function createLlmNpcPlanner(provider, opts = {}) {
         let userContent = request.messages.user;
 
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-            const { content } = await provider.complete({
+            const completionRequest = {
                 model,
                 temperature,
                 jsonMode: true,
@@ -40,6 +42,13 @@ export function createLlmNpcPlanner(provider, opts = {}) {
                     { role: 'system', content: request.messages.system },
                     { role: 'user', content: userContent },
                 ],
+            };
+            const { content, cached } = await provider.complete(completionRequest);
+
+            logPlannerResponse(request.npc, request.event, {
+                attempt: attempt + 1,
+                content,
+                cached,
             });
 
             const parsed = parsePlanDocument(extractJsonFromText(content));
@@ -53,6 +62,9 @@ export function createLlmNpcPlanner(provider, opts = {}) {
             ].join('\n');
         }
 
+        logPlannerResponse(request.npc, request.event, {
+            error: `no valid plan after ${maxAttempts} attempt(s)`,
+        });
         return null;
     };
 }
@@ -63,7 +75,10 @@ export function createLlmNpcPlanner(provider, opts = {}) {
  * @returns {NpcPlannerFn}
  */
 export function createNpcPlannerFromConfig(config, opts = {}) {
-    const provider = createLlmProvider(config);
+    let provider = createLlmProvider(config);
+    if (isLlmCacheEnabled()) {
+        provider = wrapProviderWithLlmCache(provider);
+    }
     return createLlmNpcPlanner(provider, {
         ...opts,
         model: opts.model ?? config.model,

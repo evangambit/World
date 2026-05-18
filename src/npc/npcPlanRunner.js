@@ -12,8 +12,15 @@ import { getObjectTagSpec } from './npcObjectTags.js';
 import { cookUncookedSteakInInventory } from '../domain/cooking.js';
 import { applyFood } from '../domain/vitality.js';
 import { runFind, runGoTo, runGoToMemoryRef, runTimedAction } from './npcTaskPrimitives.js';
-import { isKnownPlanRef, resolvePlanRefTargets, resolvePlanRefs } from './npcPlanRefs.js';
+import {
+    formatPlanRef,
+    isKnownPlanRef,
+    normalizePlanRef,
+    resolvePlanRefTargets,
+    resolvePlanRefs,
+} from './npcPlanRefs.js';
 import { World3D } from '../world/world.js';
+import { Obj } from '../world/tileTypes.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
 
@@ -213,8 +220,9 @@ async function executeLeaf(npc, world, step) {
     }
 
     if (step.type === 'action') {
-        if (step.ref != null && isKnownPlanRef(step.ref)) {
-            await runWithMemoryRefFallback(npc, world, step.ref, (target) =>
+        const actionRef = normalizePlanRef(step.ref);
+        if (actionRef != null && isKnownPlanRef(actionRef)) {
+            await runWithMemoryRefFallback(npc, world, actionRef, (target) =>
                 runTimedAction(npc, world, step.action, target.x, target.y, target.z));
             return;
         }
@@ -246,14 +254,15 @@ async function executeLeaf(npc, world, step) {
  * @param {PlanStep} step
  */
 async function runGoToWithFallback(npc, world, step) {
-    if (step.ref != null && isKnownPlanRef(step.ref)) {
+    const refStr = normalizePlanRef(step.ref);
+    if (refStr != null && isKnownPlanRef(refStr)) {
         const tried = new Set();
         /** @type {Error | null} */
         let lastErr = null;
 
         for (let attempt = 0; attempt < 16; attempt++) {
             try {
-                await runGoToMemoryRef(npc, world, step.ref, { excludeKeys: tried });
+                await runGoToMemoryRef(npc, world, refStr, { excludeKeys: tried });
                 return;
             } catch (err) {
                 lastErr = err instanceof Error ? err : new Error(String(err));
@@ -267,14 +276,14 @@ async function runGoToWithFallback(npc, world, step) {
         }
 
         if (tried.size > 0) {
-            throw lastErr ?? new Error(`goto: all remembered targets failed for ${step.ref}`);
+            throw lastErr ?? new Error(`goto: all remembered targets failed for ${refStr}`);
         }
-        throw lastErr ?? new Error(`goto: no reachable remembered target for ${step.ref}`);
+        throw lastErr ?? new Error(`goto: no reachable remembered target for ${refStr}`);
     }
 
     const targets = resolvePlanRefTargets(npc, world, step);
     if (targets.length === 0) {
-        throw new Error(`goto: unresolved ref ${step.ref}`);
+        throw new Error(`goto: unresolved ref ${formatPlanRef(step.ref)}`);
     }
 
     /** @type {Error | null} */
@@ -398,9 +407,11 @@ function dropFromInventoryByTag(npc, world, objectTag, count) {
  */
 async function takeFromContainerByTag(npc, world, objectTag, ref) {
     const spec = getObjectTagSpec(objectTag);
+    const refStr = normalizePlanRef(ref);
+    if (!refStr) throw new Error(`take: invalid ref ${JSON.stringify(ref)}`);
 
-    if (isKnownPlanRef(ref)) {
-        await runWithMemoryRefFallback(npc, world, ref, async (container) => {
+    if (isKnownPlanRef(refStr)) {
+        await runWithMemoryRefFallback(npc, world, refStr, async (container) => {
             const match = findContainerStack(
                 world,
                 container.x,
@@ -428,8 +439,8 @@ async function takeFromContainerByTag(npc, world, objectTag, ref) {
         return;
     }
 
-    const containers = resolvePlanRefTargets(npc, world, { ref });
-    if (containers.length === 0) throw new Error(`take: unresolved ref ${ref}`);
+    const containers = resolvePlanRefTargets(npc, world, { ref: refStr });
+    if (containers.length === 0) throw new Error(`take: unresolved ref ${refStr}`);
 
     /** @type {Error | null} */
     let lastErr = null;
@@ -474,13 +485,16 @@ async function takeFromContainerByTag(npc, world, objectTag, ref) {
  */
 async function stashToContainerByTag(npc, world, objectTag, ref) {
     const spec = getObjectTagSpec(objectTag);
+    const refStr = normalizePlanRef(ref);
+    if (!refStr) throw new Error(`stash: invalid ref ${JSON.stringify(ref)}`);
+
     const stack = (npc.inventory ?? []).find(
         (e) => spec.inventoryTypes.includes(e.objType) && e.count > 0,
     );
     if (!stack) throw new Error(`stash: no ${objectTag} in inventory`);
 
-    if (isKnownPlanRef(ref)) {
-        await runWithMemoryRefFallback(npc, world, ref, async (container) => {
+    if (isKnownPlanRef(refStr)) {
+        await runWithMemoryRefFallback(npc, world, refStr, async (container) => {
             if (!stashToContainer(npc, world, container.x, container.y, container.z, stack.objType, stack.buildingId)) {
                 throw new Error(`stash: failed at (${container.x}, ${container.y})`);
             }
@@ -488,8 +502,8 @@ async function stashToContainerByTag(npc, world, objectTag, ref) {
         return;
     }
 
-    const containers = resolvePlanRefTargets(npc, world, { ref });
-    if (containers.length === 0) throw new Error(`stash: unresolved ref ${ref}`);
+    const containers = resolvePlanRefTargets(npc, world, { ref: refStr });
+    if (containers.length === 0) throw new Error(`stash: unresolved ref ${refStr}`);
 
     /** @type {Error | null} */
     let lastErr = null;

@@ -21,6 +21,7 @@
 /**
  * @typedef {Object} LlmCompletionResult
  * @property {string} content
+ * @property {boolean} [cached] - true when served from localStorage cache
  */
 
 /**

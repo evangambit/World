@@ -171,3 +171,55 @@ export function logPlannerMessages(npc, event, messages) {
     console.log('system\n', messages.system);
     console.log('user\n', messages.user);
 }
+
+/**
+ * @typedef {Object} PlannerResponseLog
+ * @property {number} [attempt]
+ * @property {string} [content] - raw model text
+ * @property {boolean} [cached] - served from localStorage, not the API
+ * @property {import('../npcTasks.js').PlanDocument} [plan] - parsed plan document
+ * @property {string} [error]
+ * @property {null} [result] - explicit null result (mock idle, exhausted retries)
+ */
+
+/**
+ * Log planner responses (raw LLM text, parsed plan, or null).
+ * @param {import('../../actors/npcSimulation.js').NpcEntity} npc
+ * @param {PlannerEvent} event
+ * @param {PlannerResponseLog} response
+ */
+export function logPlannerResponse(npc, event, response) {
+    const name = npc.name ?? 'NPC';
+    const attemptSuffix =
+        response.attempt != null ? ` attempt ${response.attempt}` : '';
+    const label = `[NPC ${name}] planner ← LLM (${event.reason})${attemptSuffix}`;
+
+    const logBody = () => {
+        console.log('event', event);
+        if (response.cached) {
+            console.log('(localStorage cache hit)');
+        }
+        if (response.content != null) {
+            console.log('content\n', response.content);
+        }
+        if (response.plan != null) {
+            console.log('plan\n', JSON.stringify(response.plan, null, 2));
+        }
+        if (response.error != null) {
+            console.log('error', response.error);
+        }
+        if (response.result === null) {
+            console.log('result', null);
+        }
+    };
+
+    if (typeof console.groupCollapsed === 'function') {
+        console.groupCollapsed(label);
+        logBody();
+        console.groupEnd();
+        return;
+    }
+
+    console.log(label);
+    logBody();
+}

@@ -13,6 +13,54 @@ import { getObjectTagSpec } from './npcObjectTags.js';
 export const REMEMBER_NEARBY_REF_RE = /^rememberLocationsOfNearby\(([^)]+)\)$/;
 
 /**
+ * Coerce a plan ref field to a string (LLMs sometimes emit legacy `{ query: "..." }`).
+ * @param {unknown} ref
+ * @returns {string | null}
+ */
+export function normalizePlanRef(ref) {
+    if (ref == null) return null;
+    if (typeof ref === 'string') {
+        const trimmed = ref.trim();
+        return trimmed || null;
+    }
+    if (typeof ref === 'object') {
+        const query = /** @type {{ query?: string }} */ (ref).query;
+        if (typeof query === 'string') {
+            const trimmed = query.trim();
+            if (trimmed) return trimmed;
+        }
+    }
+    return null;
+}
+
+/**
+ * @param {unknown} ref
+ * @returns {TileRef | null}
+ */
+export function parsePlanRefAsTile(ref) {
+    if (ref == null || typeof ref !== 'object') return null;
+    const o = /** @type {{ query?: string, x?: unknown, y?: unknown, z?: unknown }} */ (ref);
+    if (o.query != null) return null;
+    const { x, y, z } = o;
+    if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') return null;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+    return { x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) };
+}
+
+/**
+ * @param {unknown} ref
+ * @returns {string}
+ */
+export function formatPlanRef(ref) {
+    const tile = parsePlanRefAsTile(ref);
+    if (tile) return `(${tile.x},${tile.y},${tile.z})`;
+    const refStr = normalizePlanRef(ref);
+    if (refStr) return refStr;
+    if (ref == null) return 'null';
+    return JSON.stringify(ref);
+}
+
+/**
  * @param {TileData} state
  * @param {string} objectTag
  * @returns {boolean}
@@ -68,7 +116,9 @@ export function rememberLocationsOfNearby(npc, objectTag) {
  * @returns {TileRef[]}
  */
 export function resolvePlanRefs(npc, _world, ref) {
-    const match = ref.match(REMEMBER_NEARBY_REF_RE);
+    const refStr = normalizePlanRef(ref);
+    if (!refStr) return [];
+    const match = refStr.match(REMEMBER_NEARBY_REF_RE);
     if (!match) return [];
     const objectTag = match[1].trim();
     if (!objectTag) return [];
@@ -92,12 +142,16 @@ export function resolvePlanRef(npc, world, ref) {
 /**
  * @param {NpcEntity} npc
  * @param {World3D} world
- * @param {{ ref?: string, x?: number, y?: number, z?: number }} step
+ * @param {{ ref?: unknown, x?: number, y?: number, z?: number }} step
  * @returns {TileRef[]}
  */
 export function resolvePlanRefTargets(npc, world, step) {
-    if (step.ref != null) {
-        return resolvePlanRefs(npc, world, step.ref);
+    const tileFromRef = parsePlanRefAsTile(step.ref);
+    if (tileFromRef) return [tileFromRef];
+
+    const refStr = normalizePlanRef(step.ref);
+    if (refStr != null) {
+        return resolvePlanRefs(npc, world, refStr);
     }
     if (step.x != null && step.y != null && step.z != null) {
         return [{ x: step.x, y: step.y, z: step.z }];
@@ -110,5 +164,6 @@ export function resolvePlanRefTargets(npc, world, step) {
  * @returns {boolean}
  */
 export function isKnownPlanRef(ref) {
-    return REMEMBER_NEARBY_REF_RE.test(ref);
+    const refStr = normalizePlanRef(ref);
+    return refStr != null && REMEMBER_NEARBY_REF_RE.test(refStr);
 }

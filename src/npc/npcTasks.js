@@ -1,7 +1,11 @@
 /**
  * NPC task queue — legacy primitives plus seq/sel plans.
  */
-import { buildPlannerMessages, logPlannerMessages } from './llm/npcPrompt.js';
+import {
+    buildPlannerMessages,
+    logPlannerMessages,
+    logPlannerResponse,
+} from './llm/npcPrompt.js';
 import { parsePlanDocument } from './llm/npcPlanner.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
 import { runFind, runGoTo, runTimedAction } from './npcTaskPrimitives.js';
@@ -237,6 +241,11 @@ export class NPCTaskRunner {
 
         Promise.resolve(planner(request))
             .then((raw) => {
+                logPlannerResponse(
+                    this.npc,
+                    event,
+                    raw == null ? { result: null } : { plan: raw },
+                );
                 if (!this.npc.isAlive) return;
                 if (raw == null) {
                     this._lastPlannerAt = Date.now();

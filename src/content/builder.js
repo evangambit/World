@@ -437,16 +437,6 @@ export function buildVillage() {
 export const NPC_DEFAULT_INVENTORY = [{ objType: Obj.UNCOOKED_STEAK, count: 1 }];
 
 export const VILLAGE_NPC_SPAWNS = [
-    // Elara — northwest wood cottage (6, 12)
-    { name: 'Elara', preset: 0, x: 9.5, y: 15.5, z: 0 },
     // Finn — southwest stone house (6, 28)
     { name: 'Finn', preset: 1, x: 9.5, y: 30.5, z: 0 },
-    // Mira — cottage west of market (18, 20)
-    { name: 'Mira', preset: 2, x: 21.5, y: 22.5, z: 0 },
-    // Brom — cottage east of the tavern (48, 17)
-    { name: 'Brom', preset: 3, x: 50.5, y: 19.5, z: 0 },
-    // Sage — cottage north of Elara (13, 12)
-    { name: 'Sage', preset: 4, x: 16.5, y: 14.5, z: 0 },
-    // Nyx — cottage east of the shop (44, 26)
-    { name: 'Nyx', preset: 5, x: 47.5, y: 28.5, z: 0 },
 ];

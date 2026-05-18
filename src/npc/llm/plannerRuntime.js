@@ -55,6 +55,9 @@ export function resolveNodePlannerConfig(env = process.env) {
  * Browser: enable with `?llm=openrouter` (or `openai-compatible`) and set keys in localStorage:
  *   world.llm.apiKey, world.llm.model (optional), world.llm.baseUrl (for local)
  *
+ * Planner responses are cached in localStorage by default (`world.llm.cache.v1.*`).
+ * Disable with `?llm_cache=0` or `localStorage world.llm.cache = "0"`.
+ *
  * @returns {LlmProviderConfig | null}
  */
 export function resolveBrowserPlannerConfig() {

@@ -11,6 +11,7 @@ import {
 } from './npcMemory.js';
 import {
     findBestReachableMemoryRefTarget,
+    resolveTravelDestinationForMemory,
     syncMemoryRefTravelGoal,
     travelNpcToMemoryRef,
 } from './npcMemoryTravel.js';
@@ -29,6 +30,41 @@ function fillGrass(world, x0, y0, x1, y1) {
         }
     }
 }
+
+describe('resolveTravelDestinationForMemory', () => {
+    it('uses an adjacent walkable tile when the remembered object blocks its cell', () => {
+        const world = new World3D();
+        fillGrass(world, 8, 8, 11, 11);
+        world.setTile(9, 9, 0, { terrain: T.GRASS, obj: Obj.STOVE });
+
+        const npc = createNpcEntity(9.5, 10.5, 0);
+        const dest = resolveTravelDestinationForMemory(world, npc, 9, 9, 0);
+
+        assert.ok(dest);
+        assert.ok(dest.x !== 9 || dest.y !== 9);
+        assert.equal(world.isWalkable(dest.x, dest.y, dest.z), true);
+    });
+
+    it('findBestReachableMemoryRefTarget reaches a remembered stove', () => {
+        const world = new World3D();
+        fillGrass(world, 8, 8, 11, 11);
+        world.setTile(9, 9, 0, { terrain: T.GRASS, obj: Obj.STOVE });
+
+        const npc = createNpcEntity(9.5, 10.5, 0);
+        npc.tileMemory.set(World3D.key(9, 9, 0), {
+            seenAt: 1,
+            state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
+        });
+
+        const best = findBestReachableMemoryRefTarget(
+            npc,
+            world,
+            'rememberLocationsOfNearby(stove)',
+        );
+        assert.equal(best?.key, '9,9,0');
+        assert.ok(best && world.isWalkable(best.x, best.y, best.z));
+    });
+});
 
 describe('travelNpcToMemoryRef', () => {
     it('retargets to a closer stove when one is remembered mid-travel', async () => {

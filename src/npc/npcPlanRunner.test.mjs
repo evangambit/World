@@ -49,3 +49,19 @@ describe('goto with rememberLocationsOfNearby', () => {
         assert.equal(Math.floor(npc.x), 12);
     });
 });
+
+describe('cook plan step', () => {
+    it('cooks uncooked_food in inventory', async () => {
+        const world = new World3D();
+        const npc = createNpcEntity(0, 0, 0);
+        npc.inventory = [{ objType: Obj.UNCOOKED_STEAK, count: 1 }];
+
+        const result = await runPlan(npc, world, {
+            type: 'cook',
+            object: 'uncooked_food',
+        });
+
+        assert.equal(result.ok, true);
+        assert.ok(npc.inventory.some((s) => s.objType === Obj.STEAK && s.count > 0));
+    });
+});
