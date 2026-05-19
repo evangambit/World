@@ -11,6 +11,7 @@ import {
 import { getObjectTagSpec } from './npcObjectTags.js';
 import { cookUncookedSteakInInventory } from '../domain/cooking.js';
 import { applyFood } from '../domain/vitality.js';
+import { runExplore } from './npcExplore.js';
 import { runFind, runGoTo, runGoToMemoryRef, runTimedAction } from './npcTaskPrimitives.js';
 import {
     formatPlanRef,
@@ -34,6 +35,8 @@ import { Obj } from '../world/tileTypes.js';
  * @property {number} [z]
  * @property {string} [object]
  * @property {number} [radius]
+ * @property {'home' | 'self'} [anchor]
+ * @property {number} [maxVisits]
  * @property {string} [near]
  * @property {boolean} [pickup]
  * @property {string} [from]
@@ -53,7 +56,9 @@ import { Obj } from '../world/tileTypes.js';
  * @property {(path: number[], step: PlanStep) => void} [onStepEnd]
  */
 
-const LEAF_TYPES = new Set(['goto', 'find', 'eat', 'cook', 'door', 'drop', 'take', 'stash', 'action']);
+const LEAF_TYPES = new Set([
+    'goto', 'find', 'explore', 'eat', 'cook', 'door', 'drop', 'take', 'stash', 'action',
+]);
 const COMPOSITE_TYPES = new Set(['seq', 'sel']);
 
 /**
@@ -98,6 +103,10 @@ export function validatePlan(plan, limits = {}) {
         if (node.type === 'find') {
             if (!node.object) return 'find requires object tag';
             if (node.radius == null) return 'find requires radius';
+        }
+        if (node.type === 'explore') {
+            if (!node.object) return 'explore requires object tag';
+            if (node.radius == null) return 'explore requires radius';
         }
         if (node.type === 'eat' || node.type === 'cook' || node.type === 'drop') {
             if (!node.object) return `${node.type} requires object tag`;
@@ -198,6 +207,18 @@ async function executeLeaf(npc, world, step) {
             throw new Error('find without pickup is not implemented');
         }
         await runFind(npc, world, objType, step.radius, step.buildingId);
+        return;
+    }
+
+    if (step.type === 'explore') {
+        await runExplore(npc, world, {
+            objectTag: step.object,
+            radius: step.radius,
+            anchor: step.anchor === 'self' ? 'self' : 'home',
+            pickup: step.pickup !== false,
+            buildingId: step.buildingId,
+            maxVisits: step.maxVisits,
+        });
         return;
     }
 

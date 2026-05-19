@@ -27,10 +27,10 @@ export const EAT_FOOD_PLAN = {
                               type: 'seq',
                               steps: [
                                   {
-                                      type: 'find',
+                                      type: 'explore',
                                       object: 'edible_food',
-                                      radius: 8,
-                                      near: 'self',
+                                      radius: 20,
+                                      anchor: 'home',
                                       pickup: true,
                                   },
                                   { type: 'eat', from: 'inventory', object: 'edible_food', pick: 'random' },
@@ -40,10 +40,10 @@ export const EAT_FOOD_PLAN = {
                               type: 'seq',
                               steps: [
                                   {
-                                      type: 'find',
+                                      type: 'explore',
                                       object: 'uncooked_food',
-                                      radius: 8,
-                                      near: 'self',
+                                      radius: 20,
+                                      anchor: 'home',
                                       pickup: true,
                                   },
                                   { type: 'cook', object: 'uncooked_food' },

@@ -26,6 +26,12 @@ export const PLAN_LEAF_ACTIONS = [
         fields: 'object (tag), radius (tiles), pickup: true',
     },
     {
+        type: 'explore',
+        summary:
+            'Search a wide area for a pickable object: local find, remembered tiles, then grid waypoints from anchor.',
+        fields: 'object (tag), radius (tiles from anchor), anchor: "home"|"self", pickup: true',
+    },
+    {
         type: 'eat',
         summary: 'Eat matching food from inventory; lowers hunger.',
         fields: 'from: "inventory", object (tag), pick: "random" (optional)',

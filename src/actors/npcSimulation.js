@@ -10,6 +10,7 @@ import {
     tickNpcLocomotion,
     travelNpcToTile,
 } from './npcLocomotion.js';
+import { pickUpAtTile } from '../domain/entityActions.js';
 import { Entity } from './entity.js';
 import { initNpcMemory } from '../npc/npcMemory.js';
 
@@ -40,6 +41,7 @@ export const NPC_PRESETS = [
  *   isAlive: boolean,
  *   setGoal: (gx: number, gy: number, gz: number, world: World3D) => boolean,
  *   travelToTile: (tx: number, ty: number, tz: number, world: World3D) => Promise<void>,
+ *   pickUpAt: (tileX: number, tileY: number, tileZ: number, world: World3D) => boolean,
  *   tileMemory: Map<string, import('../npc/npcMemory.js').TileMemoryEntry>,
  * }} NpcEntity
  */
@@ -90,6 +92,7 @@ export function initNpcEntity(entity, opts = {}) {
     const loco = /** @type {NpcEntity} */ (entity);
     loco.setGoal = (gx, gy, gz, world) => setNpcGoal(loco, gx, gy, gz, world);
     loco.travelToTile = (tx, ty, tz, world) => travelNpcToTile(loco, tx, ty, tz, world);
+    loco.pickUpAt = (tileX, tileY, tileZ, world) => pickUpAtTile(loco, world, tileX, tileY, tileZ);
 
     Object.defineProperty(entity, 'isAlive', {
         get() {

@@ -95,10 +95,29 @@ Literal coordinates still work: `{ "type": "goto", "x": 3, "y": 4, "z": 0 }`.
 
 **Module:** `npcObjectTags.js` — abstract names in plan JSON (`edible_food`, `stove`, …) mapped to world/inventory type ids.
 
+## Wide-area search (`explore`)
+
+**Module:** `npcExplore.js`
+
+`find` only scans live tiles within a fixed radius of the NPC’s **current** position. **`explore`** is for genuine search over a region:
+
+1. **`runFind`** at perception range (default 5 tiles).  
+2. Travel to **remembered** pickable tiles matching the object tag (still on the ground).  
+3. Visit a **grid of walkable waypoints** (same spacing as perception) inside a Chebyshev disk around **`anchor`**: `home` (default) or `self`.  
+4. Repeat until something is picked up or **`maxVisits`** (default capped at 64) is exhausted.
+
+Example:
+
+```json
+{ "type": "explore", "object": "edible_food", "radius": 20, "anchor": "home", "pickup": true }
+```
+
+Use **`find`** for a quick grab near the NPC; use **`explore`** after `goto` to a stove (or when wandering) to sweep the homestead.
+
 ## Plans vs tasks
 
 - **Tasks** (`npcTasks.js`) — `goTo`, `find`, `timedAction`; imperative queue.  
-- **Plans** (`npcPlanRunner.js`) — `seq` / `sel` and leaves (`eat`, `cook`, `door`, `take`, …); must call `entityActions` (or primitives that do).  
+- **Plans** (`npcPlanRunner.js`) — `seq` / `sel` and leaves (`eat`, `cook`, `door`, `take`, `explore`, …); must call `entityActions` (or primitives that do).  
 
 Templates: `npcPlanTemplates.js` (e.g. `EAT_FOOD_PLAN` uses `rememberLocationsOfNearby(stove)`).
 
