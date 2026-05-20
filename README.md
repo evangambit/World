@@ -24,7 +24,7 @@ src/
     npcLocomotion.js      # Pathfinding + path follow
     npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
-    npcBrain.js           # Injectable brain (task queue vs no-op)
+    npcBrain.js           # Pluggable brain (memory + tasks; attach via npc.brain)
     npcMemory.js          # Per-tile perception + reachability
     npcMemoryTravel.js    # Adaptive travel toward memory refs
     npcPlanRefs.js        # rememberLocationsOfNearby(...) in plan steps

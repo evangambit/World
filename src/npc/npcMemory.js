@@ -20,13 +20,6 @@ export { NPC_PERCEPTION_RADIUS };
  */
 
 /**
- * @param {NpcEntity} npc
- */
-export function initNpcMemory(npc) {
-    npc.tileMemory = new Map();
-}
-
-/**
  * Immutable snapshot of a live tile (decoupled from world mutations).
  * @param {TileData} tile
  * @returns {TileData}

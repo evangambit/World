@@ -2,21 +2,43 @@
 
 Scheduling, declarative plans, and **tile memory** — not world rules. World interactions still go through `domain/entityActions.js`.
 
+## Brain (`npc.brain`)
+
+Each NPC may have a pluggable **brain** (`npcBrain.js`):
+
+- **`NpcTaskBrain`** (default for `NPC` class) — perception, memory-ref travel sync, task/plan queue
+- **`NoopNpcBrain`** — no cognition (body-only tests)
+
+Attach explicitly for test entities:
+
+```js
+import { createNpcEntity } from '../actors/npcSimulation.js';
+import { createTaskBrain } from './npcBrain.js';
+
+const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
+```
+
+Swap implementations via constructor:
+
+```js
+new NPC(x, y, z, preset, name, inv, { brain: myCustomBrain });
+```
+
+`npc.tasks` is available when the brain exposes it (task brain). `npc.tileMemory` delegates to the brain’s map when attached.
+
 ## Simulation order (per NPC, each frame)
 
 `tickSimulation` runs:
 
 1. `tickNpcSimulation` — vitality, locomotion, timed actions  
-2. `tickNpcPerception` — update `tileMemory` from nearby tiles  
-3. `syncMemoryRefTravelGoal` — retarget active memory-ref travel if a better stove (etc.) appears  
-4. `npcBrain` — task queue / planner (e.g. `tickNpcTaskBrain`)
+2. `npc.brain.tick` — for task brain: perception → `syncMemoryRefTravelGoal` → task queue
 
-Perception runs **before** the brain so newly seen tiles can influence travel and plans on the same frame.
+Perception runs **before** the task runner so newly seen tiles can influence travel and plans on the same frame.
 
 ## Tile memory
 
 **Module:** `npcMemory.js`  
-**Storage:** `npc.tileMemory` — `Map<"x,y,z", TileMemoryEntry>`
+**Storage:** `npc.brain.tileMemory` (exposed as `npc.tileMemory` when a brain is attached)
 
 ### Perception
 
@@ -29,7 +51,7 @@ Each frame, on the NPC’s current floor (`npc.z`), every tile within **5 tiles*
 - **`state`** is a copy of the live tile (`snapshotTileState`) so later world edits do not change memory until the tile is seen again.  
 - Empty cells (no tile in the world) are not stored.
 
-Initialized in `initNpcEntity` (`npcSimulation.js`).
+Initialized when a task brain attaches.
 
 ### Reachability (`reachable`)
 

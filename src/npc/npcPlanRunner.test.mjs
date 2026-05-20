@@ -1,7 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { tickNpcLocomotion } from '../actors/npcLocomotion.js';
 import { createNpcEntity } from '../actors/npcSimulation.js';
+import { createTaskBrain } from './npcBrain.js';
+import { driveLocomotionUntil } from './npcTestLocomotion.js';
 import { Obj, T } from '../world/tileTypes.js';
 import { World3D } from '../world/world.js';
 import { snapshotTileState } from './npcMemory.js';
@@ -28,23 +29,20 @@ describe('goto with rememberLocationsOfNearby', () => {
         const world = new World3D();
         fillGrass(world, 10, 10, 14, 10);
 
-        const npc = createNpcEntity(10.5, 10.5, 0);
+        const npc = createNpcEntity(10.5, 10.5, 0, { brain: createTaskBrain() });
         npc.tileMemory.set(World3D.key(12, 10, 0), {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
 
-        const resultPromise = runPlan(npc, world, {
-            type: 'goto',
-            ref: 'rememberLocationsOfNearby(stove)',
-        });
-
-        for (let i = 0; i < 300 && npc._memoryRefTravel; i++) {
-            tickNpcLocomotion(npc, 0.05);
-            syncMemoryRefTravelGoal(npc, world);
-        }
-
-        const result = await resultPromise;
+        const result = await driveLocomotionUntil(
+            npc,
+            runPlan(npc, world, {
+                type: 'goto',
+                ref: 'rememberLocationsOfNearby(stove)',
+            }),
+            { onTick: (n) => syncMemoryRefTravelGoal(n, world) },
+        );
         assert.equal(result.ok, true);
         assert.equal(Math.floor(npc.x), 12);
     });
@@ -53,7 +51,7 @@ describe('goto with rememberLocationsOfNearby', () => {
 describe('cook plan step', () => {
     it('cooks uncooked_food in inventory', async () => {
         const world = new World3D();
-        const npc = createNpcEntity(0, 0, 0);
+        const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
         npc.inventory = [{ objType: Obj.UNCOOKED_STEAK, count: 1 }];
 
         const result = await runPlan(npc, world, {

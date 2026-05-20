@@ -6,7 +6,6 @@ import { Camera } from './client/camera.js';
 import { Renderer } from './client/renderer.js';
 import { Entity } from './actors/entity.js';
 import { updatePlayerFromInput } from './client/playerController.js';
-import { tickNpcTaskBrain } from './npc/npcBrain.js';
 import { tickSimulation } from './simulation/tickSimulation.js';
 import { NPC, find } from './actors/npc.js';
 import { createNpcPlannerFromConfig } from './npc/llm/createLlmPlanner.js';
@@ -578,7 +577,6 @@ class Game {
                 gameTime: this.gameTime,
                 dt,
                 npcs: this.npcs,
-                npcBrain: tickNpcTaskBrain,
             }));
 
             this.camera.follow(this.player.x, this.player.y, dt);

@@ -1,7 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { tickNpcLocomotion } from '../actors/npcLocomotion.js';
 import { createNpcEntity } from '../actors/npcSimulation.js';
+import { createTaskBrain } from './npcBrain.js';
+import { driveLocomotionUntil } from './npcTestLocomotion.js';
 import { Obj, T } from '../world/tileTypes.js';
 import { World3D } from '../world/world.js';
 import {
@@ -37,7 +38,7 @@ describe('resolveTravelDestinationForMemory', () => {
         fillGrass(world, 8, 8, 11, 11);
         world.setTile(9, 9, 0, { terrain: T.GRASS, obj: Obj.STOVE });
 
-        const npc = createNpcEntity(9.5, 10.5, 0);
+        const npc = createNpcEntity(9.5, 10.5, 0, { brain: createTaskBrain() });
         const dest = resolveTravelDestinationForMemory(world, npc, 9, 9, 0);
 
         assert.ok(dest);
@@ -50,7 +51,7 @@ describe('resolveTravelDestinationForMemory', () => {
         fillGrass(world, 8, 8, 11, 11);
         world.setTile(9, 9, 0, { terrain: T.GRASS, obj: Obj.STOVE });
 
-        const npc = createNpcEntity(9.5, 10.5, 0);
+        const npc = createNpcEntity(9.5, 10.5, 0, { brain: createTaskBrain() });
         npc.tileMemory.set(World3D.key(9, 9, 0), {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
@@ -71,7 +72,7 @@ describe('travelNpcToMemoryRef', () => {
         const world = new World3D();
         fillGrass(world, 10, 10, 14, 10);
 
-        const npc = createNpcEntity(10.5, 10.5, 0);
+        const npc = createNpcEntity(10.5, 10.5, 0, { brain: createTaskBrain() });
         npc.tileMemory.set(World3D.key(14, 10, 0), {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
@@ -91,12 +92,9 @@ describe('travelNpcToMemoryRef', () => {
         syncMemoryRefTravelGoal(npc, world);
         assert.equal(npc._memoryRefTravel?.goalKey, '12,10,0');
 
-        for (let i = 0; i < 300 && npc._memoryRefTravel; i++) {
-            tickNpcLocomotion(npc, 0.05);
-            syncMemoryRefTravelGoal(npc, world);
-        }
-
-        await travelPromise;
+        await driveLocomotionUntil(npc, travelPromise, {
+            onTick: (n) => syncMemoryRefTravelGoal(n, world),
+        });
         assert.equal(Math.floor(npc.x), 12);
         assert.equal(Math.floor(npc.y), 10);
     });
@@ -108,7 +106,7 @@ describe('travelNpcToMemoryRef', () => {
             world.setTile(13, y, 0, { terrain: T.WALL_STONE, obj: 0 });
         }
 
-        const npc = createNpcEntity(10.5, 10.5, 0);
+        const npc = createNpcEntity(10.5, 10.5, 0, { brain: createTaskBrain() });
         npc.tileMemory.set(World3D.key(14, 10, 0), {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
@@ -130,12 +128,9 @@ describe('travelNpcToMemoryRef', () => {
             world,
         );
 
-        for (let i = 0; i < 300 && npc._memoryRefTravel; i++) {
-            tickNpcLocomotion(npc, 0.05);
-            syncMemoryRefTravelGoal(npc, world);
-        }
-
-        await travelPromise;
+        await driveLocomotionUntil(npc, travelPromise, {
+            onTick: (n) => syncMemoryRefTravelGoal(n, world),
+        });
         assert.equal(isTileMemoryReachable(npc, 14, 10, 0), false);
         assert.equal(getNpcTileMemory(npc, 12, 10, 0)?.reachable, true);
     });

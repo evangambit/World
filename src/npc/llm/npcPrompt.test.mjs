@@ -4,6 +4,7 @@ import { World3D } from '../../world/world.js';
 import { VITALITY } from '../../domain/vitality.js';
 import { Obj, T } from '../../world/tileTypes.js';
 import { createNpcEntity } from '../../actors/npcSimulation.js';
+import { createTaskBrain } from '../npcBrain.js';
 import { snapshotTileState, tickNpcPerception } from '../npcMemory.js';
 import {
     buildSystemPrompt,
@@ -79,7 +80,7 @@ describe('buildUserPrompt', () => {
 
     it('includes nearby chunk surroundings when world is provided', () => {
         const world = new World3D();
-        const npc = createNpcEntity(10, 10, 0);
+        const npc = createNpcEntity(10, 10, 0, { brain: createTaskBrain() });
         world.setTile(10, 10, 0, { terrain: T.DIRT, obj: Obj.NONE });
         world.setTile(11, 10, 0, { terrain: T.WALL_STONE, obj: Obj.NONE });
         tickNpcPerception(npc, world, 1);

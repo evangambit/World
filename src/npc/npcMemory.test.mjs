@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { World3D } from '../world/world.js';
 import { Obj, T } from '../world/tileTypes.js';
 import { createNpcEntity } from '../actors/npcSimulation.js';
+import { createTaskBrain } from './npcBrain.js';
 import { tickSimulation } from '../simulation/tickSimulation.js';
 import {
     NPC_PERCEPTION_RADIUS,
@@ -43,7 +44,7 @@ describe('tileMemoryStatesEqual', () => {
 describe('tickNpcPerception', () => {
     it('records tiles within perception radius with seenAt', () => {
         const world = new World3D();
-        const npc = createNpcEntity(10, 10, 0);
+        const npc = createNpcEntity(10, 10, 0, { brain: createTaskBrain() });
         const inRangeX = 10 + NPC_PERCEPTION_RADIUS;
         const outOfRangeX = 10 + NPC_PERCEPTION_RADIUS + 1;
 
@@ -60,7 +61,7 @@ describe('tickNpcPerception', () => {
 
     it('refreshes seenAt and state while the tile stays in view', () => {
         const world = new World3D();
-        const npc = createNpcEntity(0, 0, 0);
+        const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
         world.setTile(3, 0, 0, { terrain: T.GRASS, obj: Obj.BUSH });
 
         tickNpcPerception(npc, world, 1);
@@ -74,7 +75,7 @@ describe('tickNpcPerception', () => {
 
     it('runs from tickSimulation with advancing gameTime', () => {
         const world = new World3D();
-        const npc = createNpcEntity(0, 0, 0);
+        const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
         world.setTile(0, 0, 0, { terrain: T.GRASS, obj: Obj.SIGN });
 
         let gameTime = 0;
@@ -87,7 +88,7 @@ describe('tickNpcPerception', () => {
 
     it('clears reachability when the tile state changes on re-perception', () => {
         const world = new World3D();
-        const npc = createNpcEntity(0, 0, 0);
+        const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
         world.setTile(2, 0, 0, { terrain: T.DOOR, obj: 0, doorLocked: true });
 
         tickNpcPerception(npc, world, 1);

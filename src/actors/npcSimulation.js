@@ -12,7 +12,7 @@ import {
 } from './npcLocomotion.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
 import { Entity } from './entity.js';
-import { initNpcMemory } from '../npc/npcMemory.js';
+import { attachNpcBrain } from '../npc/npcBrain.js';
 
 /** NPC appearance presets (skin, hair, shirt, pants). */
 export const NPC_PRESETS = [
@@ -29,9 +29,10 @@ export const NPC_PRESETS = [
 /** @typedef {import('./entity.js').Entity} Entity */
 /** @typedef {import('./npcLocomotion.js').NpcLocomotionState} NpcLocomotionState */
 /** @typedef {import('../world/world.js').World3D} World3D */
+/** @typedef {import('../npc/npcBrain.js').NpcBrain} NpcBrain */
 
 /**
- * Entity with NPC village fields (no brain).
+ * Entity with NPC village fields (optional brain).
  * @typedef {Entity & NpcLocomotionState & {
  *   name: string,
  *   homeX: number,
@@ -39,10 +40,11 @@ export const NPC_PRESETS = [
  *   homeZ: number,
  *   wanderRadius: number,
  *   isAlive: boolean,
+ *   brain?: NpcBrain,
+ *   tileMemory?: Map<string, import('../npc/npcMemory.js').TileMemoryEntry>,
  *   setGoal: (gx: number, gy: number, gz: number, world: World3D) => boolean,
  *   travelToTile: (tx: number, ty: number, tz: number, world: World3D) => Promise<void>,
  *   pickUpAt: (tileX: number, tileY: number, tileZ: number, world: World3D) => boolean,
- *   tileMemory: Map<string, import('../npc/npcMemory.js').TileMemoryEntry>,
  * }} NpcEntity
  */
 
@@ -54,6 +56,7 @@ export const NPC_PRESETS = [
  * @param {number} [opts.presetIndex]
  * @param {string} [opts.name]
  * @param {{ objType: number, count: number, buildingId?: number }[]} [opts.inventory]
+ * @param {NpcBrain} [opts.brain]
  * @returns {NpcEntity}
  */
 export function createNpcEntity(x, y, z, opts = {}) {
@@ -68,12 +71,14 @@ export function createNpcEntity(x, y, z, opts = {}) {
  * @param {number} [opts.presetIndex]
  * @param {string} [opts.name]
  * @param {{ objType: number, count: number, buildingId?: number }[]} [opts.inventory]
+ * @param {NpcBrain} [opts.brain]
  */
 export function initNpcEntity(entity, opts = {}) {
     const {
         presetIndex = 0,
         name = 'Villager',
         inventory = [],
+        brain,
     } = opts;
 
     entity.speed = 2.0;
@@ -87,7 +92,6 @@ export function initNpcEntity(entity, opts = {}) {
     entity.wanderRadius = 10;
 
     initNpcLocomotion(/** @type {Entity & NpcLocomotionState} */ (entity));
-    initNpcMemory(/** @type {NpcEntity} */ (entity));
 
     const loco = /** @type {NpcEntity} */ (entity);
     loco.setGoal = (gx, gy, gz, world) => setNpcGoal(loco, gx, gy, gz, world);
@@ -100,6 +104,10 @@ export function initNpcEntity(entity, opts = {}) {
         },
         configurable: true,
     });
+
+    if (brain) {
+        attachNpcBrain(loco, brain);
+    }
 }
 
 /**
@@ -111,9 +119,7 @@ export function markNpcDead(entity) {
     entity.health = 0;
     entity.timedAction.cancel();
     clearNpcLocomotion(entity);
-    if (entity.tasks?.clear) {
-        entity.tasks.clear();
-    }
+    entity.brain?.destroy?.();
 }
 
 /**

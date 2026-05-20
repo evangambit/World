@@ -1,14 +1,12 @@
 /**
- * NPC — Entity + village sim + task/plan brain.
+ * NPC — Entity + village sim + pluggable brain.
  * For tests without AI, use createNpcEntity / tickNpcSimulation from npcSimulation.js.
  */
 import { Entity } from './entity.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
-import { tickNpcTaskBrain } from '../npc/npcBrain.js';
+import { attachNpcBrain, createDefaultTaskBrain } from '../npc/npcBrain.js';
 import { initNpcEntity, tickNpcSimulation } from './npcSimulation.js';
-import { mockRequestPlan } from '../npc/llm/mockPlanner.js';
 import {
-    NPCTaskRunner,
     goTo,
     find,
     clearGrass,
@@ -17,9 +15,24 @@ import {
 
 export { goTo, find, clearGrass, timedAction };
 export { EAT_FOOD_PLAN } from '../npc/npcPlanTemplates.js';
-export { createNpcEntity, initNpcEntity, tickNpcSimulation, NPC_PRESETS } from './npcSimulation.js';
+export {
+    createNpcEntity,
+    initNpcEntity,
+    tickNpcSimulation,
+    NPC_PRESETS,
+} from './npcSimulation.js';
+export {
+    attachNpcBrain,
+    createTaskBrain,
+    createDefaultTaskBrain,
+    noopNpcBrain,
+    NoopNpcBrain,
+    NpcTaskBrain,
+} from '../npc/npcBrain.js';
 
 /** @typedef {import('./npcSimulation.js').NpcEntity} NpcEntity */
+/** @typedef {import('../npc/npcBrain.js').NpcBrain} NpcBrain */
+/** @typedef {import('../npc/npcTasks.js').NPCTaskRunner} NPCTaskRunner */
 
 export class NPC extends Entity {
     /**
@@ -29,16 +42,23 @@ export class NPC extends Entity {
      * @param {number} presetIndex
      * @param {string} name
      * @param {{ objType: number, count: number, buildingId?: number }[]} [inventory]
-     * @param {{ planner?: import('../npc/llm/npcPlanner.js').NpcPlannerFn | null, plannerCooldownMs?: number }} [brainOpts]
+     * @param {{ brain?: NpcBrain, planner?: import('../npc/llm/npcPlanner.js').NpcPlannerFn | null, plannerCooldownMs?: number }} [brainOpts]
      */
     constructor(x, y, z, presetIndex = 0, name = 'Villager', inventory = [], brainOpts = {}) {
         super(x, y, z);
         initNpcEntity(this, { presetIndex, name, inventory });
-        const planner = brainOpts.planner === undefined ? mockRequestPlan : brainOpts.planner;
-        this.tasks = new NPCTaskRunner(this, {
-            planner: planner ?? undefined,
-            plannerCooldownMs: brainOpts.plannerCooldownMs,
-        });
+        const brain =
+            brainOpts.brain ??
+            createDefaultTaskBrain({
+                planner: brainOpts.planner,
+                plannerCooldownMs: brainOpts.plannerCooldownMs,
+            });
+        attachNpcBrain(/** @type {NpcEntity} */ (this), brain);
+    }
+
+    /** @returns {NPCTaskRunner | undefined} */
+    get tasks() {
+        return this.brain?.tasks;
     }
 
     get isAlive() {
@@ -52,9 +72,10 @@ export class NPC extends Entity {
     /**
      * @param {import('../world/world.js').World3D} world
      * @param {number} dt
+     * @param {number} [gameTime]
      */
-    update(world, dt) {
+    update(world, dt, gameTime = 0) {
         tickNpcSimulation(/** @type {NpcEntity} */ (this), world, dt);
-        tickNpcTaskBrain(/** @type {NpcEntity} */ (this), world, dt);
+        this.brain?.tick(world, dt, gameTime);
     }
 }
