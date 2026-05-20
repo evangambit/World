@@ -123,6 +123,15 @@ Templates: `npcPlanTemplates.js` (e.g. `EAT_FOOD_PLAN` uses `rememberLocationsOf
 
 LLM planners: `llm/` — prompts in `npcPrompt.js`, catalog in `llm/npcActionCatalog.js`.
 
+## Chunk descriptions (LLM context)
+
+**Module:** `tileChunkDescribe.js`  
+**Constant:** `WORLD_CHUNK_SIZE` in `world/worldConstants.js` (default 5×5 tiles per chunk).
+
+- **`describeChunkSnapshot`** — e.g. `Chunk (3, 5): 15 dirt tiles, 10 wall stone tiles. 5/25 unseen tiles.`
+- **`diffChunk` / `describeChunkDiff`** — call explicitly when you have before/after memory; not run each frame.
+- Planner user prompts include a **## Surroundings** section (memory + world for empty vs unseen) when a real `World3D` is passed to `buildPlannerMessages`.
+
 ## Adding a stove (or similar) to plans
 
 1. Add or extend tag in `npcObjectTags.js` if needed.  

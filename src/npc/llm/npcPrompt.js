@@ -13,6 +13,7 @@ import {
     listObjectTagNames,
 } from './npcActionCatalog.js';
 import { formatPlanHistorySection } from '../npcPlanHistory.js';
+import { formatSurroundingsSection } from '../tileChunkDescribe.js';
 
 /** @typedef {import('../npcPlanHistory.js').PlanHistoryRecord} PlanHistoryRecord */
 
@@ -30,6 +31,12 @@ import { formatPlanHistorySection } from '../npcPlanHistory.js';
  * @property {string} [failedStep] - human-readable step that failed (latest attempt)
  * @property {string} [position] - NPC tile at failure, e.g. "(12, 30, 0)"
  * @property {PlanHistoryRecord[]} [recentPlans] - prior plan outcomes, oldest first
+ * @property {import('../tileChunkDescribe.js').ChunkDiffResult[]} [chunkDiffs] - optional chunk diffs (caller-computed)
+ */
+
+/**
+ * @typedef {Object} BuildPromptOptions
+ * @property {import('../../world/world.js').World3D} [world] - marks empty cells vs unseen in chunk text
  */
 
 /**
@@ -103,7 +110,7 @@ export function buildSystemPrompt(name = 'Villager') {
  * @param {PlannerEvent} event
  * @returns {string}
  */
-export function buildUserPrompt(npc, event) {
+export function buildUserPrompt(npc, event, options = {}) {
     const hunger = Math.round(npc.hunger ?? 0);
     const health = Math.round(npc.health ?? 0);
     const inv = summarizeInventoryByTag(npc);
@@ -148,6 +155,17 @@ export function buildUserPrompt(npc, event) {
         lines.push('', ...historyLines);
     }
 
+    const surroundings = formatSurroundingsSection(npc, {
+        world:
+            options.world && typeof options.world.getTile === 'function'
+                ? options.world
+                : undefined,
+        chunkDiffs: event.chunkDiffs,
+    });
+    if (surroundings.length > 0) {
+        lines.push('', ...surroundings);
+    }
+
     return lines.join('\n');
 }
 
@@ -156,10 +174,10 @@ export function buildUserPrompt(npc, event) {
  * @param {PlannerEvent} event
  * @returns {{ system: string, user: string }}
  */
-export function buildPlannerMessages(npc, event) {
+export function buildPlannerMessages(npc, event, options = {}) {
     return {
         system: buildSystemPrompt(npc.name ?? 'Villager'),
-        user: buildUserPrompt(npc, event),
+        user: buildUserPrompt(npc, event, options),
     };
 }
 

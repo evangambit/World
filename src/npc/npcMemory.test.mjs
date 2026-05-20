@@ -11,6 +11,7 @@ import {
     markTileUnreachable,
     snapshotTileState,
     tickNpcPerception,
+    tileMemoryStatesEqual,
 } from './npcMemory.js';
 
 describe('snapshotTileState', () => {
@@ -28,6 +29,14 @@ describe('snapshotTileState', () => {
 
         assert.equal(snap.obj, Obj.CHEST);
         assert.equal(snap.contents?.length, 1);
+    });
+});
+
+describe('tileMemoryStatesEqual', () => {
+    it('includes crop stage when comparing snapshots', () => {
+        const a = snapshotTileState({ terrain: T.DIRT, obj: Obj.WHEAT_CROP, cropStage: 0 });
+        const b = snapshotTileState({ terrain: T.DIRT, obj: Obj.WHEAT_CROP, cropStage: 1 });
+        assert.equal(tileMemoryStatesEqual(a, b), false);
     });
 });
 

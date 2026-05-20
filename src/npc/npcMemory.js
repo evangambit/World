@@ -2,9 +2,11 @@
  * NPC tile memory — records tiles perceived within range (latest snapshot + seenAt).
  */
 import { World3D } from '../world/world.js';
+import { tileStatesEqual } from './tileChunkDescribe.js';
 
-/** Chebyshev tile distance at which an NPC "sees" a tile. */
-export const NPC_PERCEPTION_RADIUS = 5;
+import { NPC_PERCEPTION_RADIUS } from './npcConstants.js';
+
+export { NPC_PERCEPTION_RADIUS };
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -64,15 +66,7 @@ export function getNpcTileMemory(npc, x, y, z) {
  * @returns {boolean}
  */
 export function tileMemoryStatesEqual(a, b) {
-    if (a.terrain !== b.terrain || a.obj !== b.obj) return false;
-    if (!!a.doorLocked !== !!b.doorLocked) return false;
-    const at = a.transition;
-    const bt = b.transition;
-    if (!at !== !bt) return false;
-    if (at && bt && (at.tx !== bt.tx || at.ty !== bt.ty || at.tz !== bt.tz || at.type !== bt.type)) {
-        return false;
-    }
-    return true;
+    return tileStatesEqual(a, b);
 }
 
 /**

@@ -351,7 +351,9 @@ export class NPCTaskRunner {
         this._awaitingPlanner = true;
         this._lastPlannerAt = Date.now();
 
-        const messages = buildPlannerMessages(this.npc, this._plannerEventWithHistory(event));
+        const messages = buildPlannerMessages(this.npc, this._plannerEventWithHistory(event), {
+            world,
+        });
         logPlannerMessages(this.npc, event, messages);
         const request = {
             npc: this.npc,

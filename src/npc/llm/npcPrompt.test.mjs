@@ -1,7 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { World3D } from '../../world/world.js';
 import { VITALITY } from '../../domain/vitality.js';
-import { Obj } from '../../world/tileTypes.js';
+import { Obj, T } from '../../world/tileTypes.js';
+import { createNpcEntity } from '../../actors/npcSimulation.js';
+import { snapshotTileState, tickNpcPerception } from '../npcMemory.js';
 import {
     buildSystemPrompt,
     buildUserPrompt,
@@ -72,6 +75,23 @@ describe('buildUserPrompt', () => {
         assert.match(user, /Recent plans/);
         assert.match(user, /1\. eat_food — completed/);
         assert.match(user, /2\. gather_food — failed/);
+    });
+
+    it('includes nearby chunk surroundings when world is provided', () => {
+        const world = new World3D();
+        const npc = createNpcEntity(10, 10, 0);
+        world.setTile(10, 10, 0, { terrain: T.DIRT, obj: Obj.NONE });
+        world.setTile(11, 10, 0, { terrain: T.WALL_STONE, obj: Obj.NONE });
+        tickNpcPerception(npc, world, 1);
+
+        const user = buildUserPrompt(
+            npc,
+            { reason: 'idle' },
+            { world },
+        );
+        assert.match(user, /## Surroundings/);
+        assert.match(user, /Nearby chunks/);
+        assert.match(user, /dirt tile/);
     });
 });
 
