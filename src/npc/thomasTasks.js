@@ -8,6 +8,7 @@
  * Higher-level combinators (seekKnownDesires) compose primitives and hide ticks.
  */
 import { markTileUnreachable } from './npcMemory.js';
+import { findApproachTile } from './npcTaskPrimitives.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -129,22 +130,35 @@ export async function seekKnownDesires(ctx, desires, maxTicks, opts = {}) {
         const candidates = findDesirableTiles(ctx, desires);
         if (candidates.length === 0) return SeekResult.NO_KNOWN_REACHABLE;
 
-        const best = candidates[0];
         const ticksLeft = deadline - ctx.tickCount;
         const moveTicks = Math.min(ticksLeft, reevalInterval);
-        const result = await moveTowardLocation(ctx, best.x, best.y, moveTicks);
 
-        switch (result) {
-            case MoveResult.ARRIVED:
-                return SeekResult.ARRIVED;
-            case MoveResult.TOOK_DAMAGE:
-                return SeekResult.TOOK_DAMAGE;
-            case MoveResult.IMPOSSIBLE:
+        let advanced = false;
+        for (const best of candidates) {
+            const dest = resolveDesireDestination(ctx, best.x, best.y, best.z);
+            if (!dest) {
                 markTileUnreachable(npc, best.x, best.y, best.z);
-                break;
-            case MoveResult.MAX_TICKS:
-                break;
+                continue;
+            }
+
+            const result = await moveTowardLocation(ctx, dest.x, dest.y, moveTicks);
+            advanced = true;
+
+            switch (result) {
+                case MoveResult.ARRIVED:
+                    return SeekResult.ARRIVED;
+                case MoveResult.TOOK_DAMAGE:
+                    return SeekResult.TOOK_DAMAGE;
+                case MoveResult.IMPOSSIBLE:
+                    markTileUnreachable(npc, best.x, best.y, best.z);
+                    break;
+                case MoveResult.MAX_TICKS:
+                    break;
+            }
+            break;
         }
+
+        if (!advanced) return SeekResult.NO_KNOWN_REACHABLE;
     }
 
     return SeekResult.MAX_TICKS;
@@ -188,6 +202,22 @@ function findDesirableTiles(ctx, desires) {
 
     results.sort((a, b) => b.score - a.score);
     return results;
+}
+
+/**
+ * Walkable tile to path toward a remembered desire (e.g. stove blocks its cell).
+ * @param {TaskContext} ctx
+ * @param {number} tx
+ * @param {number} ty
+ * @param {number} tz
+ * @returns {{ x: number, y: number, z: number } | null}
+ */
+function resolveDesireDestination(ctx, tx, ty, tz) {
+    const { world, npc } = ctx;
+    if (world.isWalkable(tx, ty, tz)) {
+        return { x: tx, y: ty, z: tz };
+    }
+    return findApproachTile(world, npc, { x: tx, y: ty, z: tz });
 }
 
 // ── Timed actions ───────────────────────────────────────────────────────────
