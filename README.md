@@ -41,7 +41,7 @@ src/
     npcPlanHistory.js     # Rolling log of plan outcomes (LLM context)
     npcPlanDescribe.js    # Human-readable plan step descriptions
     npcObjectTags.js
-    npcConstants.js
+    npcConstants.js       # Shared NPC constants (e.g. NPC_PERCEPTION_RADIUS)
     tileChunkDescribe.js  # Chunk-level world descriptions for LLM prompts
     llm/                  # LLM planner + prompts
       npcPlanner.js       # Planner contract and plan JSON validation
@@ -50,6 +50,9 @@ src/
       createLlmPlanner.js # Factory wiring prompt → provider → plan
       plannerRuntime.js   # Runtime state (cooldown, history, event bus)
       llmResponseCache.js # Disk cache for LLM responses
+      mockPlanner.js      # Default dev/test planner (returns built-in plan when hungry)
+      extractJson.js      # Pulls JSON object from raw or fenced model output
+      llmTypes.js         # Shared LLM message/role types (used by all providers)
       providers/          # OpenAI-compatible and OpenRouter backends
   content/                # Maps and spawns (data, not rules)
     builder.js
@@ -164,7 +167,7 @@ Perception runs **before** the task runner so newly seen tiles can influence tra
 - **`plannerRuntime.js`** — cooldown, rolling plan history (`npcPlanHistory.js`), event bus.
 - **`providers/`** — OpenAI-compatible and OpenRouter backends.
 
-The planner is wired in via `NpcTaskBrain`'s `planner` option; the brain falls back to templates when the planner returns `null`.
+The planner is wired in via `NpcTaskBrain`'s `planner` option. `createDefaultTaskBrain` uses `mockPlanner` as the default when no planner is supplied; pass `planner: null` to disable LLM planning entirely. The brain falls back to templates when the planner returns `null`.
 
 ### NPC tile memory (summary)
 
