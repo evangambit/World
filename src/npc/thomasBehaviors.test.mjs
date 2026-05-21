@@ -73,7 +73,8 @@ describe('farmBehavior bread production over 10 000 ticks', () => {
         console.log(
             `[bread-production] ticks=10000 game=${gameTime.toFixed(0)}s` +
             `  bread=${bread}  wheat=${wheat}  seeds=${seeds}` +
-            `  alive=${npc.isAlive}  hunger=${npc.hunger.toFixed(1)}`,
+            `  alive=${npc.isAlive}  hunger=${npc.hunger.toFixed(1)}` +
+            `  health=${npc.health}`,
         );
 
         // The NPC must not starve — a dead NPC is an unambiguous regression.
