@@ -226,7 +226,8 @@ html, body {
 }
 
 #layer-indicator,
-#fps-indicator {
+#fps-indicator,
+#speed-toggle-btn {
     font-size: 0.55rem;
     color: #e0d8c0;
     background: rgba(10, 10, 18, 0.75);
@@ -237,6 +238,23 @@ html, body {
 
 #fps-indicator {
     color: #a8c878;
+}
+
+#speed-toggle-btn {
+    font-family: "Press Start 2P", monospace;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+#speed-toggle-btn:hover {
+    color: #f8f0d8;
+    border-color: rgba(196, 162, 101, 0.55);
+}
+
+#speed-toggle-btn[aria-pressed="true"] {
+    color: #1a1810;
+    background: #c4a265;
+    border-color: #e8c070;
 }
 
 #vitals-panel {

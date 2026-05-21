@@ -32,12 +32,15 @@ import {
     takeFromContainer,
     toggleDoorLock,
 } from './domain/entityActions.js';
-import { inventoryHasUncookedSteak } from './domain/cooking.js';
+import { inventoryHasUncookedSteak, inventoryHasWheat } from './domain/cooking.js';
 import {
     harvestWheatAtTile,
     plantWheatSeedAtTile,
 } from './domain/crops.js';
 import { consumeFoodFromInventory, isEdible, VITALITY } from './domain/vitality.js';
+
+const GAME_SPEED_FAST = 5;
+
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
@@ -54,6 +57,9 @@ class Game {
         this._fpsEma = 60;
         this.layerIndicator = document.getElementById('layer-indicator');
         this.fpsIndicator = document.getElementById('fps-indicator');
+        this.speedToggleBtn = document.getElementById('speed-toggle-btn');
+        /** @type {1 | typeof GAME_SPEED_FAST} */
+        this.speedMultiplier = 1;
         this.inventoryEl = document.getElementById('inventory-items');
         this.inventoryPanelEl = document.getElementById('inventory-panel');
         this.containerPanelEl = document.getElementById('container-panel');
@@ -149,6 +155,12 @@ class Game {
             this._mouseScreenX = e.offsetX * dpr;
             this._mouseScreenY = e.offsetY * dpr;
         });
+        this.speedToggleBtn?.addEventListener('click', () => {
+            this.speedMultiplier = this.speedMultiplier === 1 ? GAME_SPEED_FAST : 1;
+            this._syncSpeedToggleUI();
+        });
+        this._syncSpeedToggleUI();
+
         this.canvas.addEventListener('mouseleave', () => {
             this._mouseScreenX = null;
             this._mouseScreenY = null;
@@ -221,11 +233,18 @@ class Game {
                     }
                 }
                 if (tile && isStoveObject(tile.obj)) {
-                    if (cookAtStove(this.player, this.world, tx, ty)) {
+                    const cooked = cookAtStove(this.player, this.world, tx, ty);
+                    if (cooked === 'steak') {
                         this._showGameMessage('Cooked a steak.');
                         this._syncInventoryUI();
-                    } else if (!inventoryHasUncookedSteak(this.player.inventory ?? [])) {
-                        this._showGameMessage('You need uncooked steak in your pack.');
+                    } else if (cooked === 'bread') {
+                        this._showGameMessage('Baked some bread.');
+                        this._syncInventoryUI();
+                    } else {
+                        const inv = this.player.inventory ?? [];
+                        if (!inventoryHasUncookedSteak(inv) && !inventoryHasWheat(inv)) {
+                            this._showGameMessage('You need uncooked steak or wheat in your pack.');
+                        }
                     }
                     return;
                 }
@@ -492,6 +511,13 @@ class Game {
         this.npcPanelPlanEl.textContent = [...status.lines, ...invLines].join('\n');
     }
 
+    _syncSpeedToggleUI() {
+        if (!this.speedToggleBtn) return;
+        const fast = this.speedMultiplier === GAME_SPEED_FAST;
+        this.speedToggleBtn.textContent = fast ? '5× speed ON' : '5× speed';
+        this.speedToggleBtn.setAttribute('aria-pressed', fast ? 'true' : 'false');
+    }
+
     _syncVitalsUI() {
         const p = this.player;
         if (!p) return;
@@ -579,17 +605,19 @@ class Game {
             }
         }
 
+        const simDt = dt * this.speedMultiplier;
+
         if (!this.paused) {
-            updatePlayerFromInput(this.player, this.input, this.world, dt);
+            updatePlayerFromInput(this.player, this.input, this.world, simDt);
 
             ({ gameTime: this.gameTime } = tickSimulation({
                 world: this.world,
                 gameTime: this.gameTime,
-                dt,
+                dt: simDt,
                 npcs: this.npcs,
             }));
 
-            this.camera.follow(this.player.x, this.player.y, dt);
+            this.camera.follow(this.player.x, this.player.y, simDt);
 
             if (this.openContainer) {
                 const { x, y } = this.openContainer;
@@ -635,7 +663,7 @@ class Game {
             this.npcs,
             this.hoverTile,
             this.hoverNpc,
-            this.paused ? 0 : dt,
+            this.paused ? 0 : simDt,
             this.selectedNpc,
         );
 

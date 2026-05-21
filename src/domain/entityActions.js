@@ -2,7 +2,7 @@
  * Shared world interactions for any entity (player or NPC).
  * Input UI and plan runners call these — implement a capability once here.
  */
-import { cookUncookedSteakInInventory } from './cooking.js';
+import { cookUncookedSteakInInventory, cookWheatIntoBread } from './cooking.js';
 import {
     Obj,
     T,
@@ -77,7 +77,7 @@ export function pickUpAtTile(entity, world, tileX, tileY, tileZ = entity.z) {
  * @param {World3D} world
  * @param {number} tileX
  * @param {number} tileY
- * @returns {boolean}
+ * @returns {false | 'steak' | 'bread'}
  */
 export function cookAtStove(entity, world, tileX, tileY) {
     if (!entity.inventory) entity.inventory = [];
@@ -86,7 +86,9 @@ export function cookAtStove(entity, world, tileX, tileY) {
     const tile = world.getTile(tileX, tileY, entity.z);
     if (!tile || !isStoveObject(tile.obj)) return false;
 
-    return cookUncookedSteakInInventory(entity.inventory);
+    if (cookUncookedSteakInInventory(entity.inventory)) return 'steak';
+    if (cookWheatIntoBread(entity.inventory)) return 'bread';
+    return false;
 }
 
 /**

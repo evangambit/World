@@ -48,6 +48,7 @@ export const Obj = {
     WHEAT_CROP: 18,
     WHEAT: 19,
     WHEAT_SEED: 20,
+    BREAD: 21,
 };
 
 /** Wheat growth stages (0 = sprout … 3 = mature). */
@@ -61,7 +62,7 @@ export const OBJ_NAMES = _buildNames(Obj);
 /** Objects the player can pick up into inventory (world tile `obj` is cleared). */
 const PICKABLE_OBJ = new Set([
     Obj.FLOWER, Obj.BUSH, Obj.ROCK, Obj.BARREL, Obj.CRATE, Obj.KEY, Obj.UNCOOKED_STEAK,
-    Obj.WHEAT, Obj.WHEAT_SEED,
+    Obj.WHEAT, Obj.WHEAT_SEED, Obj.BREAD,
 ]);
 
 /** Furniture / storage that can hold `contents` stacks on the tile. */

@@ -12,7 +12,7 @@ import {
 } from './npcLocomotion.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
 import { Entity } from './entity.js';
-import { attachNpcBrain } from '../npc/npcBrain.js';
+import { attachNpcBrain, ThomasBrain } from '../npc/npcBrain.js';
 
 /** NPC appearance presets (skin, hair, shirt, pants). */
 export const NPC_PRESETS = [
@@ -142,6 +142,8 @@ export function tickNpcSimulation(entity, world, dt) {
         entity.timedAction.tick(dt, world);
     } else {
         tickNpcLocomotion(entity, dt);
-        tryEatFromInventoryIfHungry(entity, 55);
+        if (!(entity.brain instanceof ThomasBrain)) {
+            tryEatFromInventoryIfHungry(entity, 55);
+        }
     }
 }

@@ -459,6 +459,16 @@ const objectRenderers = {
         ctx.fillStyle = '#4a3818';
         ctx.fillRect(3, 12, 10, 2);
     },
+    [Obj.BREAD](ctx) {
+        ctx.fillStyle = '#c49a50';
+        ctx.fillRect(4, 7, 8, 6);
+        ctx.fillStyle = '#d8b060';
+        ctx.fillRect(5, 8, 6, 4);
+        ctx.fillStyle = '#8a6028';
+        ctx.fillRect(4, 12, 8, 1);
+        ctx.fillStyle = '#e8c878';
+        ctx.fillRect(6, 7, 4, 1);
+    },
 };
 
 /** @param {CanvasRenderingContext2D} ctx @param {number} stage 0–3 */
