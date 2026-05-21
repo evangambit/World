@@ -32,7 +32,7 @@ import {
     takeFromContainer,
     toggleDoorLock,
 } from './domain/entityActions.js';
-import { inventoryHasUncookedSteak } from './domain/cooking.js';
+import { inventoryHasUncookedSteak, inventoryHasWheat } from './domain/cooking.js';
 import {
     harvestWheatAtTile,
     plantWheatSeedAtTile,
@@ -221,11 +221,18 @@ class Game {
                     }
                 }
                 if (tile && isStoveObject(tile.obj)) {
-                    if (cookAtStove(this.player, this.world, tx, ty)) {
+                    const cooked = cookAtStove(this.player, this.world, tx, ty);
+                    if (cooked === 'steak') {
                         this._showGameMessage('Cooked a steak.');
                         this._syncInventoryUI();
-                    } else if (!inventoryHasUncookedSteak(this.player.inventory ?? [])) {
-                        this._showGameMessage('You need uncooked steak in your pack.');
+                    } else if (cooked === 'bread') {
+                        this._showGameMessage('Baked some bread.');
+                        this._syncInventoryUI();
+                    } else {
+                        const inv = this.player.inventory ?? [];
+                        if (!inventoryHasUncookedSteak(inv) && !inventoryHasWheat(inv)) {
+                            this._showGameMessage('You need uncooked steak or wheat in your pack.');
+                        }
                     }
                     return;
                 }

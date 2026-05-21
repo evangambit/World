@@ -8,7 +8,7 @@ import { Obj } from '../world/tileTypes.js';
 /** @type {Record<string, ObjectTagSpec>} */
 export const OBJECT_TAGS = {
     edible_food: {
-        inventoryTypes: [Obj.STEAK, Obj.FLOWER, Obj.WHEAT],
+        inventoryTypes: [Obj.STEAK, Obj.FLOWER, Obj.WHEAT, Obj.BREAD],
         worldTypes: [Obj.FLOWER],
     },
     uncooked_food: {

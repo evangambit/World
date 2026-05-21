@@ -17,6 +17,7 @@ const FOOD_NUTRITION = {
     [Obj.STEAK]: 40,
     [Obj.FLOWER]: 10,
     [Obj.WHEAT]: 15,
+    [Obj.BREAD]: 30,
 };
 
 /** @typedef {import('../actors/entity.js').Entity} Entity */

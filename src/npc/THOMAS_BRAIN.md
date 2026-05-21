@@ -66,7 +66,14 @@ If `seekKnownDesires` returns `ARRIVED` and the interaction is a no-op (e.g. the
 
 ## Default behavior: wheat farming (`thomasBehaviors.js`)
 
-`farmBehavior` loops:
+`farmBehavior` runs each loop iteration in priority order:
+
+1. **Hungry with bread** — if `hunger > 30` and inventory has bread, eat one loaf (`consumeFoodFromInventory`). Thomas does not use the generic auto-eat at hunger 55; only this bread rule applies.
+2. **Surplus wheat** — if carrying more than 3 wheat, seek a remembered `STOVE`, stand adjacent, and bake one loaf via `cookAtStove` (1 wheat → 1 bread). If no stove is known yet, wander to expand perception.
+3. **Farming** — otherwise the crop loop below.
+
+Farming sub-loop:
+
 1. **Need seeds** → seek `TALL_GRASS` → `clear_grass` (5 s timed action) → receive 1–2 seeds
 2. **Have seeds** → seek empty `DIRT` tiles → plant instantly
 3. **Crops ready** → seek mature `WHEAT_CROP` → harvest (wheat + 2 seeds back)

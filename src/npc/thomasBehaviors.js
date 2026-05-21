@@ -4,8 +4,10 @@
  * A behavior is an `async (ctx) => {}` that drives an NPC using task
  * primitives.  Pass one to the ThomasBrain constructor.
  */
-import { T, Obj, isWheatCropObject } from '../world/tileTypes.js';
+import { T, Obj, isStoveObject, isWheatCropObject } from '../world/tileTypes.js';
 import { canPlantWheatAt, harvestWheatAtTile, isWheatMature, plantWheatSeedAtTile } from '../domain/crops.js';
+import { cookAtStove } from '../domain/entityActions.js';
+import { consumeFoodFromInventory } from '../domain/vitality.js';
 import {
     SeekResult,
     doTimedAction,
@@ -13,6 +15,11 @@ import {
     seekKnownDesires,
     wanderOnce,
 } from './thomasTasks.js';
+
+/** Bake when carrying more than this many wheat. */
+const WHEAT_BAKE_THRESHOLD = 3;
+/** Eat bread when hunger is above this (0 = full, 100 = starving). */
+const HUNGER_EAT_BREAD_THRESHOLD = 30;
 
 /** @typedef {import('./thomasTasks.js').TaskContext} TaskContext */
 /** @typedef {import('./thomasTasks.js').Desire} Desire */
@@ -28,6 +35,39 @@ export async function farmBehavior(ctx) {
     while (true) {
         const { npc } = ctx;
         if (npc._dead) return;
+
+        const breadCount = inventoryCount(npc, Obj.BREAD);
+        if (npc.hunger > HUNGER_EAT_BREAD_THRESHOLD && breadCount > 0) {
+            ctx.setStatus('Eating bread');
+            consumeFoodFromInventory(npc, Obj.BREAD);
+            await ctx.nextTick();
+            continue;
+        }
+
+        const wheatCount = inventoryCount(npc, Obj.WHEAT);
+        if (wheatCount > WHEAT_BAKE_THRESHOLD) {
+            ctx.setStatus(`Baking bread (${wheatCount} wheat)`);
+            const bakeResult = await seekKnownDesires(
+                ctx,
+                [{ match: (s) => s.obj === Obj.STOVE, weight: 3 }],
+                500,
+            );
+            switch (bakeResult) {
+                case SeekResult.ARRIVED:
+                    tryCookBreadAtAdjacentStove(ctx);
+                    await ctx.nextTick();
+                    break;
+                case SeekResult.NO_KNOWN_REACHABLE:
+                    ctx.setStatus('Looking for a stove');
+                    await wanderOnce(ctx, 200);
+                    break;
+                case SeekResult.TOOK_DAMAGE:
+                    return;
+                case SeekResult.MAX_TICKS:
+                    break;
+            }
+            continue;
+        }
 
         const seedCount = inventoryCount(npc, Obj.WHEAT_SEED);
 
@@ -107,4 +147,26 @@ async function interactAtCurrentTile(ctx) {
     if (canPlantWheatAt(world, tx, ty, tz) && inventoryCount(npc, Obj.WHEAT_SEED) > 0) {
         plantWheatSeedAtTile(npc, world, tx, ty, gameTime, tz);
     }
+}
+
+/**
+ * Cook one wheat into bread using a stove on a neighboring tile.
+ * @param {TaskContext} ctx
+ * @returns {boolean}
+ */
+function tryCookBreadAtAdjacentStove(ctx) {
+    const { npc, world } = ctx;
+    const px = Math.floor(npc.x);
+    const py = Math.floor(npc.y);
+    const z = npc.z;
+
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const tx = px + dx;
+        const ty = py + dy;
+        const tile = world.getTile(tx, ty, z);
+        if (!tile || !isStoveObject(tile.obj)) continue;
+        const cooked = cookAtStove(npc, world, tx, ty);
+        if (cooked === 'bread') return true;
+    }
+    return false;
 }

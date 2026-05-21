@@ -9,7 +9,11 @@ import {
     toggleDoorLock,
 } from '../domain/entityActions.js';
 import { getObjectTagSpec } from './npcObjectTags.js';
-import { cookUncookedSteakInInventory } from '../domain/cooking.js';
+import {
+    cookUncookedSteakInInventory,
+    cookWheatIntoBread,
+    inventoryHasWheat,
+} from '../domain/cooking.js';
 import { applyFood } from '../domain/vitality.js';
 import { runExplore } from './npcExplore.js';
 import { runFind, runGoTo, runGoToMemoryRef, runTimedAction } from './npcTaskPrimitives.js';
@@ -379,6 +383,13 @@ function cookFromInventory(npc, objectTag) {
     const spec = getObjectTagSpec(objectTag);
     if (spec.inventoryTypes.includes(Obj.UNCOOKED_STEAK)) {
         if (!cookUncookedSteakInInventory(npc.inventory)) {
+            throw new Error(`cook: no ${objectTag} in inventory`);
+        }
+        return;
+    }
+
+    if (spec.inventoryTypes.includes(Obj.WHEAT) || inventoryHasWheat(npc.inventory)) {
+        if (!cookWheatIntoBread(npc.inventory)) {
             throw new Error(`cook: no ${objectTag} in inventory`);
         }
         return;
