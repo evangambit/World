@@ -160,13 +160,14 @@ function tryCookBreadAtAdjacentStove(ctx) {
     const py = Math.floor(npc.y);
     const z = npc.z;
 
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const tx = px + dx;
-        const ty = py + dy;
-        const tile = world.getTile(tx, ty, z);
-        if (!tile || !isStoveObject(tile.obj)) continue;
-        const cooked = cookAtStove(npc, world, tx, ty);
-        if (cooked === 'bread') return true;
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const tile = world.getTile(px + dx, py + dy, z);
+            if (!tile || !isStoveObject(tile.obj)) continue;
+            const cooked = cookAtStove(npc, world, px + dx, py + dy);
+            if (cooked === 'bread') return true;
+        }
     }
     return false;
 }
