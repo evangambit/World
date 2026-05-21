@@ -147,13 +147,16 @@ When a plan step needs a remembered place (stove, chest), use **`ref`: `remember
 
 Each NPC has a pluggable **brain** (`npcBrain.js`):
 
-- **`NpcTaskBrain`** — perception, memory-ref travel sync, task/plan queue (default for the `NPC` class).
+- **`NpcTaskBrain`** — perception + task/plan queue with optional LLM planner (default for the `NPC` class).
+- **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there.
 - **`NoopNpcBrain`** — no cognition (body-only tests).
+
+Select at runtime with `?brain=task` (default), `?brain=wander`, or `?brain=noop` (see `npcBrainRuntime.js`).
 
 Per-frame simulation order (see `tickSimulation.js`):
 
 1. `tickNpcSimulation` — vitality, locomotion, timed actions
-2. `npc.brain?.tick` — perception → `syncMemoryRefTravelGoal` → task queue
+2. `npc.brain?.tick` — perception → task queue (which runs `syncMemoryRefTravelGoal` internally)
 
 Perception runs **before** the task runner so newly seen tiles can influence travel and plans on the same frame. Full brain/memory/plan details: [`src/npc/README.md`](src/npc/README.md).
 
@@ -217,7 +220,8 @@ Allowed direction: `main.js` → `client/` + logic layers; `client/` → logic l
 | `actors/entity.js`, `actors/npcSimulation.js`, `actors/npc.js`, `client/playerController.js` | Actor state and movement |
 | `actors/timedActionRunner.js` | Runs timed actions on entities |
 | `main.js` | Player input and UI |
-| `npc/npcBrain.js` | Pluggable NPC brain (`NpcTaskBrain` / `NoopNpcBrain`) |
+| `npc/npcBrain.js` | Pluggable NPC brain (`NpcTaskBrain` / `WanderBrain` / `NoopNpcBrain`) |
+| `npc/npcBrainRuntime.js` | Resolves `?brain=` URL param to a brain instance |
 | `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
 | `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |
 | `npc/npcExplore.js` | Wide-area search (`explore` plan step) |

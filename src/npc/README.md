@@ -6,8 +6,11 @@ Scheduling, declarative plans, and **tile memory** — not world rules. World in
 
 Each NPC may have a pluggable **brain** (`npcBrain.js`):
 
-- **`NpcTaskBrain`** (default for `NPC` class) — perception, memory-ref travel sync, task/plan queue
+- **`NpcTaskBrain`** (default for `NPC` class) — perception + task/plan queue with optional LLM planner
+- **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there
 - **`NoopNpcBrain`** — no cognition (body-only tests)
+
+Select at runtime with `?brain=task` (default), `?brain=wander`, or `?brain=noop` (see `npcBrainRuntime.js`).
 
 Attach explicitly for test entities:
 
@@ -31,7 +34,7 @@ new NPC(x, y, z, preset, name, inv, { brain: myCustomBrain });
 `tickSimulation` runs:
 
 1. `tickNpcSimulation` — vitality, locomotion, timed actions  
-2. `npc.brain.tick` — for task brain: perception → `syncMemoryRefTravelGoal` → task queue
+2. `npc.brain.tick` — for task brain: perception → task queue (which runs `syncMemoryRefTravelGoal` internally)
 
 Perception runs **before** the task runner so newly seen tiles can influence travel and plans on the same frame.
 
