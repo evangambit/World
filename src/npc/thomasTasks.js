@@ -28,6 +28,12 @@ export const SeekResult = Object.freeze({
     TOOK_DAMAGE:        'took_damage',
 });
 
+export const ActionResult = Object.freeze({
+    COMPLETED:   'completed',
+    FAILED:      'failed',
+    TOOK_DAMAGE: 'took_damage',
+});
+
 // ── Task context ────────────────────────────────────────────────────────────
 
 /**
@@ -49,6 +55,9 @@ export class TaskContext {
 
     /** Yield control until the next simulation tick. */
     nextTick() { return this._brain._nextTick(); }
+
+    /** Update the status line shown in the NPC panel. */
+    setStatus(line) { this._brain._statusLine = line; }
 }
 
 // ── Primitives ──────────────────────────────────────────────────────────────
@@ -179,6 +188,70 @@ function findDesirableTiles(ctx, desires) {
 
     results.sort((a, b) => b.score - a.score);
     return results;
+}
+
+// ── Timed actions ───────────────────────────────────────────────────────────
+
+/**
+ * Start a timed action on an adjacent tile and wait for it to finish.
+ *
+ * The engine's `tickNpcSimulation` ticks the action each frame (advancing
+ * elapsed time, checking validity).  We just poll `isBusy()` via nextTick.
+ *
+ * @param {TaskContext} ctx
+ * @param {string} actionId   e.g. `'clear_grass'`
+ * @param {number} tx
+ * @param {number} ty
+ * @returns {Promise<string>} An `ActionResult.*` value.
+ */
+export async function doTimedAction(ctx, actionId, tx, ty) {
+    const { npc } = ctx;
+    const startHealth = npc.health;
+
+    const result = npc.timedAction.start(actionId, ctx.world, tx, ty);
+    if (!result.ok) return ActionResult.FAILED;
+
+    while (npc.timedAction.isBusy()) {
+        await ctx.nextTick();
+        if (npc._dead || npc.health < startHealth) return ActionResult.TOOK_DAMAGE;
+    }
+    return ActionResult.COMPLETED;
+}
+
+// ── Utilities ───────────────────────────────────────────────────────────────
+
+/**
+ * Count how many of a given object type the NPC is carrying.
+ * @param {NpcEntity} npc
+ * @param {number} objType  e.g. `Obj.WHEAT_SEED`
+ * @returns {number}
+ */
+export function inventoryCount(npc, objType) {
+    if (!npc.inventory) return 0;
+    const stack = npc.inventory.find(s => s.objType === objType);
+    return stack ? stack.count : 0;
+}
+
+/**
+ * Pick a random walkable tile near home and walk there (single trip).
+ * Useful as a fallback when a behavior has nothing specific to do — the
+ * movement expands perception coverage.
+ *
+ * @param {TaskContext} ctx
+ * @param {number} maxTicks
+ * @returns {Promise<string>} A `MoveResult.*` value.
+ */
+export async function wanderOnce(ctx, maxTicks) {
+    const { npc } = ctx;
+    const radius = npc.wanderRadius ?? 10;
+    for (let attempt = 0; attempt < 10; attempt++) {
+        const gx = npc.homeX + Math.floor(Math.random() * radius * 2 - radius);
+        const gy = npc.homeY + Math.floor(Math.random() * radius * 2 - radius);
+        if (!ctx.world.isWalkable(gx, gy, npc.homeZ)) continue;
+        return await moveTowardLocation(ctx, gx, gy, maxTicks);
+    }
+    await ctx.nextTick();
+    return MoveResult.IMPOSSIBLE;
 }
 
 // ── Default behavior ────────────────────────────────────────────────────────

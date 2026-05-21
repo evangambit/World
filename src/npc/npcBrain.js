@@ -4,7 +4,8 @@
 import { mockRequestPlan } from './llm/mockPlanner.js';
 import { tickNpcPerception } from './npcMemory.js';
 import { tickThomasPerception } from './thomasPerception.js';
-import { TaskContext, defaultWanderBehavior } from './thomasTasks.js';
+import { TaskContext } from './thomasTasks.js';
+import { farmBehavior } from './thomasBehaviors.js';
 import { NPCTaskRunner } from './npcTasks.js';
 
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -182,7 +183,7 @@ export class ThomasBrain {
         /** @type {Map<string, import('./npcMemory.js').TileMemoryEntry>} */
         this.tileMemory = new Map();
         /** @type {(ctx: TaskContext) => Promise<void>} */
-        this._behavior = behavior ?? defaultWanderBehavior;
+        this._behavior = behavior ?? farmBehavior;
         /** @type {World3D | null} */
         this._world = null;
         this._gameTime = 0;
@@ -190,6 +191,13 @@ export class ThomasBrain {
         /** @type {(() => void) | null} */
         this._tickResolve = null;
         this._taskRunning = false;
+        /** @type {string} */
+        this._statusLine = 'Idle';
+    }
+
+    /** @returns {{ lines: string[] }} */
+    getStatus() {
+        return { lines: [this._statusLine] };
     }
 
     /** @param {NpcEntity} npc */

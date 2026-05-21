@@ -484,7 +484,7 @@ class Game {
 
         panel.classList.remove('hidden');
         this.npcPanelNameEl.textContent = npc.name;
-        const status = npc.tasks?.getPlanStatus() ?? { lines: ['Wandering'] };
+        const status = npc.tasks?.getPlanStatus() ?? npc.brain?.getStatus?.() ?? { lines: ['Wandering'] };
         this.npcPanelPlanEl.textContent = status.lines.join('\n');
     }
 
