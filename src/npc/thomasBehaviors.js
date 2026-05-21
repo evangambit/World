@@ -16,8 +16,6 @@ import {
     wanderOnce,
 } from './thomasTasks.js';
 
-/** Bake when carrying more than this many wheat. */
-const WHEAT_BAKE_THRESHOLD = 3;
 /** Eat bread when hunger is above this (0 = full, 100 = starving). */
 const HUNGER_EAT_BREAD_THRESHOLD = 30;
 
@@ -45,7 +43,7 @@ export async function farmBehavior(ctx) {
         }
 
         const wheatCount = inventoryCount(npc, Obj.WHEAT);
-        if (wheatCount > WHEAT_BAKE_THRESHOLD) {
+        if (wheatCount > 1) {
             ctx.setStatus(`Baking bread (${wheatCount} wheat)`);
             const bakeResult = await seekKnownDesires(
                 ctx,
