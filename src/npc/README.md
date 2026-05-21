@@ -8,9 +8,10 @@ Each NPC may have a pluggable **brain** (`npcBrain.js`):
 
 - **`NpcTaskBrain`** (default for `NPC` class) — perception + task/plan queue with optional LLM planner
 - **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there
+- **`ThomasBrain`** — custom brain, currently identical to `WanderBrain`
 - **`NoopNpcBrain`** — no cognition (body-only tests)
 
-Select at runtime with `?brain=task` (default), `?brain=wander`, or `?brain=noop` (see `npcBrainRuntime.js`).
+Select at runtime with `?brain=task` (default), `?brain=wander`, `?brain=thomas`, or `?brain=noop` (see `npcBrainRuntime.js`).
 
 Attach explicitly for test entities:
 
