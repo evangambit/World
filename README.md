@@ -48,7 +48,7 @@ src/
       npcPrompt.js        # System/user prompt builders
       npcActionCatalog.js # Machine-readable plan DSL (kept in sync with runner)
       createLlmPlanner.js # Factory wiring prompt → provider → plan
-      plannerRuntime.js   # Runtime state (cooldown, history, event bus)
+      plannerRuntime.js   # Resolves LLM provider config (env vars / localStorage)
       llmResponseCache.js # Disk cache for LLM responses
       mockPlanner.js      # Default dev/test planner (returns built-in plan when hungry)
       extractJson.js      # Pulls JSON object from raw or fenced model output
@@ -164,7 +164,7 @@ Perception runs **before** the task runner so newly seen tiles can influence tra
 - **`npcPrompt.js`** — builds system and user prompts (tile chunk descriptions, plan history, surroundings).
 - **`npcActionCatalog.js`** — machine-readable plan DSL; kept in sync with `npcPlanRunner.js`.
 - **`createLlmPlanner.js`** — factory that wires prompt → provider → validated plan.
-- **`plannerRuntime.js`** — cooldown, rolling plan history (`npcPlanHistory.js`), event bus.
+- **`plannerRuntime.js`** — resolves LLM provider config from env vars (Node) or URL params / localStorage (browser).
 - **`providers/`** — OpenAI-compatible and OpenRouter backends.
 
 The planner is wired in via `NpcTaskBrain`'s `planner` option. `createDefaultTaskBrain` uses `mockPlanner` as the default when no planner is supplied; pass `planner: null` to disable LLM planning entirely. The brain falls back to templates when the planner returns `null`.
