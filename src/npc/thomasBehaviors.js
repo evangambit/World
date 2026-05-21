@@ -4,8 +4,8 @@
  * A behavior is an `async (ctx) => {}` that drives an NPC using task
  * primitives.  Pass one to the ThomasBrain constructor.
  */
-import { T, Obj, isStoveObject, isWheatCropObject } from '../world/tileTypes.js';
-import { canPlantWheatAt, harvestWheatAtTile, isWheatMature, plantWheatSeedAtTile } from '../domain/crops.js';
+import { T, Obj, WHEAT_CROP_STAGES, isStoveObject, isWheatCropObject } from '../world/tileTypes.js';
+import { canPlantWheatAt, harvestWheatAtTile, isWheatMature, plantWheatSeedAtTile, wheatStageForTile } from '../domain/crops.js';
 import { cookAtStove } from '../domain/entityActions.js';
 import { consumeFoodFromInventory } from '../domain/vitality.js';
 import {
@@ -43,7 +43,7 @@ export async function farmBehavior(ctx) {
         }
 
         const wheatCount = inventoryCount(npc, Obj.WHEAT);
-        if (wheatCount > 1) {
+        if (wheatCount > 1 && breadCount < 5) {
             ctx.setStatus(`Baking bread (${wheatCount} wheat)`);
             const bakeResult = await seekKnownDesires(
                 ctx,
@@ -73,27 +73,31 @@ export async function farmBehavior(ctx) {
         const desires = [];
 
         desires.push({
-            match: s => isWheatCropObject(s.obj) && s.cropStage >= 3,
+            match: s => isWheatCropObject(s.obj) && wheatStageForTile(s, ctx.gameTime) >= WHEAT_CROP_STAGES - 1,
             weight: 2,
         });
-
-        if (seedCount < 10) {
-            desires.push({
-                match: s => s.terrain === T.TALL_GRASS && !s.obj,
-                weight: 1.5,
-            });
-        }
 
         if (seedCount > 0) {
             desires.push({
                 match: s => !s.obj && s.terrain === T.DIRT,
                 weight: 1,
             });
+            desires.push({
+                match: s => s.terrain === T.TALL_GRASS && !s.obj,
+                weight: 0.5,
+            });
+        }
+
+        if (wheatCount > 0) {
+            desires.push({
+                match: s => s.obj === Obj.STOVE,
+                weight: 1.5,
+            });
         }
 
         const goalDesc = seedCount > 0
             ? `Farming (${seedCount} seeds)`
-            : 'Looking for seeds';
+            : 'Looking for wheat';
         ctx.setStatus(`Seeking: ${goalDesc}`);
 
         const result = await seekKnownDesires(ctx, desires, 500);
@@ -102,6 +106,9 @@ export async function farmBehavior(ctx) {
             case SeekResult.ARRIVED:
                 ctx.setStatus('Working…');
                 await interactAtCurrentTile(ctx);
+                if (inventoryCount(npc, Obj.WHEAT) > 0) {
+                    tryCookBreadAtAdjacentStove(ctx);
+                }
                 await ctx.nextTick();
                 break;
 
