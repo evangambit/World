@@ -25,9 +25,11 @@ export {
     attachNpcBrain,
     createTaskBrain,
     createDefaultTaskBrain,
+    createWanderBrain,
     noopNpcBrain,
     NoopNpcBrain,
     NpcTaskBrain,
+    WanderBrain,
 } from '../npc/npcBrain.js';
 
 /** @typedef {import('./npcSimulation.js').NpcEntity} NpcEntity */

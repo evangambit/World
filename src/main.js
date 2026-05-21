@@ -10,6 +10,7 @@ import { tickSimulation } from './simulation/tickSimulation.js';
 import { NPC, find } from './actors/npc.js';
 import { createNpcPlannerFromConfig } from './npc/llm/createLlmPlanner.js';
 import { resolveBrowserPlannerConfig } from './npc/llm/plannerRuntime.js';
+import { resolveBrainType, createBrainForType } from './npc/npcBrainRuntime.js';
 import { clearGrass } from './npc/npcTasks.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
 import {
@@ -113,21 +114,26 @@ class Game {
         }
 
         // Spawn NPCs inside their homes (see VILLAGE_NPC_SPAWNS in builder.js)
+        const brainType = resolveBrainType();
+        if (brainType !== 'task') {
+            console.log(`[World] NPC brain: ${brainType}`);
+        }
         for (const def of VILLAGE_NPC_SPAWNS) {
             const inventory = [...NPC_DEFAULT_INVENTORY, ...(def.inventory ?? [])];
-            const brainOpts = llmPlanner ? { planner: llmPlanner } : {};
-            const npc = new NPC(def.x, def.y, def.z, def.preset, def.name, inventory, brainOpts);
+            const plannerOpts = llmPlanner ? { planner: llmPlanner } : {};
+            const brain = createBrainForType(brainType, plannerOpts);
+            const npc = new NPC(def.x, def.y, def.z, def.preset, def.name, inventory, { brain });
             const homeBid = this.world.getBuildingId(Math.floor(def.x), Math.floor(def.y), def.z);
             if (homeBid != null) {
-                npc.tasks.enqueue(find(Obj.KEY, 16, { buildingId: homeBid }));
+                npc.tasks?.enqueue(find(Obj.KEY, 16, { buildingId: homeBid }));
             }
-            if (def.tasks?.length) npc.tasks.enqueueMany(def.tasks);
+            if (def.tasks?.length) npc.tasks?.enqueueMany(def.tasks);
             this.npcs.push(npc);
         }
 
         // Finn clears a grass patch outside his house, then resumes wandering
         const finn = this.npcs.find((n) => n.name === 'Finn');
-        if (finn) finn.tasks.enqueue(clearGrass(13, 32, 0));
+        if (finn) finn.tasks?.enqueue(clearGrass(13, 32, 0));
 
         // Handle resize
         this._resize();
@@ -478,7 +484,7 @@ class Game {
 
         panel.classList.remove('hidden');
         this.npcPanelNameEl.textContent = npc.name;
-        const status = npc.tasks.getPlanStatus();
+        const status = npc.tasks?.getPlanStatus() ?? { lines: ['Wandering'] };
         this.npcPanelPlanEl.textContent = status.lines.join('\n');
     }
 

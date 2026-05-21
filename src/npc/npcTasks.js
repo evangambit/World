@@ -11,6 +11,7 @@ import { describePlanStep, formatPlanOutline, getPlanStepAt } from './npcPlanDes
 import { MAX_PLAN_HISTORY } from './npcPlanHistory.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
 import { runFind, runGoTo, runTimedAction } from './npcTaskPrimitives.js';
+import { syncMemoryRefTravelGoal } from './npcMemoryTravel.js';
 import { findPath } from '../world/pathfinding.js';
 
 /** @typedef {import('./llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
@@ -271,6 +272,7 @@ export class NPCTaskRunner {
     /** @param {import('../world/world.js').World3D} world */
     update(world) {
         if (!this.npc.isAlive) return;
+        syncMemoryRefTravelGoal(this.npc, world);
         if (this._running || this._awaitingPlanner) return;
 
         if (this._queue.length === 0) {
