@@ -29,7 +29,11 @@ src/
     npcLocomotion.js      # Pathfinding + path follow
     npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
-    npcBrain.js           # Pluggable brain (NpcTaskBrain / NoopNpcBrain)
+    npcBrain.js           # Pluggable brain (NpcTaskBrain / WanderBrain / ThomasBrain / NoopNpcBrain)
+    npcBrainRuntime.js    # Resolves ?brain= URL param to a brain instance
+    thomasPerception.js   # Wall-respecting LOS perception (supercover DDA raycast)
+    thomasTasks.js        # Async task framework: tick bridge, moveTowardLocation, seekKnownDesires
+    thomasBehaviors.js    # ThomasBrain behaviors (farmBehavior)
     npcMemory.js          # Per-tile perception + reachability
     npcMemoryTravel.js    # Adaptive travel toward memory refs
     npcPlanRefs.js        # rememberLocationsOfNearby(...) in plan steps
@@ -149,9 +153,10 @@ Each NPC has a pluggable **brain** (`npcBrain.js`):
 
 - **`NpcTaskBrain`** — perception + task/plan queue with optional LLM planner (default for the `NPC` class).
 - **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there.
+- **`ThomasBrain`** — wall-respecting tile memory (supercover DDA raycast) + async behavior framework; default behavior is autonomous wheat farming. See [`src/npc/README.md`](src/npc/README.md) for the full task API.
 - **`NoopNpcBrain`** — no cognition (body-only tests).
 
-Select at runtime with `?brain=task` (default), `?brain=wander`, or `?brain=noop` (see `npcBrainRuntime.js`).
+Select at runtime with `?brain=task` (default), `?brain=wander`, `?brain=thomas`, or `?brain=noop` (see `npcBrainRuntime.js`).
 
 Per-frame simulation order (see `tickSimulation.js`):
 
@@ -220,8 +225,11 @@ Allowed direction: `main.js` → `client/` + logic layers; `client/` → logic l
 | `actors/entity.js`, `actors/npcSimulation.js`, `actors/npc.js`, `client/playerController.js` | Actor state and movement |
 | `actors/timedActionRunner.js` | Runs timed actions on entities |
 | `main.js` | Player input and UI |
-| `npc/npcBrain.js` | Pluggable NPC brain (`NpcTaskBrain` / `WanderBrain` / `NoopNpcBrain`) |
+| `npc/npcBrain.js` | Pluggable NPC brain (`NpcTaskBrain` / `WanderBrain` / `ThomasBrain` / `NoopNpcBrain`) |
 | `npc/npcBrainRuntime.js` | Resolves `?brain=` URL param to a brain instance |
+| `npc/thomasPerception.js` | Wall-respecting LOS perception for ThomasBrain |
+| `npc/thomasTasks.js` | Async task primitives (`moveTowardLocation`, `seekKnownDesires`, …) |
+| `npc/thomasBehaviors.js` | Behavior functions for ThomasBrain (wheat farming) |
 | `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
 | `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |
 | `npc/npcExplore.js` | Wide-area search (`explore` plan step) |
