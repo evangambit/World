@@ -32,56 +32,7 @@ new NPC(x, y, z, preset, name, inv, { brain: myCustomBrain });
 
 ## ThomasBrain
 
-**Modules:** `thomasPerception.js`, `thomasTasks.js`, `thomasBehaviors.js`
-
-A fully custom brain with two novel layers:
-
-### Wall-respecting perception (`thomasPerception.js`)
-
-Replaces the default Chebyshev scan with a **supercover DDA raycast** per candidate tile. Opaque tiles (`WALL_STONE`, `WALL_WOOD`, `CLIFF`, `ROOF`, `TREE`) block line of sight; the NPC only records tiles it can actually see. The observer's tile and the target tile are never treated as blockers (so a wall tile adjacent to the NPC is still perceived).
-
-### Async task framework (`thomasTasks.js`)
-
-A **tick-to-async bridge**: `await ctx.nextTick()` suspends the behavior for exactly one simulation frame. The brain resolves it each `tick()` call. This lets behavior code read as sequential logic rather than a state machine.
-
-**`TaskContext`** — passed to every behavior; live getters for `npc`, `world`, `tileMemory`, `gameTime`, `tickCount`; plus `nextTick()` and `setStatus(line)`.
-
-**Primitives:**
-
-| Function | Returns | Description |
-|---|---|---|
-| `moveTowardLocation(ctx, x, y, maxTicks)` | `MoveResult.*` | Walk to a tile; polls locomotion each tick |
-| `seekKnownDesires(ctx, desires, maxTicks)` | `SeekResult.*` | Scan memory, rank by `weight/distance`, walk to best; re-evaluates every `reevalInterval` ticks |
-| `doTimedAction(ctx, actionId, tx, ty)` | `ActionResult.*` | Start a timed action and wait for completion |
-| `wanderOnce(ctx, maxTicks)` | `MoveResult.*` | Single random walk near home |
-| `inventoryCount(npc, objType)` | `number` | Count carried items |
-
-Exit reasons follow a typed `*Result` pattern (e.g. `arrived`, `impossible`, `took_damage`, `max_ticks`) so behaviors can switch on outcomes without inspecting raw state.
-
-### Writing a behavior
-
-Pass an `async (ctx) => { ... }` to the `ThomasBrain` constructor. If it returns, the brain restarts it on the next tick.
-
-```js
-import { ThomasBrain } from './npcBrain.js';
-import { seekKnownDesires, SeekResult } from './thomasTasks.js';
-
-const brain = new ThomasBrain(async (ctx) => {
-    while (true) {
-        const result = await seekKnownDesires(ctx, myDesires, 500);
-        if (result === SeekResult.ARRIVED) { /* interact */ }
-        // ...
-    }
-});
-```
-
-### Default behavior: wheat farming (`thomasBehaviors.js`)
-
-`farmBehavior` loops:
-1. **Need seeds** → seek `TALL_GRASS` → `clear_grass` (5 s timed action) → receive 1–2 seeds
-2. **Have seeds** → seek empty `DIRT` tiles → plant instantly
-3. **Crops ready** → seek mature `WHEAT_CROP` → harvest (wheat + 2 seeds)
-4. **Nothing known** → `wanderOnce` to expand perception coverage
+See [`THOMAS_BRAIN.md`](THOMAS_BRAIN.md) for full details: wall-respecting perception, the async task API, writing behaviors, and the farming behavior loop.
 
 ## Simulation order (per NPC, each frame)
 
