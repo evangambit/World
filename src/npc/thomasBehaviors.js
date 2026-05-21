@@ -4,12 +4,11 @@
  * A behavior is an `async (ctx) => {}` that drives an NPC using task
  * primitives.  Pass one to the ThomasBrain constructor.
  */
-import { Obj } from '../world/tileTypes.js';
-import { canPlaceAmbientPlantOnTerrain, isWheatCropObject } from '../world/tileTypes.js';
+import { T, Obj, isWheatCropObject } from '../world/tileTypes.js';
 import { canPlantWheatAt, harvestWheatAtTile, isWheatMature, plantWheatSeedAtTile } from '../domain/crops.js';
-import { pickUpAtTile } from '../domain/entityActions.js';
 import {
     SeekResult,
+    doTimedAction,
     inventoryCount,
     seekKnownDesires,
     wanderOnce,
@@ -42,14 +41,14 @@ export async function farmBehavior(ctx) {
 
         if (seedCount < 10) {
             desires.push({
-                match: s => s.obj === Obj.WHEAT_SEED,
+                match: s => s.terrain === T.TALL_GRASS && !s.obj,
                 weight: 1.5,
             });
         }
 
         if (seedCount > 0) {
             desires.push({
-                match: s => !s.obj && canPlaceAmbientPlantOnTerrain(s.terrain),
+                match: s => !s.obj && s.terrain === T.DIRT,
                 weight: 1,
             });
         }
@@ -64,7 +63,8 @@ export async function farmBehavior(ctx) {
         switch (result) {
             case SeekResult.ARRIVED:
                 ctx.setStatus('Working…');
-                interactAtCurrentTile(ctx);
+                await interactAtCurrentTile(ctx);
+                await ctx.nextTick();
                 break;
 
             case SeekResult.NO_KNOWN_REACHABLE:
@@ -83,10 +83,10 @@ export async function farmBehavior(ctx) {
 
 /**
  * After arriving at a desired tile, figure out what's actually here (live
- * world, not memory) and perform the appropriate instant action.
+ * world, not memory) and perform the appropriate action.
  * @param {TaskContext} ctx
  */
-function interactAtCurrentTile(ctx) {
+async function interactAtCurrentTile(ctx) {
     const { npc, world, gameTime } = ctx;
     const tx = Math.floor(npc.x);
     const ty = Math.floor(npc.y);
@@ -99,8 +99,8 @@ function interactAtCurrentTile(ctx) {
         return;
     }
 
-    if (tile.obj === Obj.WHEAT_SEED) {
-        pickUpAtTile(npc, world, tx, ty, tz);
+    if (tile.terrain === T.TALL_GRASS && !tile.obj) {
+        await doTimedAction(ctx, 'clear_grass', tx, ty);
         return;
     }
 

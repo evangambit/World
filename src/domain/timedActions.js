@@ -2,8 +2,8 @@
  * Timed world actions — registry and per-action rules.
  * Player and NPC runners call these; add new actions here.
  */
-import { isAdjacentToTile } from './entityActions.js';
-import { T, isClearableGrassTerrain } from '../world/tileTypes.js';
+import { isAdjacentToTile, mergeStackInto } from './entityActions.js';
+import { T, Obj, isClearableGrassTerrain } from '../world/tileTypes.js';
 
 /** @typedef {import('../actors/entity.js').Entity} Entity */
 /** @typedef {import('../world/world.js').World3D} World3D */
@@ -35,7 +35,13 @@ export const TIMED_ACTIONS = {
             }
             return { ok: true };
         },
-        complete(_entity, world, tx, ty, tz) {
+        complete(entity, world, tx, ty, tz) {
+            const tile = world.getTile(tx, ty, tz);
+            if (tile?.terrain === T.TALL_GRASS) {
+                const seeds = 1 + Math.floor(Math.random() * 2);
+                if (!entity.inventory) entity.inventory = [];
+                mergeStackInto(entity.inventory, Obj.WHEAT_SEED, seeds);
+            }
             world.setTile(tx, ty, tz, { terrain: T.DIRT });
         },
     },
