@@ -484,8 +484,12 @@ class Game {
 
         panel.classList.remove('hidden');
         this.npcPanelNameEl.textContent = npc.name;
-        const status = npc.tasks?.getPlanStatus() ?? { lines: ['Wandering'] };
-        this.npcPanelPlanEl.textContent = status.lines.join('\n');
+        const status = npc.tasks?.getPlanStatus() ?? npc.brain?.getStatus?.() ?? { lines: ['Wandering'] };
+        const inv = npc.inventory ?? [];
+        const invLines = inv.length
+            ? ['', 'Inventory:', ...inv.map(s => `  ${formatItemStackLabel(s.objType, s.count, s.buildingId)}`)]
+            : ['', 'Inventory: empty'];
+        this.npcPanelPlanEl.textContent = [...status.lines, ...invLines].join('\n');
     }
 
     _syncVitalsUI() {

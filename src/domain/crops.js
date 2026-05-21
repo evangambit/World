@@ -3,9 +3,9 @@
  */
 import { mergeStackInto } from './entityActions.js';
 import {
+    T,
     Obj,
     WHEAT_CROP_STAGES,
-    canPlaceAmbientPlantOnTerrain,
     isWheatCropObject,
 } from '../world/tileTypes.js';
 
@@ -59,7 +59,7 @@ export function updateCrops(world, gameTime) {
 export function canPlantWheatAt(world, tx, ty, tz) {
     const tile = world.getTile(tx, ty, tz);
     if (!tile || tile.obj) return false;
-    return canPlaceAmbientPlantOnTerrain(tile.terrain);
+    return tile.terrain === T.DIRT;
 }
 
 /**
