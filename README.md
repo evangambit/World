@@ -198,10 +198,17 @@ Test files live next to the module they cover:
 | `npc/npcPlanDescribe.test.mjs` | Plan step descriptions |
 | `npc/npcExplore.test.mjs` | Wide-area waypoint search |
 | `npc/tileChunkDescribe.test.mjs` | Chunk snapshot and diff strings |
+| `npc/thomasBehaviors.test.mjs` | Behavioral regression: full `farmBehavior` loop over 10 000 ticks |
 | `npc/llm/*.test.mjs` | Prompt building, plan parsing, response cache |
 | `architecture/importLayers.test.mjs` | Layer boundary enforcement |
 
 For new rules, add a `*.test.mjs` next to the module under test.
+
+#### Behavioral regression tests
+
+`thomasBehaviors.test.mjs` runs `ThomasBrain` / `farmBehavior` for 10 000 simulation ticks (~500 game-seconds) in under a second — no browser, no renderer. It uses `buildVillage()` for a realistic world and asserts the NPC survives and ends with ≥ 5 bread (meaning the full farming cycle ran at least once). The `[bread-production]` console line prints a snapshot of final inventory and hunger for comparing productivity across AI-code changes.
+
+The key technique: `tickSimulation` is synchronous, but `ThomasBrain` behaviors are async coroutines. A plain `for` loop would freeze them (microtasks don't drain mid-loop). Adding `await Promise.resolve()` after each tick flushes the queue so the coroutine advances one step per tick, matching how the browser loop works.
 
 ### Layer boundaries (presentation vs logic)
 

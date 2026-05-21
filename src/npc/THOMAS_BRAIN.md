@@ -80,3 +80,31 @@ Farming sub-loop:
 4. **Nothing known** → `wanderOnce` to expand perception coverage
 
 Wheat can only be planted on `T.DIRT` — enforced by `canPlantWheatAt` in `domain/crops.js`.
+
+## Testing behaviors headlessly
+
+`thomasBehaviors.test.mjs` runs `farmBehavior` for 10 000 ticks (~500 game-seconds) in under a second with no browser or renderer. Use the same pattern to test any behavior change:
+
+```js
+import { buildVillage } from '../content/builder.js';
+import { createNpcEntity } from '../actors/npcSimulation.js';
+import { createThomasBrain } from './npcBrain.js';
+import { tickSimulation } from '../simulation/tickSimulation.js';
+
+async function runTicks(world, npcs, ticks, dt = 0.05) {
+    let gameTime = 0;
+    for (let i = 0; i < ticks; i++) {
+        ({ gameTime } = tickSimulation({ world, gameTime, dt, npcs }));
+        await Promise.resolve(); // let the async behavior coroutine advance
+    }
+    return gameTime;
+}
+
+// In a node:test it() block:
+const world = buildVillage();
+const npc = createNpcEntity(x, y, z, { brain: createThomasBrain(myBehavior) });
+await runTicks(world, [npc], 10_000);
+// assert on npc.inventory, npc.isAlive, etc.
+```
+
+The `await Promise.resolve()` after each tick is essential: `ThomasBrain` advances its behavior by resolving the pending `_nextTick()` promise inside `tick()`, but Promise continuations are microtasks and don't run inside a synchronous loop. Yielding once per tick keeps the coroutine in lock-step with the engine.

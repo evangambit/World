@@ -90,8 +90,26 @@ Helpers: `markTileUnreachable`, `markTileReachable`, `isTileMemoryReachable`.
 
 - `npcMemory.test.mjs` — perception, snapshots, reachability reset on state change  
 - `npcMemoryTravel.test.mjs` — travel, retargeting, skipping unreachable tiles  
+- `thomasBehaviors.test.mjs` — behavioral regression for `farmBehavior` (see [ThomasBrain testing](#thomasbrain-testing))
 
 Run: `npm test`
+
+### ThomasBrain testing
+
+Because `ThomasBrain` behaviors are async coroutines, a plain synchronous `for` loop would freeze them — microtasks don't drain mid-loop. The trick is to yield after each tick:
+
+```js
+async function runTicks(world, npcs, ticks, dt = 0.05) {
+    let gameTime = 0;
+    for (let i = 0; i < ticks; i++) {
+        ({ gameTime } = tickSimulation({ world, gameTime, dt, npcs }));
+        await Promise.resolve(); // flush microtask queue so nextTick() resolves
+    }
+    return gameTime;
+}
+```
+
+`thomasBehaviors.test.mjs` uses this helper to run 10 000 ticks (~500 game-seconds) in under a second. It logs a `[bread-production]` snapshot line (bread / wheat / seeds / hunger) so productivity changes are visible when comparing AI-code versions. Tighten the `bread >= 5` threshold whenever you want stricter coverage of a specific behavior.
 
 ## Plan location refs
 
