@@ -3,7 +3,6 @@
  */
 import { mockRequestPlan } from './llm/mockPlanner.js';
 import { tickNpcPerception } from './npcMemory.js';
-import { syncMemoryRefTravelGoal } from './npcMemoryTravel.js';
 import { NPCTaskRunner } from './npcTasks.js';
 
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -35,6 +34,50 @@ export class NoopNpcBrain {
     tick(_world, _dt, _gameTime) {}
 
     destroy() {}
+}
+
+/**
+ * Simple wander brain — no memory, no plans, no task queue.
+ * Picks a random walkable tile near home each time the previous journey ends.
+ */
+export class WanderBrain {
+    constructor() {
+        /** @type {NpcEntity | null} */
+        this.npc = null;
+        this._traveling = false;
+    }
+
+    /** @param {NpcEntity} npc */
+    attach(npc) {
+        this.npc = npc;
+    }
+
+    /**
+     * @param {World3D} world
+     */
+    tick(world, _dt, _gameTime) {
+        const npc = this.npc;
+        if (!npc || npc._dead || this._traveling) return;
+
+        const radius = npc.wanderRadius ?? 10;
+        for (let attempt = 0; attempt < 10; attempt++) {
+            const gx = npc.homeX + Math.floor(Math.random() * radius * 2 - radius);
+            const gy = npc.homeY + Math.floor(Math.random() * radius * 2 - radius);
+            if (!world.isWalkable(gx, gy, npc.homeZ)) continue;
+            this._traveling = true;
+            npc.travelToTile(gx, gy, npc.homeZ, world)
+                .catch(() => {})
+                .finally(() => {
+                    this._traveling = false;
+                });
+            return;
+        }
+    }
+
+    destroy() {
+        this.npc = null;
+        this._traveling = false;
+    }
 }
 
 /** Perception + memory-ref travel + task/plan queue (default game brain). */
@@ -78,7 +121,6 @@ export class NpcTaskBrain {
         if (!npc || npc._dead) return;
 
         tickNpcPerception(npc, world, gameTime);
-        syncMemoryRefTravelGoal(npc, world);
         this._tasks?.update(world);
     }
 
@@ -110,6 +152,11 @@ export function createDefaultTaskBrain(opts = {}) {
 /** @returns {NoopNpcBrain} */
 export function noopNpcBrain() {
     return new NoopNpcBrain();
+}
+
+/** @returns {WanderBrain} */
+export function createWanderBrain() {
+    return new WanderBrain();
 }
 
 /**
