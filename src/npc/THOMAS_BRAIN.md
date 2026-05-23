@@ -12,7 +12,7 @@ Replaces the default Chebyshev scan with a **supercover DDA raycast** per candid
 
 A **tick-to-async bridge**: `await ctx.nextTick()` suspends the behavior for exactly one simulation frame. The brain resolves it each `tick()` call. This lets behavior code read as sequential logic rather than a state machine.
 
-**`TaskContext`** — passed to every behavior; live getters for `npc`, `world`, `tileMemory`, `gameTime`, `tickCount`; plus `nextTick()` and `setStatus(line)`.
+**`TaskContext`** — passed to every behavior; live getters for `npc`, `world`, `gameTime`, `tickCount`; plus `nextTick()` and `setStatus(line)`.
 
 **Primitives:**
 
@@ -45,7 +45,7 @@ const brain = new ThomasBrain(async (ctx) => {
 
 ### Desires
 
-`seekKnownDesires` takes an array of `Desire` objects, each with a `match` predicate and a `weight`. It scans `tileMemory`, ranks matches by `weight / distance`, and walks toward the best, re-evaluating each `reevalInterval` ticks (default 60) as perception updates memory.
+`seekKnownDesires` takes an array of `Desire` objects, each with a `match` predicate and a `weight`. It scans tile memory via `forEachNpcObservedTile`, ranks matches by `weight / distance`, and walks toward the best, re-evaluating each `reevalInterval` ticks (default 60) as perception updates memory.
 
 ```js
 const desires = [

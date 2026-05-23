@@ -1,6 +1,7 @@
 /**
  * NPC brain — tile memory, perception, and optional task/plan runner.
  */
+import { World3D } from '../world/world.js';
 import { mockRequestPlan } from './llm/mockPlanner.js';
 import { tickNpcPerception } from './npcMemory.js';
 import { tickThomasPerception } from './thomasPerception.js';
@@ -26,9 +27,19 @@ import { NPCTaskRunner } from './npcTasks.js';
  * @property {(npc: NpcEntity) => void} attach
  * @property {(world: World3D, dt: number, gameTime: number) => void} tick
  * @property {() => void} [destroy]
- * @property {Map<string, TileMemoryEntry>} [tileMemory]
+ * @property {(x: number, y: number, z: number, entry: TileMemoryEntry) => void} [observeTile]
  * @property {NPCTaskRunner} [tasks]
  */
+
+/**
+ * @param {{ _tileStore: Map<string, TileMemoryEntry> }} host
+ */
+function initTileStore(host) {
+    host._tileStore = new Map();
+    host.observeTile = (x, y, z, entry) => {
+        host._tileStore.set(World3D.key(x, y, z), entry);
+    };
+}
 
 /** No cognition — body-only simulation. */
 export class NoopNpcBrain {
@@ -89,8 +100,7 @@ export class NpcTaskBrain {
      * @param {NpcTaskBrainOptions} [opts]
      */
     constructor(opts = {}) {
-        /** @type {Map<string, TileMemoryEntry>} */
-        this.tileMemory = new Map();
+        initTileStore(this);
         /** @type {NpcTaskBrainOptions} */
         this._opts = opts;
         /** @type {NpcEntity | null} */
@@ -102,10 +112,6 @@ export class NpcTaskBrain {
     /** @param {NpcEntity} npc */
     attach(npc) {
         this.npc = npc;
-        Object.defineProperty(npc, 'tileMemory', {
-            get: () => this.tileMemory,
-            configurable: true,
-        });
         this._tasks = new NPCTaskRunner(npc, this._opts);
     }
 
@@ -129,6 +135,7 @@ export class NpcTaskBrain {
 
     destroy() {
         this._tasks?.clear();
+        this._tileStore.clear();
     }
 }
 
@@ -180,8 +187,7 @@ export class ThomasBrain {
     constructor(behavior) {
         /** @type {NpcEntity | null} */
         this.npc = null;
-        /** @type {Map<string, import('./npcMemory.js').TileMemoryEntry>} */
-        this.tileMemory = new Map();
+        initTileStore(this);
         /** @type {(ctx: TaskContext) => Promise<void>} */
         this._behavior = behavior ?? farmBehavior;
         /** @type {World3D | null} */
@@ -203,10 +209,6 @@ export class ThomasBrain {
     /** @param {NpcEntity} npc */
     attach(npc) {
         this.npc = npc;
-        Object.defineProperty(npc, 'tileMemory', {
-            get: () => this.tileMemory,
-            configurable: true,
-        });
     }
 
     /**
@@ -270,6 +272,7 @@ export class ThomasBrain {
         this._tickResolve = null;
         this._taskRunning = false;
         this.npc = null;
+        this._tileStore.clear();
     }
 }
 

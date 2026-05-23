@@ -52,7 +52,7 @@ describe('resolveTravelDestinationForMemory', () => {
         world.setTile(9, 9, 0, { terrain: T.GRASS, obj: Obj.STOVE });
 
         const npc = createNpcEntity(9.5, 10.5, 0, { brain: createTaskBrain() });
-        npc.tileMemory.set(World3D.key(9, 9, 0), {
+        npc.brain.observeTile(9, 9, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
@@ -73,7 +73,7 @@ describe('travelNpcToMemoryRef', () => {
         fillGrass(world, 10, 10, 14, 10);
 
         const npc = createNpcEntity(10.5, 10.5, 0, { brain: createTaskBrain() });
-        npc.tileMemory.set(World3D.key(14, 10, 0), {
+        npc.brain.observeTile(14, 10, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
@@ -85,7 +85,7 @@ describe('travelNpcToMemoryRef', () => {
         );
         assert.equal(npc._memoryRefTravel?.goalKey, '14,10,0');
 
-        npc.tileMemory.set(World3D.key(12, 10, 0), {
+        npc.brain.observeTile(12, 10, 0, {
             seenAt: 2,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
@@ -107,12 +107,12 @@ describe('travelNpcToMemoryRef', () => {
         }
 
         const npc = createNpcEntity(10.5, 10.5, 0, { brain: createTaskBrain() });
-        npc.tileMemory.set(World3D.key(14, 10, 0), {
+        npc.brain.observeTile(14, 10, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
             reachable: false,
         });
-        npc.tileMemory.set(World3D.key(12, 10, 0), {
+        npc.brain.observeTile(12, 10, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });

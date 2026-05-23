@@ -28,7 +28,7 @@ Swap implementations via constructor:
 new NPC(x, y, z, preset, name, inv, { brain: myCustomBrain });
 ```
 
-`npc.tasks` is available when the brain exposes it (task brain). `npc.tileMemory` delegates to the brain’s map when attached.
+`npc.tasks` is available when the brain exposes it (task brain). The brain records observations via `observeTile`; reads use `npcMemory` helpers (`getNpcTileMemory`, `forEachNpcObservedTile`, etc.).
 
 ## ThomasBrain
 
@@ -46,7 +46,7 @@ Perception runs **before** the task runner so newly seen tiles can influence tra
 ## Tile memory
 
 **Module:** `npcMemory.js`  
-**Storage:** `npc.brain.tileMemory` (exposed as `npc.tileMemory` when a brain is attached)
+**Storage:** `brain._tileStore` (private); `npc.brain.observeTile` to write, `getNpcTileMemory(npc, …)` to read
 
 ### Perception
 

@@ -90,7 +90,7 @@ describe('runExplore', () => {
         const npc = createNpcEntity(10.5, 10.5, 0, { brain: createTaskBrain() });
         npc.homeX = 10;
         npc.homeY = 10;
-        npc.tileMemory.set(World3D.key(10, 18, 0), {
+        npc.brain.observeTile(10, 18, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.FLOWER }),
         });

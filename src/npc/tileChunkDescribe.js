@@ -12,6 +12,7 @@ import {
 } from '../world/tileTypes.js';
 import { World3D } from '../world/world.js';
 import { NPC_PERCEPTION_RADIUS } from './npcConstants.js';
+import { getNpcTileMemory } from './npcMemory.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('./npcMemory.js').TileMemoryEntry} TileMemoryEntry */
@@ -190,6 +191,7 @@ export function* chunkTileCoords(chunkX, chunkY, z, chunkSize = WORLD_CHUNK_SIZE
 /**
  * @typedef {Object} BuildChunkCellsOptions
  * @property {Map<string, TileMemoryEntry>} [memory]
+ * @property {(x: number, y: number, z: number) => TileMemoryEntry|undefined} [getObservedTile]
  * @property {import('../world/world.js').World3D} [world]
  * @property {number} [chunkSize]
  */
@@ -204,12 +206,13 @@ export function* chunkTileCoords(chunkX, chunkY, z, chunkSize = WORLD_CHUNK_SIZE
 export function buildChunkCells(chunkX, chunkY, z, opts = {}) {
     const chunkSize = opts.chunkSize ?? WORLD_CHUNK_SIZE;
     const memory = opts.memory;
+    const getObservedTile = opts.getObservedTile;
     const world = opts.world;
     /** @type {ChunkCell[]} */
     const cells = [];
 
     for (const { x, y, z: cz } of chunkTileCoords(chunkX, chunkY, z, chunkSize)) {
-        const mem = memory?.get(World3D.key(x, y, cz));
+        const mem = getObservedTile?.(x, y, cz) ?? memory?.get(World3D.key(x, y, cz));
         if (mem) {
             cells.push({
                 x,
@@ -430,7 +433,7 @@ export function formatSurroundingsSection(npc, opts = {}) {
     const y = Math.floor(npc.y ?? 0);
     const radius = opts.radius ?? NPC_PERCEPTION_RADIUS;
     const chunkSize = opts.chunkSize ?? WORLD_CHUNK_SIZE;
-    const memory = npc.tileMemory;
+    const getObservedTile = (x, y, z) => getNpcTileMemory(npc, x, y, z);
     const world = opts.world;
 
     const chunks = listChunksNearTile(x, y, z, radius, chunkSize);
@@ -440,7 +443,7 @@ export function formatSurroundingsSection(npc, opts = {}) {
         `position: (${x}, ${y}, ${z})`,
     ];
 
-    const buildOpts = { memory, world, chunkSize };
+    const buildOpts = { getObservedTile, world, chunkSize };
     /** @type {string[]} */
     const chunkLines = [];
 

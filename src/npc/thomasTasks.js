@@ -7,7 +7,7 @@
  * Low-level primitives (moveTowardLocation) think in ticks.
  * Higher-level combinators (seekKnownDesires) compose primitives and hide ticks.
  */
-import { markTileUnreachable } from './npcMemory.js';
+import { forEachNpcObservedTile, markTileUnreachable } from './npcMemory.js';
 import { findApproachTile } from './npcTaskPrimitives.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
@@ -49,7 +49,6 @@ export class TaskContext {
     }
 
     get npc()        { return this._brain.npc; }
-    get tileMemory() { return this._brain.tileMemory; }
     get world()      { return this._brain._world; }
     get gameTime()   { return this._brain._gameTime; }
     get tickCount()  { return this._brain._tickCount; }
@@ -173,7 +172,7 @@ export async function seekKnownDesires(ctx, desires, maxTicks, opts = {}) {
  * @returns {{ x: number, y: number, z: number, weight: number, dist: number, score: number }[]}
  */
 function findDesirableTiles(ctx, desires) {
-    const { npc, tileMemory } = ctx;
+    const { npc } = ctx;
     const npcX = Math.floor(npc.x);
     const npcY = Math.floor(npc.y);
     const npcZ = npc.z;
@@ -181,14 +180,14 @@ function findDesirableTiles(ctx, desires) {
     /** @type {{ x: number, y: number, z: number, weight: number, dist: number, score: number }[]} */
     const results = [];
 
-    for (const [key, entry] of tileMemory) {
-        if (entry.reachable === false) continue;
+    forEachNpcObservedTile(npc, (key, entry) => {
+        if (entry.reachable === false) return;
 
         const parts = key.split(',');
         const tx = +parts[0];
         const ty = +parts[1];
         const tz = +parts[2];
-        if (tz !== npcZ) continue;
+        if (tz !== npcZ) return;
 
         for (const desire of desires) {
             if (desire.match(entry.state)) {
@@ -198,7 +197,7 @@ function findDesirableTiles(ctx, desires) {
                 break;
             }
         }
-    }
+    });
 
     results.sort((a, b) => b.score - a.score);
     return results;

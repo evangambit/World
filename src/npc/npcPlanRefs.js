@@ -1,8 +1,8 @@
 /**
  * Resolve plan step refs (memory queries, etc.) into tile coordinates.
  */
-import { World3D } from '../world/world.js';
 import { getObjectTagSpec } from './npcObjectTags.js';
+import { forEachNpcObservedTile } from './npcMemory.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
 /** @typedef {import('../world/world.js').TileData} TileData */
@@ -92,18 +92,18 @@ export function rememberLocationsOfNearby(npc, objectTag) {
     /** @type {{ ref: TileRef, dist: number }[]} */
     const matches = [];
 
-    for (const [key, entry] of npc.tileMemory ?? []) {
-        if (!tileMemoryMatchesObjectTag(entry.state, objectTag)) continue;
+    forEachNpcObservedTile(npc, (key, entry) => {
+        if (!tileMemoryMatchesObjectTag(entry.state, objectTag)) return;
 
         const parts = key.split(',').map(Number);
         const x = parts[0];
         const y = parts[1];
         const z = parts[2];
-        if (z !== cz) continue;
+        if (z !== cz) return;
 
         const dist = Math.max(Math.abs(x - cx), Math.abs(y - cy));
         matches.push({ ref: { x, y, z }, dist });
-    }
+    });
 
     matches.sort((a, b) => a.dist - b.dist || a.ref.x - b.ref.x || a.ref.y - b.ref.y);
     return matches.map((m) => m.ref);

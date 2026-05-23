@@ -7,7 +7,7 @@
  */
 import { T, Obj } from '../world/tileTypes.js';
 import { World3D } from '../world/world.js';
-import { snapshotTileState, tileMemoryStatesEqual } from './npcMemory.js';
+import { getNpcTileMemory, snapshotTileState, tileMemoryStatesEqual } from './npcMemory.js';
 import { NPC_PERCEPTION_RADIUS } from './npcConstants.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
@@ -98,7 +98,8 @@ export function hasLineOfSight(world, ax, ay, bx, by, z) {
  * @param {number} gameTime
  */
 export function tickThomasPerception(npc, world, gameTime) {
-    if (npc._dead || !npc.tileMemory) return;
+    const brain = npc.brain;
+    if (npc._dead || !brain?.observeTile) return;
 
     const cx = Math.floor(npc.x);
     const cy = Math.floor(npc.y);
@@ -115,9 +116,8 @@ export function tickThomasPerception(npc, world, gameTime) {
 
             if (!hasLineOfSight(world, cx, cy, tx, ty, cz)) continue;
 
-            const key = World3D.key(tx, ty, cz);
             const state = snapshotTileState(tile);
-            const prev = npc.tileMemory.get(key);
+            const prev = getNpcTileMemory(npc, tx, ty, cz);
 
             /** @type {boolean|undefined} */
             let reachable;
@@ -125,7 +125,7 @@ export function tickThomasPerception(npc, world, gameTime) {
                 reachable = prev.reachable;
             }
 
-            npc.tileMemory.set(key, { seenAt: gameTime, state, reachable });
+            brain.observeTile(tx, ty, cz, { seenAt: gameTime, state, reachable });
         }
     }
 }

@@ -41,7 +41,6 @@ export const NPC_PRESETS = [
  *   wanderRadius: number,
  *   isAlive: boolean,
  *   brain?: NpcBrain,
- *   tileMemory?: Map<string, import('../npc/npcMemory.js').TileMemoryEntry>,
  *   setGoal: (gx: number, gy: number, gz: number, world: World3D) => boolean,
  *   travelToTile: (tx: number, ty: number, tz: number, world: World3D) => Promise<void>,
  *   pickUpAt: (tileX: number, tileY: number, tileZ: number, world: World3D) => boolean,

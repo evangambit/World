@@ -20,6 +20,26 @@ export { NPC_PERCEPTION_RADIUS };
  */
 
 /**
+ * @param {NpcEntity} npc
+ * @returns {Map<string, TileMemoryEntry>|undefined}
+ */
+function tileStoreFor(npc) {
+    const brain = npc.brain;
+    if (!brain || !('_tileStore' in brain)) return undefined;
+    return /** @type {{ _tileStore: Map<string, TileMemoryEntry> }} */ (brain)._tileStore;
+}
+
+/**
+ * @param {NpcEntity} npc
+ * @param {(key: string, entry: TileMemoryEntry) => void} fn
+ */
+export function forEachNpcObservedTile(npc, fn) {
+    const map = tileStoreFor(npc);
+    if (!map) return;
+    for (const [key, entry] of map) fn(key, entry);
+}
+
+/**
  * Immutable snapshot of a live tile (decoupled from world mutations).
  * @param {TileData} tile
  * @returns {TileData}
@@ -50,7 +70,7 @@ export function snapshotTileState(tile) {
  * @returns {TileMemoryEntry|undefined}
  */
 export function getNpcTileMemory(npc, x, y, z) {
-    return npc.tileMemory?.get(World3D.key(x, y, z));
+    return tileStoreFor(npc)?.get(World3D.key(x, y, z));
 }
 
 /**
@@ -104,7 +124,8 @@ export function markTileReachable(npc, x, y, z) {
  * @param {number} gameTime
  */
 export function tickNpcPerception(npc, world, gameTime) {
-    if (npc._dead || !npc.tileMemory) return;
+    const brain = npc.brain;
+    if (npc._dead || !brain?.observeTile) return;
 
     const cx = Math.floor(npc.x);
     const cy = Math.floor(npc.y);
@@ -118,16 +139,15 @@ export function tickNpcPerception(npc, world, gameTime) {
             const tile = world.getTile(tx, ty, cz);
             if (!tile) continue;
 
-            const key = World3D.key(tx, ty, cz);
             const state = snapshotTileState(tile);
-            const prev = npc.tileMemory.get(key);
+            const prev = getNpcTileMemory(npc, tx, ty, cz);
             /** @type {boolean|undefined} */
             let reachable;
             if (prev && tileMemoryStatesEqual(prev.state, state)) {
                 reachable = prev.reachable;
             }
 
-            npc.tileMemory.set(key, {
+            brain.observeTile(tx, ty, cz, {
                 seenAt: gameTime,
                 state,
                 reachable,

@@ -30,7 +30,7 @@ describe('goto with rememberLocationsOfNearby', () => {
         fillGrass(world, 10, 10, 14, 10);
 
         const npc = createNpcEntity(10.5, 10.5, 0, { brain: createTaskBrain() });
-        npc.tileMemory.set(World3D.key(12, 10, 0), {
+        npc.brain.observeTile(12, 10, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });

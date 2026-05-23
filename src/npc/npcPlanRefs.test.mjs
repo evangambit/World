@@ -4,7 +4,6 @@ import { Obj, T } from '../world/tileTypes.js';
 import { createNpcEntity } from '../actors/npcSimulation.js';
 import { createTaskBrain } from './npcBrain.js';
 import { snapshotTileState } from './npcMemory.js';
-import { World3D } from '../world/world.js';
 import {
     normalizePlanRef,
     parsePlanRefAsTile,
@@ -18,15 +17,15 @@ import {
 describe('rememberLocationsOfNearby', () => {
     it('returns all remembered matches sorted nearest first', () => {
         const npc = createNpcEntity(10, 10, 0, { brain: createTaskBrain() });
-        npc.tileMemory.set(World3D.key(14, 10, 0), {
+        npc.brain.observeTile(14, 10, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
-        npc.tileMemory.set(World3D.key(12, 10, 0), {
+        npc.brain.observeTile(12, 10, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
-        npc.tileMemory.set(World3D.key(11, 11, 0), {
+        npc.brain.observeTile(11, 11, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.CHEST }),
         });
@@ -40,7 +39,7 @@ describe('rememberLocationsOfNearby', () => {
 
     it('returns an empty array when nothing matches', () => {
         const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
-        npc.tileMemory.set(World3D.key(3, 0, 1), {
+        npc.brain.observeTile(3, 0, 1, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
@@ -59,7 +58,7 @@ describe('normalizePlanRef', () => {
 
     it('resolves legacy binding objects via resolvePlanRefs', () => {
         const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
-        npc.tileMemory.set(World3D.key(2, 0, 0), {
+        npc.brain.observeTile(2, 0, 0, {
             seenAt: 1,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.CHEST }),
         });
@@ -92,7 +91,7 @@ describe('parsePlanRefAsTile', () => {
 describe('resolvePlanRef', () => {
     it('parses rememberLocationsOfNearby(tag)', () => {
         const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
-        npc.tileMemory.set(World3D.key(2, 0, 0), {
+        npc.brain.observeTile(2, 0, 0, {
             seenAt: 5,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
