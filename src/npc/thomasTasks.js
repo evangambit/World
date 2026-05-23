@@ -42,7 +42,7 @@ export const ActionResult = Object.freeze({
  * world, and tile memory — all of which are updated each tick by the brain.
  */
 export class TaskContext {
-    /** @param {import('./npcBrain.js').ThomasBrain} brain */
+    /** @param {import('./brain/thomasImpl/thomasBrain.js').ThomasBrain} brain */
     constructor(brain) {
         /** @private */
         this._brain = brain;

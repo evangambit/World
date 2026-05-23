@@ -12,7 +12,8 @@ import {
 } from './npcLocomotion.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
 import { Entity } from './entity.js';
-import { attachNpcBrain, ThomasBrain } from '../npc/npcBrain.js';
+import { attachNpcBrain } from '../npc/brain/attach.js';
+import { ThomasBrain } from '../npc/brain/thomasImpl/thomasBrain.js';
 
 /** NPC appearance presets (skin, hair, shirt, pants). */
 export const NPC_PRESETS = [
@@ -29,7 +30,7 @@ export const NPC_PRESETS = [
 /** @typedef {import('./entity.js').Entity} Entity */
 /** @typedef {import('./npcLocomotion.js').NpcLocomotionState} NpcLocomotionState */
 /** @typedef {import('../world/world.js').World3D} World3D */
-/** @typedef {import('../npc/npcBrain.js').NpcBrain} NpcBrain */
+/** @typedef {import('../npc/brain/interface.js').NpcBrain} NpcBrain */
 
 /**
  * Entity with NPC village fields (optional brain).

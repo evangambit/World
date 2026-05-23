@@ -31,7 +31,7 @@ Exit reasons follow a typed `*Result` pattern (e.g. `arrived`, `impossible`, `to
 Pass an `async (ctx) => { ... }` to the `ThomasBrain` constructor. If it returns, the brain restarts it on the next tick.
 
 ```js
-import { ThomasBrain } from './npcBrain.js';
+import { ThomasBrain } from './brain/thomasImpl/thomasBrain.js';
 import { seekKnownDesires, SeekResult } from './thomasTasks.js';
 
 const brain = new ThomasBrain(async (ctx) => {
@@ -88,7 +88,7 @@ Wheat can only be planted on `T.DIRT` — enforced by `canPlantWheatAt` in `doma
 ```js
 import { buildVillage } from '../content/builder.js';
 import { createNpcEntity } from '../actors/npcSimulation.js';
-import { createThomasBrain } from './npcBrain.js';
+import { createThomasBrain } from './brain/index.js';
 import { tickSimulation } from '../simulation/tickSimulation.js';
 
 async function runTicks(world, npcs, ticks, dt = 0.05) {

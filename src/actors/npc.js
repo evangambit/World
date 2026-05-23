@@ -33,7 +33,7 @@ export {
 } from '../npc/npcBrain.js';
 
 /** @typedef {import('./npcSimulation.js').NpcEntity} NpcEntity */
-/** @typedef {import('../npc/npcBrain.js').NpcBrain} NpcBrain */
+/** @typedef {import('../npc/brain/interface.js').NpcBrain} NpcBrain */
 /** @typedef {import('../npc/npcTasks.js').NPCTaskRunner} NPCTaskRunner */
 
 export class NPC extends Entity {

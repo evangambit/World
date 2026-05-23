@@ -20,7 +20,7 @@ function wheatFieldFixture() {
     const tileX = 5;
     const tileY = 5;
     const tileZ = 0;
-    world.setTile(tileX, tileY, tileZ, { terrain: T.GRASS, obj: 0 });
+    world.setTile(tileX, tileY, tileZ, { terrain: T.DIRT, obj: 0 });
     const entity = new Entity(tileX + 0.5, tileY + 0.5, tileZ);
     entity.inventory = [{ objType: Obj.WHEAT_SEED, count: 3 }];
     return { world, entity, tileX, tileY, tileZ };
@@ -99,7 +99,7 @@ describe('plantWheatSeedAtTile', () => {
         entity.inventory = [];
         const result = plantWheatSeedAtTile(entity, world, tileX, tileY, 0, tileZ);
         assert.equal(result.ok, false);
-        assert.match(result.message, /seed/i);
+        assert.match(result.message, /wheat seeds/i);
     });
 
     it('fails when the tile already has an object', () => {
@@ -165,10 +165,16 @@ describe('wheat growth via tickSimulation', () => {
 });
 
 describe('canPlantWheatAt', () => {
-    it('allows grass without objects', () => {
+    it('allows tilled dirt without objects', () => {
+        const world = new World3D();
+        world.setTile(0, 0, 0, { terrain: T.DIRT, obj: 0 });
+        assert.equal(canPlantWheatAt(world, 0, 0, 0), true);
+    });
+
+    it('disallows grass (must till first)', () => {
         const world = new World3D();
         world.setTile(0, 0, 0, { terrain: T.GRASS, obj: 0 });
-        assert.equal(canPlantWheatAt(world, 0, 0, 0), true);
+        assert.equal(canPlantWheatAt(world, 0, 0, 0), false);
     });
 
     it('disallows stone floor', () => {

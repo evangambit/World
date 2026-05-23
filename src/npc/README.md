@@ -4,7 +4,7 @@ Scheduling, declarative plans, and **tile memory** — not world rules. World in
 
 ## Brain (`npc.brain`)
 
-Each NPC may have a pluggable **brain** (`npcBrain.js`):
+Each NPC may have a pluggable **brain** (`brain/`):
 
 - **`NpcTaskBrain`** (default for `NPC` class) — perception + task/plan queue with optional LLM planner
 - **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there
@@ -13,11 +13,27 @@ Each NPC may have a pluggable **brain** (`npcBrain.js`):
 
 Select at runtime with `?brain=task` (default), `?brain=wander`, `?brain=thomas`, or `?brain=noop` (see `npcBrainRuntime.js`).
 
+Layout:
+
+```
+brain/
+  interface.js       # NpcBrain typedef + shared options
+  tileStore.js       # _tileStore + observeTile (task + thomas)
+  attach.js          # attachNpcBrain
+  index.js           # barrel exports
+  noopImpl/noopBrain.js
+  wanderImpl/wanderBrain.js
+  taskImpl/taskBrain.js
+  thomasImpl/thomasBrain.js
+```
+
+`npcBrain.js` re-exports `brain/index.js` for older imports.
+
 Attach explicitly for test entities:
 
 ```js
 import { createNpcEntity } from '../actors/npcSimulation.js';
-import { createTaskBrain } from './npcBrain.js';
+import { createTaskBrain } from './brain/index.js';
 
 const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
 ```

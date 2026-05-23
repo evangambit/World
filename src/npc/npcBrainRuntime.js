@@ -5,9 +5,14 @@
  *
  * Defaults to "task" (full perception + plans + optional LLM planner).
  */
-import { createDefaultTaskBrain, createThomasBrain, createWanderBrain, noopNpcBrain } from './npcBrain.js';
+import {
+    createDefaultTaskBrain,
+    createThomasBrain,
+    createWanderBrain,
+    noopNpcBrain,
+} from './brain/index.js';
 
-/** @typedef {import('./npcBrain.js').NpcBrain} NpcBrain */
+/** @typedef {import('./brain/interface.js').NpcBrain} NpcBrain */
 /** @typedef {import('./llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
 /** @typedef {'task' | 'wander' | 'noop' | 'thomas'} BrainType */
 

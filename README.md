@@ -29,7 +29,8 @@ src/
     npcLocomotion.js      # Pathfinding + path follow
     npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
-    npcBrain.js           # Pluggable brain (NpcTaskBrain / WanderBrain / ThomasBrain / NoopNpcBrain)
+    brain/                # Pluggable brain interface + impls (task / wander / thomas / noop)
+    npcBrain.js           # Re-exports brain/ (backward compat)
     npcBrainRuntime.js    # Resolves ?brain= URL param to a brain instance
     thomasPerception.js   # Wall-respecting LOS perception (supercover DDA raycast)
     thomasTasks.js        # Async task framework: tick bridge, moveTowardLocation, seekKnownDesires
@@ -232,7 +233,7 @@ Allowed direction: `main.js` → `client/` + logic layers; `client/` → logic l
 | `actors/entity.js`, `actors/npcSimulation.js`, `actors/npc.js`, `client/playerController.js` | Actor state and movement |
 | `actors/timedActionRunner.js` | Runs timed actions on entities |
 | `main.js` | Player input and UI |
-| `npc/npcBrain.js` | Pluggable NPC brain (`NpcTaskBrain` / `WanderBrain` / `ThomasBrain` / `NoopNpcBrain`) |
+| `npc/brain/` | Pluggable NPC brain interface + implementations |
 | `npc/npcBrainRuntime.js` | Resolves `?brain=` URL param to a brain instance |
 | `npc/thomasPerception.js` | Wall-respecting LOS perception for ThomasBrain |
 | `npc/thomasTasks.js` | Async task primitives (`moveTowardLocation`, `seekKnownDesires`, …) |
