@@ -9,6 +9,7 @@
  */
 import { markTileUnreachable } from './npcMemory.js';
 import { findApproachTile } from './npcTaskPrimitives.js';
+import { MemoryWorldView } from './npcMemoryWorld.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -127,7 +128,10 @@ export async function seekKnownDesires(ctx, desires, maxTicks, opts = {}) {
     while (ctx.tickCount < deadline) {
         if (npc._dead || npc.health < startHealth) return SeekResult.TOOK_DAMAGE;
 
-        const candidates = findDesirableTiles(ctx, desires);
+        const candidates = findDesirableTiles(
+            { x: Math.floor(npc.x), y: Math.floor(npc.y), z: npc.z, tileMemory: ctx.tileMemory },
+            desires,
+        );
         if (candidates.length === 0) return SeekResult.NO_KNOWN_REACHABLE;
 
         const ticksLeft = deadline - ctx.tickCount;
@@ -165,18 +169,21 @@ export async function seekKnownDesires(ctx, desires, maxTicks, opts = {}) {
 }
 
 /**
- * Scan tileMemory for tiles matching any desire on the NPC's current floor.
+ * Scan tileMemory for tiles matching any desire on the given floor.
  * Returns them sorted best-first by `weight / max(distance, 1)`.
  *
- * @param {TaskContext} ctx
+ * Accepts a duck-typed position object so that both `TaskContext` (execute
+ * path) and `SimContext` (simulate path) can call this without coupling.
+ *
+ * @param {{ x: number, y: number, z: number, tileMemory: Map<string, *> }} pos
  * @param {Desire[]} desires
  * @returns {{ x: number, y: number, z: number, weight: number, dist: number, score: number }[]}
  */
-function findDesirableTiles(ctx, desires) {
-    const { npc, tileMemory } = ctx;
-    const npcX = Math.floor(npc.x);
-    const npcY = Math.floor(npc.y);
-    const npcZ = npc.z;
+export function findDesirableTiles(pos, desires) {
+    const { tileMemory } = pos;
+    const npcX = pos.x;
+    const npcY = pos.y;
+    const npcZ = pos.z;
 
     /** @type {{ x: number, y: number, z: number, weight: number, dist: number, score: number }[]} */
     const results = [];
@@ -213,11 +220,11 @@ function findDesirableTiles(ctx, desires) {
  * @returns {{ x: number, y: number, z: number } | null}
  */
 function resolveDesireDestination(ctx, tx, ty, tz) {
-    const { world, npc } = ctx;
-    if (world.isWalkable(tx, ty, tz)) {
+    const memWorld = new MemoryWorldView(ctx.tileMemory);
+    if (memWorld.isWalkable(tx, ty, tz)) {
         return { x: tx, y: ty, z: tz };
     }
-    return findApproachTile(world, npc, { x: tx, y: ty, z: tz });
+    return findApproachTile(memWorld, ctx.npc, { x: tx, y: ty, z: tz });
 }
 
 // ── Timed actions ───────────────────────────────────────────────────────────
