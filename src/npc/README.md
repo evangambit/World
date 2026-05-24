@@ -8,23 +8,22 @@ Each NPC may have a pluggable **brain** (`brain/`):
 
 - **`NpcTaskBrain`** (default for `NPC` class) — perception + task/plan queue with optional LLM planner
 - **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there
-- **`ThomasBrain`** — wall-respecting tile memory + async behavior framework; default behavior is autonomous wheat farming (`thomasBehaviors.js`)
+- **`ThomasBrain`** — wall-respecting tile memory + async behavior framework; default behavior is autonomous wheat farming (`brain/thomasImpl/thomasBehaviors.js`)
 - **`NoopNpcBrain`** — no cognition (body-only tests)
 
-Select at runtime with `?brain=task` (default), `?brain=wander`, `?brain=thomas`, or `?brain=noop` (see `npcBrainRuntime.js`).
+Select at runtime with `?brain=task` (default), `?brain=wander`, `?brain=thomas`, or `?brain=noop` (see `shared/npcBrainRuntime.js`).
 
 Layout:
 
 ```
+shared/              # tile memory, object tags, chunk describe, test helpers, brain runtime
 brain/
-  interface.js       # NpcBrain typedef + shared options
-  tileStore.js       # _tileStore + observeTile (task + thomas)
-  attach.js          # attachNpcBrain
-  index.js           # barrel exports
+  interface.js, tileStore.js, attach.js, index.js
   noopImpl/noopBrain.js
   wanderImpl/wanderBrain.js
-  taskImpl/taskBrain.js
-  thomasImpl/thomasBrain.js
+  taskImpl/          # plans, tasks, memory-ref travel, explore
+  thomasImpl/        # perception, async tasks, behaviors
+llm/                 # planner (task brain)
 ```
 
 Attach explicitly for test entities:
@@ -46,7 +45,7 @@ new NPC(x, y, z, preset, name, inv, { brain: myCustomBrain });
 
 ## ThomasBrain
 
-See [`THOMAS_BRAIN.md`](THOMAS_BRAIN.md) for full details: wall-respecting perception, the async task API, writing behaviors, and the farming behavior loop.
+See [`brain/thomasImpl/THOMAS_BRAIN.md`](brain/thomasImpl/THOMAS_BRAIN.md) for full details: wall-respecting perception, the async task API, writing behaviors, and the farming behavior loop.
 
 ## Simulation order (per NPC, each frame)
 

@@ -2,8 +2,8 @@
  * Task brain — perception, tile memory, and optional task/plan queue.
  */
 import { mockRequestPlan } from '../../llm/mockPlanner.js';
-import { tickNpcPerception } from '../../npcMemory.js';
-import { NPCTaskRunner } from '../../npcTasks.js';
+import { tickNpcPerception } from '../../shared/npcMemory.js';
+import { NPCTaskRunner } from './npcTasks.js';
 import { initTileStore } from '../tileStore.js';
 
 /** @typedef {import('../interface.js').NpcEntity} NpcEntity */

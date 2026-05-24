@@ -1,8 +1,8 @@
 /**
  * Resolve plan step refs (memory queries, etc.) into tile coordinates.
  */
-import { getObjectTagSpec } from './npcObjectTags.js';
-import { forEachNpcObservedTile } from './npcMemory.js';
+import { getObjectTagSpec } from '../../shared/npcObjectTags.js';
+import { forEachNpcObservedTile } from '../../shared/npcMemory.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
 /** @typedef {import('../world/world.js').TileData} TileData */

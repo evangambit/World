@@ -2,7 +2,7 @@
  * Stand-in planner for tests and local dev — returns built-in eat plan when hungry.
  */
 import { VITALITY } from '../../domain/vitality.js';
-import { EAT_FOOD_PLAN } from '../npcPlanTemplates.js';
+import { EAT_FOOD_PLAN } from '../brain/taskImpl/npcPlanTemplates.js';
 import { buildPlannerMessages } from './npcPrompt.js';
 
 /** @typedef {import('./npcPlanner.js').PlannerRequest} PlannerRequest */
@@ -12,7 +12,7 @@ export const MOCK_EAT_HUNGER_THRESHOLD = 40;
 
 /**
  * @param {PlannerRequest} request
- * @returns {Promise<import('../npcTasks.js').PlanDocument | null>}
+ * @returns {Promise<import('../brain/taskImpl/npcTasks.js').PlanDocument | null>}
  */
 export async function mockRequestPlan(request) {
     const { npc, event } = request;

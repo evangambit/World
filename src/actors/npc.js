@@ -11,10 +11,10 @@ import {
     find,
     clearGrass,
     timedAction,
-} from '../npc/npcTasks.js';
+} from '../npc/brain/taskImpl/npcTasks.js';
 
 export { goTo, find, clearGrass, timedAction };
-export { EAT_FOOD_PLAN } from '../npc/npcPlanTemplates.js';
+export { EAT_FOOD_PLAN } from '../npc/brain/taskImpl/npcPlanTemplates.js';
 export {
     createNpcEntity,
     initNpcEntity,
@@ -34,7 +34,7 @@ export {
 
 /** @typedef {import('./npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../npc/brain/interface.js').NpcBrain} NpcBrain */
-/** @typedef {import('../npc/npcTasks.js').NPCTaskRunner} NPCTaskRunner */
+/** @typedef {import('../npc/brain/taskImpl/npcTasks.js').NPCTaskRunner} NPCTaskRunner */
 
 export class NPC extends Entity {
     /**

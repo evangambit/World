@@ -1,7 +1,7 @@
 /**
  * English summaries of tile chunks and chunk diffs (for LLM / debug context).
  */
-import { WORLD_CHUNK_SIZE } from '../world/worldConstants.js';
+import { WORLD_CHUNK_SIZE } from '../../world/worldConstants.js';
 import {
     Obj,
     T,
@@ -9,8 +9,8 @@ import {
     OBJ_NAMES,
     formatWheatCropLabel,
     isWheatCropObject,
-} from '../world/tileTypes.js';
-import { World3D } from '../world/world.js';
+} from '../../world/tileTypes.js';
+import { World3D } from '../../world/world.js';
 import { NPC_PERCEPTION_RADIUS } from './npcConstants.js';
 import { getNpcTileMemory } from './npcMemory.js';
 

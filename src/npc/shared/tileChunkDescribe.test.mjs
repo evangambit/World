@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { World3D } from '../world/world.js';
-import { WORLD_CHUNK_SIZE } from '../world/worldConstants.js';
-import { Obj, T } from '../world/tileTypes.js';
+import { World3D } from '../../world/world.js';
+import { WORLD_CHUNK_SIZE } from '../../world/worldConstants.js';
+import { Obj, T } from '../../world/tileTypes.js';
 import { snapshotTileState } from './npcMemory.js';
 import {
     analyzeChunk,

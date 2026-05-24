@@ -10,9 +10,9 @@ import {
     createThomasBrain,
     createWanderBrain,
     noopNpcBrain,
-} from './brain/index.js';
+} from '../brain/index.js';
 
-/** @typedef {import('./brain/interface.js').NpcBrain} NpcBrain */
+/** @typedef {import('../brain/interface.js').NpcBrain} NpcBrain */
 /** @typedef {import('./llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
 /** @typedef {'task' | 'wander' | 'noop' | 'thomas'} BrainType */
 

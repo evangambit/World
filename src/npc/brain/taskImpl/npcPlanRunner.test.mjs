@@ -1,11 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createNpcEntity } from '../actors/npcSimulation.js';
-import { createTaskBrain } from './brain/index.js';
-import { driveLocomotionUntil } from './npcTestLocomotion.js';
-import { Obj, T } from '../world/tileTypes.js';
-import { World3D } from '../world/world.js';
-import { snapshotTileState } from './npcMemory.js';
+import { createNpcEntity } from '../../../actors/npcSimulation.js';
+import { createTaskBrain } from '../index.js';
+import { driveLocomotionUntil } from '../../shared/npcTestLocomotion.js';
+import { Obj, T } from '../../../world/tileTypes.js';
+import { World3D } from '../../../world/world.js';
+import { snapshotTileState } from '../../shared/npcMemory.js';
 import { syncMemoryRefTravelGoal } from './npcMemoryTravel.js';
 import { runPlan } from './npcPlanRunner.js';
 

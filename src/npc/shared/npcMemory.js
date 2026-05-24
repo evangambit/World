@@ -1,7 +1,7 @@
 /**
  * NPC tile memory — records tiles perceived within range (latest snapshot + seenAt).
  */
-import { World3D } from '../world/world.js';
+import { World3D } from '../../world/world.js';
 import { tileStatesEqual } from './tileChunkDescribe.js';
 
 import { NPC_PERCEPTION_RADIUS } from './npcConstants.js';

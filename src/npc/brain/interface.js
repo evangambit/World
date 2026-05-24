@@ -4,9 +4,9 @@
 
 /** @typedef {import('../../actors/npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../../world/world.js').World3D} World3D */
-/** @typedef {import('../npcMemory.js').TileMemoryEntry} TileMemoryEntry */
+/** @typedef {import('../shared/npcMemory.js').TileMemoryEntry} TileMemoryEntry */
 /** @typedef {import('../llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
-/** @typedef {import('../npcTasks.js').NPCTaskRunner} NPCTaskRunner */
+/** @typedef {import('./taskImpl/npcTasks.js').NPCTaskRunner} NPCTaskRunner */
 
 /**
  * @typedef {Object} NpcTaskBrainOptions

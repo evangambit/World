@@ -1,9 +1,9 @@
 /**
  * Thomas brain — wall-respecting perception + async behavior coroutines.
  */
-import { tickThomasPerception } from '../../thomasPerception.js';
-import { TaskContext } from '../../thomasTasks.js';
-import { farmBehavior } from '../../thomasBehaviors.js';
+import { tickThomasPerception } from './thomasPerception.js';
+import { TaskContext } from './thomasTasks.js';
+import { farmBehavior } from './thomasBehaviors.js';
 import { initTileStore } from '../tileStore.js';
 
 /** @typedef {import('../interface.js').NpcEntity} NpcEntity */
@@ -117,7 +117,7 @@ export class ThomasBrain {
 }
 
 /**
- * @param {((ctx: import('../../thomasTasks.js').TaskContext) => Promise<void>)} [behavior]
+ * @param {((ctx: import('./thomasTasks.js').TaskContext) => Promise<void>)} [behavior]
  * @returns {ThomasBrain}
  */
 export function createThomasBrain(behavior) {

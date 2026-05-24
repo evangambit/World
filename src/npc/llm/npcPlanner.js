@@ -1,9 +1,9 @@
 /**
  * NPC planner contract and plan JSON validation.
  */
-import { validatePlan } from '../npcPlanRunner.js';
+import { validatePlan } from '../brain/taskImpl/npcPlanRunner.js';
 
-/** @typedef {import('../npcTasks.js').PlanDocument} PlanDocument */
+/** @typedef {import('../brain/taskImpl/npcTasks.js').PlanDocument} PlanDocument */
 
 /** @typedef {import('./npcPrompt.js').PlannerEvent} PlannerEvent */
 

@@ -2,13 +2,13 @@
  * Wide-area search — visits a grid of waypoints (perception-sized steps),
  * retries local find, and paths to remembered pickable matches.
  */
-import { findPath } from '../world/pathfinding.js';
-import { isPickableObject } from '../world/tileTypes.js';
-import { World3D } from '../world/world.js';
-import { NPC_PERCEPTION_RADIUS } from './npcMemory.js';
-import { isTileMemoryReachable } from './npcMemory.js';
+import { findPath } from '../../../world/pathfinding.js';
+import { isPickableObject } from '../../../world/tileTypes.js';
+import { World3D } from '../../../world/world.js';
+import { NPC_PERCEPTION_RADIUS } from '../../shared/npcMemory.js';
+import { isTileMemoryReachable } from '../../shared/npcMemory.js';
 import { pathStepsFromNpc } from './npcMemoryTravel.js';
-import { getObjectTagSpec } from './npcObjectTags.js';
+import { getObjectTagSpec } from '../../shared/npcObjectTags.js';
 import { rememberLocationsOfNearby } from './npcPlanRefs.js';
 import { findApproachTile, runFind } from './npcTaskPrimitives.js';
 

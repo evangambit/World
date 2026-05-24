@@ -1,7 +1,7 @@
 /**
  * Plan object tags — abstract names used in plans map to world / inventory types.
  */
-import { Obj } from '../world/tileTypes.js';
+import { Obj } from '../../world/tileTypes.js';
 
 /** @typedef {{ inventoryTypes: number[], worldTypes: number[] }} ObjectTagSpec */
 

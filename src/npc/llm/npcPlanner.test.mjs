@@ -2,8 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { Obj } from '../../world/tileTypes.js';
 import { parsePlanDocument } from './npcPlanner.js';
-import { EAT_FOOD_PLAN } from '../npcPlanTemplates.js';
-import { NPCTaskRunner } from '../npcTasks.js';
+import { EAT_FOOD_PLAN } from '../brain/taskImpl/npcPlanTemplates.js';
+import { NPCTaskRunner } from '../brain/taskImpl/npcTasks.js';
 import { mockRequestPlan } from './mockPlanner.js';
 
 describe('parsePlanDocument', () => {

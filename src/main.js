@@ -10,8 +10,8 @@ import { tickSimulation } from './simulation/tickSimulation.js';
 import { NPC, find } from './actors/npc.js';
 import { createNpcPlannerFromConfig } from './npc/llm/createLlmPlanner.js';
 import { resolveBrowserPlannerConfig } from './npc/llm/plannerRuntime.js';
-import { resolveBrainType, createBrainForType } from './npc/npcBrainRuntime.js';
-import { clearGrass } from './npc/npcTasks.js';
+import { resolveBrainType, createBrainForType } from './npc/shared/npcBrainRuntime.js';
+import { clearGrass } from './npc/brain/taskImpl/npcTasks.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
 import {
     Obj,

@@ -5,17 +5,17 @@ import {
     buildPlannerMessages,
     logPlannerMessages,
     logPlannerResponse,
-} from './llm/npcPrompt.js';
-import { parsePlanDocument } from './llm/npcPlanner.js';
+} from '../../llm/npcPrompt.js';
+import { parsePlanDocument } from '../../llm/npcPlanner.js';
 import { describePlanStep, formatPlanOutline, getPlanStepAt } from './npcPlanDescribe.js';
 import { MAX_PLAN_HISTORY } from './npcPlanHistory.js';
 import { runPlan, validatePlan } from './npcPlanRunner.js';
 import { runFind, runGoTo, runTimedAction } from './npcTaskPrimitives.js';
 import { syncMemoryRefTravelGoal } from './npcMemoryTravel.js';
-import { findPath } from '../world/pathfinding.js';
+import { findPath } from '../../../world/pathfinding.js';
 
-/** @typedef {import('./llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
-/** @typedef {import('./llm/npcPrompt.js').PlannerEvent} PlannerEvent */
+/** @typedef {import('../../llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
+/** @typedef {import('../../llm/npcPrompt.js').PlannerEvent} PlannerEvent */
 
 /**
  * @typedef {Object} NpcTaskRunnerOptions

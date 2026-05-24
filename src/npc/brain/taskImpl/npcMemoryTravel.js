@@ -2,14 +2,14 @@
  * Travel toward rememberLocationsOfNearby refs — picks the best reachable
  * target and retargets when memory or path cost improves mid-trip.
  */
-import { findPath } from '../world/pathfinding.js';
-import { World3D } from '../world/world.js';
-import { setNpcGoal } from '../actors/npcLocomotion.js';
+import { findPath } from '../../../world/pathfinding.js';
+import { World3D } from '../../../world/world.js';
+import { setNpcGoal } from '../../../actors/npcLocomotion.js';
 import {
     isTileMemoryReachable,
     markTileReachable,
     markTileUnreachable,
-} from './npcMemory.js';
+} from '../../shared/npcMemory.js';
 import { resolvePlanRefs } from './npcPlanRefs.js';
 import { findApproachTile } from './npcTaskPrimitives.js';
 

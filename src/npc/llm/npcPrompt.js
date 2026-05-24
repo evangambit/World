@@ -2,8 +2,8 @@
  * Build LLM prompts for NPC plan authoring.
  */
 import { VITALITY } from '../../domain/vitality.js';
-import { EAT_FOOD_PLAN } from '../npcPlanTemplates.js';
-import { OBJECT_TAGS } from '../npcObjectTags.js';
+import { EAT_FOOD_PLAN } from '../brain/taskImpl/npcPlanTemplates.js';
+import { OBJECT_TAGS } from '../shared/npcObjectTags.js';
 import {
     PLAN_REF_QUERIES,
     PLAN_LEAF_ACTIONS,
@@ -12,12 +12,12 @@ import {
     describeObjectTag,
     listObjectTagNames,
 } from './npcActionCatalog.js';
-import { formatPlanHistorySection } from '../npcPlanHistory.js';
-import { formatSurroundingsSection } from '../tileChunkDescribe.js';
+import { formatPlanHistorySection } from '../brain/taskImpl/npcPlanHistory.js';
+import { formatSurroundingsSection } from '../shared/tileChunkDescribe.js';
 
-/** @typedef {import('../npcPlanHistory.js').PlanHistoryRecord} PlanHistoryRecord */
+/** @typedef {import('../brain/taskImpl/npcPlanHistory.js').PlanHistoryRecord} PlanHistoryRecord */
 
-/** @typedef {import('../npcTasks.js').PlanDocument} PlanDocument */
+/** @typedef {import('../brain/taskImpl/npcTasks.js').PlanDocument} PlanDocument */
 
 /**
  * @typedef {'idle' | 'plan_completed' | 'plan_failed'} PlannerReason
@@ -31,7 +31,7 @@ import { formatSurroundingsSection } from '../tileChunkDescribe.js';
  * @property {string} [failedStep] - human-readable step that failed (latest attempt)
  * @property {string} [position] - NPC tile at failure, e.g. "(12, 30, 0)"
  * @property {PlanHistoryRecord[]} [recentPlans] - prior plan outcomes, oldest first
- * @property {import('../tileChunkDescribe.js').ChunkDiffResult[]} [chunkDiffs] - optional chunk diffs (caller-computed)
+ * @property {import('../shared/tileChunkDescribe.js').ChunkDiffResult[]} [chunkDiffs] - optional chunk diffs (caller-computed)
  */
 
 /**
@@ -211,7 +211,7 @@ export function logPlannerMessages(npc, event, messages) {
  * @property {number} [attempt]
  * @property {string} [content] - raw model text
  * @property {boolean} [cached] - served from localStorage, not the API
- * @property {import('../npcTasks.js').PlanDocument} [plan] - parsed plan document
+ * @property {import('../brain/taskImpl/npcTasks.js').PlanDocument} [plan] - parsed plan document
  * @property {string} [error]
  * @property {null} [result] - explicit null result (mock idle, exhausted retries)
  */

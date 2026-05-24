@@ -1,10 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { World3D } from '../world/world.js';
-import { Obj, T } from '../world/tileTypes.js';
-import { createNpcEntity } from '../actors/npcSimulation.js';
-import { createTaskBrain } from './brain/index.js';
-import { tickSimulation } from '../simulation/tickSimulation.js';
+import { World3D } from '../../world/world.js';
+import { Obj, T } from '../../world/tileTypes.js';
+import { createNpcEntity } from '../../actors/npcSimulation.js';
+import { createTaskBrain } from '../brain/index.js';
+import { tickSimulation } from '../../simulation/tickSimulation.js';
 import {
     NPC_PERCEPTION_RADIUS,
     getNpcTileMemory,

@@ -29,25 +29,9 @@ src/
     npcLocomotion.js      # Pathfinding + path follow
     npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
-    brain/                # Pluggable brain interface + impls (task / wander / thomas / noop)
-    npcBrainRuntime.js    # Resolves ?brain= URL param to a brain instance
-    thomasPerception.js   # Wall-respecting LOS perception (supercover DDA raycast)
-    thomasTasks.js        # Async task framework: tick bridge, moveTowardLocation, seekKnownDesires
-    thomasBehaviors.js    # ThomasBrain behaviors (farmBehavior)
-    npcMemory.js          # Per-tile perception + reachability
-    npcMemoryTravel.js    # Adaptive travel toward memory refs
-    npcPlanRefs.js        # rememberLocationsOfNearby(...) in plan steps
-    npcExplore.js         # Wide-area search over a grid of waypoints
-    npcTasks.js
-    npcTaskPrimitives.js
-    npcPlanRunner.js
-    npcPlanTemplates.js
-    npcPlanHistory.js     # Rolling log of plan outcomes (LLM context)
-    npcPlanDescribe.js    # Human-readable plan step descriptions
-    npcObjectTags.js
-    npcConstants.js       # Shared NPC constants (e.g. NPC_PERCEPTION_RADIUS)
-    tileChunkDescribe.js  # Chunk-level world descriptions for LLM prompts
-    llm/                  # LLM planner + prompts
+    shared/               # Tile memory, object tags, chunk describe, brain runtime
+    brain/                # Brain interface + task / wander / thomas / noop impls
+    llm/                  # LLM planner + prompts (task brain)
       npcPlanner.js       # Planner contract and plan JSON validation
       npcPrompt.js        # System/user prompt builders
       npcActionCatalog.js # Machine-readable plan DSL (kept in sync with runner)
@@ -190,14 +174,14 @@ Test files live next to the module they cover:
 | Test file | Covers |
 |---|---|
 | `domain/crops.test.mjs` | Wheat growth and harvest |
-| `npc/npcMemory.test.mjs` | Perception, snapshots, reachability reset |
-| `npc/npcMemoryTravel.test.mjs` | Travel, retargeting, skipping unreachable tiles |
+| `npc/shared/npcMemory.test.mjs` | Perception, snapshots, reachability reset |
+| `npc/brain/taskImpl/npcMemoryTravel.test.mjs` | Travel, retargeting, skipping unreachable tiles |
 | `npc/npcPlanRefs.test.mjs` | `rememberLocationsOfNearby` ref resolution |
 | `npc/npcPlanRunner.test.mjs` | seq/sel execution and failure |
 | `npc/npcPlanHistory.test.mjs` | Rolling plan log |
 | `npc/npcPlanDescribe.test.mjs` | Plan step descriptions |
 | `npc/npcExplore.test.mjs` | Wide-area waypoint search |
-| `npc/tileChunkDescribe.test.mjs` | Chunk snapshot and diff strings |
+| `npc/shared/tileChunkDescribe.test.mjs` | Chunk snapshot and diff strings |
 | `npc/thomasBehaviors.test.mjs` | Behavioral regression: full `farmBehavior` loop over 10 000 ticks |
 | `npc/llm/*.test.mjs` | Prompt building, plan parsing, response cache |
 | `architecture/importLayers.test.mjs` | Layer boundary enforcement |
@@ -233,18 +217,15 @@ Allowed direction: `main.js` → `client/` + logic layers; `client/` → logic l
 | `actors/timedActionRunner.js` | Runs timed actions on entities |
 | `main.js` | Player input and UI |
 | `npc/brain/` | Pluggable NPC brain interface + implementations |
-| `npc/npcBrainRuntime.js` | Resolves `?brain=` URL param to a brain instance |
-| `npc/thomasPerception.js` | Wall-respecting LOS perception for ThomasBrain |
-| `npc/thomasTasks.js` | Async task primitives (`moveTowardLocation`, `seekKnownDesires`, …) |
-| `npc/thomasBehaviors.js` | Behavior functions for ThomasBrain (wheat farming) |
+| `npc/shared/npcBrainRuntime.js` | Resolves `?brain=` URL param to a brain instance |
+| `npc/brain/thomasImpl/` | Thomas perception, async tasks, behaviors |
+| `npc/brain/taskImpl/` | Task queue, plans, explore, memory-ref travel |
 | `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
 | `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |
 | `npc/npcExplore.js` | Wide-area search (`explore` plan step) |
-| `npc/npcObjectTags.js` | Abstract names for plan JSON |
-| `npc/npcMemory.js` | Perception + `tileMemory` / reachability |
+| `npc/shared/` | Tile memory, object tags, chunk describe (shared across brains) |
 | `npc/npcPlanRefs.js` | `rememberLocationsOfNearby(tag)` → tile list |
 | `npc/npcMemoryTravel.js` | Adaptive pathing to memory refs |
-| `npc/tileChunkDescribe.js` | Chunk descriptions for LLM prompts |
 | `npc/llm/npcPrompt.js` | LLM system/user prompt builders |
 | `npc/llm/npcActionCatalog.js` | Machine-readable plan DSL |
 | `npc/llm/createLlmPlanner.js` | LLM planner factory |

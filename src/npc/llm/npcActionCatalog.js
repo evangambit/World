@@ -1,7 +1,7 @@
 /**
  * Machine-readable NPC plan DSL — kept in sync with npcPlanRunner / npcPlanRefs.
  */
-import { OBJECT_TAGS } from '../npcObjectTags.js';
+import { OBJECT_TAGS } from '../shared/npcObjectTags.js';
 
 export const PLAN_LIMITS = {
     maxSteps: 16,

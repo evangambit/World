@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { EAT_FOOD_PLAN } from '../npcPlanTemplates.js';
+import { EAT_FOOD_PLAN } from '../brain/taskImpl/npcPlanTemplates.js';
 import { createLlmNpcPlanner } from './createLlmPlanner.js';
 
 describe('createLlmNpcPlanner', () => {

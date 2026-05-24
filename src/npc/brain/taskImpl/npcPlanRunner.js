@@ -7,14 +7,14 @@ import {
     stashToContainer,
     takeFromContainer,
     toggleDoorLock,
-} from '../domain/entityActions.js';
-import { getObjectTagSpec } from './npcObjectTags.js';
+} from '../../../domain/entityActions.js';
+import { getObjectTagSpec } from '../../shared/npcObjectTags.js';
 import {
     cookUncookedSteakInInventory,
     cookWheatIntoBread,
     inventoryHasWheat,
-} from '../domain/cooking.js';
-import { applyFood } from '../domain/vitality.js';
+} from '../../../domain/cooking.js';
+import { applyFood } from '../../../domain/vitality.js';
 import { runExplore } from './npcExplore.js';
 import { runFind, runGoTo, runGoToMemoryRef, runTimedAction } from './npcTaskPrimitives.js';
 import {
@@ -24,8 +24,8 @@ import {
     resolvePlanRefTargets,
     resolvePlanRefs,
 } from './npcPlanRefs.js';
-import { World3D } from '../world/world.js';
-import { Obj } from '../world/tileTypes.js';
+import { World3D } from '../../../world/world.js';
+import { Obj } from '../../../world/tileTypes.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
 

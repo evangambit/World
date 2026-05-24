@@ -4,10 +4,10 @@
  * A behavior is an `async (ctx) => {}` that drives an NPC using task
  * primitives.  Pass one to the ThomasBrain constructor.
  */
-import { T, Obj, WHEAT_CROP_STAGES, isStoveObject, isWheatCropObject } from '../world/tileTypes.js';
-import { canPlantWheatAt, harvestWheatAtTile, isWheatMature, plantWheatSeedAtTile, wheatStageForTile } from '../domain/crops.js';
-import { cookAtStove } from '../domain/entityActions.js';
-import { consumeFoodFromInventory } from '../domain/vitality.js';
+import { T, Obj, WHEAT_CROP_STAGES, isStoveObject, isWheatCropObject } from '../../../world/tileTypes.js';
+import { canPlantWheatAt, harvestWheatAtTile, isWheatMature, plantWheatSeedAtTile, wheatStageForTile } from '../../../domain/crops.js';
+import { cookAtStove } from '../../../domain/entityActions.js';
+import { consumeFoodFromInventory } from '../../../domain/vitality.js';
 import {
     SeekResult,
     doTimedAction,

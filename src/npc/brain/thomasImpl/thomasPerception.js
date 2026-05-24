@@ -5,15 +5,15 @@
  * opaque tiles (walls, cliffs, trees…) block sight — unlike the default
  * Chebyshev scan which records everything within range unconditionally.
  */
-import { T, Obj } from '../world/tileTypes.js';
-import { World3D } from '../world/world.js';
-import { getNpcTileMemory, snapshotTileState, tileMemoryStatesEqual } from './npcMemory.js';
-import { NPC_PERCEPTION_RADIUS } from './npcConstants.js';
+import { T, Obj } from '../../../world/tileTypes.js';
+import { World3D } from '../../../world/world.js';
+import { getNpcTileMemory, snapshotTileState, tileMemoryStatesEqual } from '../../shared/npcMemory.js';
+import { NPC_PERCEPTION_RADIUS } from '../../shared/npcConstants.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../world/world.js').World3D} World3D */
-/** @typedef {import('./npcMemory.js').TileMemoryEntry} TileMemoryEntry */
+/** @typedef {import('../../shared/npcMemory.js').TileMemoryEntry} TileMemoryEntry */
 
 /**
  * Returns true when a tile blocks line of sight.

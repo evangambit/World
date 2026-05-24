@@ -5,14 +5,14 @@ import { VITALITY } from '../../domain/vitality.js';
 import { Obj, T } from '../../world/tileTypes.js';
 import { createNpcEntity } from '../../actors/npcSimulation.js';
 import { createTaskBrain } from '../brain/index.js';
-import { snapshotTileState, tickNpcPerception } from '../npcMemory.js';
+import { snapshotTileState, tickNpcPerception } from '../shared/npcMemory.js';
 import {
     buildSystemPrompt,
     buildUserPrompt,
     summarizeInventoryByTag,
 } from './npcPrompt.js';
 import { MOCK_EAT_HUNGER_THRESHOLD, mockRequestPlan } from './mockPlanner.js';
-import { EAT_FOOD_PLAN } from '../npcPlanTemplates.js';
+import { EAT_FOOD_PLAN } from '../brain/taskImpl/npcPlanTemplates.js';
 
 describe('buildSystemPrompt', () => {
     it('mentions starvation and plan combinators', () => {

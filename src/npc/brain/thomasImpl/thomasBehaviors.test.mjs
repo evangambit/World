@@ -9,12 +9,12 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildVillage } from '../content/builder.js';
-import { createNpcEntity } from '../actors/npcSimulation.js';
-import { createThomasBrain } from './brain/index.js';
+import { buildVillage } from '../../../content/builder.js';
+import { createNpcEntity } from '../../../actors/npcSimulation.js';
+import { createThomasBrain } from '../index.js';
 import { inventoryCount } from './thomasTasks.js';
-import { tickSimulation } from '../simulation/tickSimulation.js';
-import { Obj } from '../world/tileTypes.js';
+import { tickSimulation } from '../../../simulation/tickSimulation.js';
+import { Obj } from '../../../world/tileTypes.js';
 
 /**
  * Advance the simulation by `ticks` steps at `dt` seconds per tick.

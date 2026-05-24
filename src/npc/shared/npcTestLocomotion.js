@@ -2,9 +2,9 @@
  * Test helpers — drive NPC locomotion until async travel/plan work settles.
  */
 import assert from 'node:assert/strict';
-import { tickNpcLocomotion } from '../actors/npcLocomotion.js';
+import { tickNpcLocomotion } from '../../actors/npcLocomotion.js';
 
-/** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
+/** @typedef {import('../../actors/npcSimulation.js').NpcEntity} NpcEntity */
 
 /**
  * @typedef {Object} DriveLocomotionOptions

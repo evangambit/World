@@ -11,7 +11,7 @@ import { parsePlanDocument } from './npcPlanner.js';
 /** @typedef {import('./llmTypes.js').LlmProviderConfig} LlmProviderConfig */
 /** @typedef {import('./npcPlanner.js').PlannerRequest} PlannerRequest */
 /** @typedef {import('./npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
-/** @typedef {import('../npcTasks.js').PlanDocument} PlanDocument */
+/** @typedef {import('../brain/taskImpl/npcTasks.js').PlanDocument} PlanDocument */
 
 /**
  * @typedef {Object} LlmPlannerOptions

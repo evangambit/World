@@ -7,8 +7,8 @@
  * Low-level primitives (moveTowardLocation) think in ticks.
  * Higher-level combinators (seekKnownDesires) compose primitives and hide ticks.
  */
-import { forEachNpcObservedTile, markTileUnreachable } from './npcMemory.js';
-import { findApproachTile } from './npcTaskPrimitives.js';
+import { forEachNpcObservedTile, markTileUnreachable } from '../../shared/npcMemory.js';
+import { findApproachTile } from '../taskImpl/npcTaskPrimitives.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
