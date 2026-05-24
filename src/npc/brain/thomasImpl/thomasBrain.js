@@ -19,6 +19,7 @@ import { initTileStore } from '../tileStore.js';
  * The bridge: each call to `tick()` resolves the pending `nextTick()` promise,
  * advancing the behavior by one simulation frame.
  */
+/** @implements {NpcBrain} */
 export class ThomasBrain {
     /**
      * @param {((ctx: TaskContext) => Promise<void>)} [behavior]

@@ -9,6 +9,7 @@
  * Simple wander brain — no memory, no plans, no task queue.
  * Picks a random walkable tile near home each time the previous journey ends.
  */
+/** @implements {NpcBrain} */
 export class WanderBrain {
     constructor() {
         /** @type {NpcEntity | null} */
