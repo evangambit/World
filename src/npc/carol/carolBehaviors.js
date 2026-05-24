@@ -279,7 +279,7 @@ function pickBestExploreDirection(ctx, endTick) {
 
     for (const [dx, dy] of EXPLORE_DIRECTIONS) {
         const branch = ctx.hypothetical();
-        simulateExploreRay(branch, dx, dy, endTick);
+        simulateExploreDirection(branch, dx, dy, endTick);
         const score = branch.utility();
         if (score > bestScore) {
             bestScore = score;
@@ -291,93 +291,79 @@ function pickBestExploreDirection(ctx, endTick) {
 }
 
 /**
+ * Cast a ray through known memory in (dx, dy) until the first absent tile.
+ * Does not mutate ctx.
+ *
  * @param {CarolContext} ctx
- * @param {number} startX
- * @param {number} startY
  * @param {number} dx
  * @param {number} dy
- * @param {number} endTick
+ * @returns {{ x: number, y: number } | null}
  */
-function simulateExploreRay(ctx, startX, startY, dx, dy, endTick) {
+function findFrontierTile(ctx, dx, dy) {
     const memWorld = new MemoryWorldView(ctx.tileMemory);
     const z = ctx.z;
+    const startX = ctx.x;
+    const startY = ctx.y;
     let x = startX;
     let y = startY;
 
-    while (ctx.tickCount < endTick) {
+    while (true) {
         const nx = x + dx;
         const ny = y + dy;
         const key = World3D.key(nx, ny, z);
 
         if (!ctx.tileMemory.has(key)) {
-            ctx.simMove(nx, ny, endTick);
-            ctx.addDiscoveredTile(nx, ny, endTick);
-            return;
+            return { x: nx, y: ny };
         }
 
-        if (!memWorld.isWalkable(nx, ny, z)) return;
-
-        if (ctx.simDirectStep(nx, ny, endTick) !== MoveResult.ARRIVED) return;
+        if (!memWorld.isWalkable(nx, ny, z)) return null;
 
         x = nx;
         y = ny;
 
         if (Math.max(Math.abs(x - startX), Math.abs(y - startY)) >= ctx.wanderRadius) {
-            return;
+            return null;
         }
     }
 }
 
 /**
+ * Simulate pathfinding to the frontier tile found by a direction ray.
+ *
+ * @param {CarolContext} ctx
+ * @param {number} dx
+ * @param {number} dy
+ * @param {number} endTick
+ */
+function simulateExploreDirection(ctx, dx, dy, endTick) {
+    const frontier = findFrontierTile(ctx, dx, dy);
+    if (!frontier) return;
+
+    ctx.simMove(frontier.x, frontier.y, endTick);
+    ctx.addDiscoveredTile(frontier.x, frontier.y, endTick);
+}
+
+/**
+ * Walk toward the frontier tile for the chosen direction.
+ *
  * @param {CarolContext} ctx
  * @param {number} dx
  * @param {number} dy
  * @param {number} endTick
  */
 async function executeExploreRay(ctx, dx, dy, endTick) {
-    const memWorld = new MemoryWorldView(ctx.tileMemory);
-    const z = ctx.z;
-    const startX = ctx.x;
-    const startY = ctx.y;
-    let x = ctx.x;
-    let y = ctx.y;
+    if (!ctx.isActive()) return;
+    if (!ctx.isHypothetical && ctx.npc._dead) return;
 
-    while (ctx.tickCount < endTick) {
-        if (!ctx.isActive()) return;
-        if (!ctx.isHypothetical && ctx.npc._dead) return;
+    const frontier = findFrontierTile(ctx, dx, dy);
+    if (!frontier) return;
 
-        const nx = x + dx;
-        const ny = y + dy;
-        const key = World3D.key(nx, ny, z);
-
-        if (!ctx.tileMemory.has(key)) {
-            ctx.setStatus('Exploring unknown');
-            if (ctx.isHypothetical) {
-                ctx.simMove(nx, ny, endTick);
-                ctx.addDiscoveredTile(nx, ny, endTick);
-            } else {
-                await ctx.moveToward(nx, ny, endTick - ctx.tickCount);
-            }
-            return;
-        }
-
-        if (!memWorld.isWalkable(nx, ny, z)) return;
-
-        ctx.setStatus('Exploring');
-        if (ctx.isHypothetical) {
-            if (ctx.simDirectStep(nx, ny, endTick) !== MoveResult.ARRIVED) return;
-            x = ctx.x;
-            y = ctx.y;
-        } else {
-            const step = await ctx.moveToward(nx, ny, endTick - ctx.tickCount);
-            if (step !== MoveResult.ARRIVED) return;
-            x = Math.floor(ctx.npc.x);
-            y = Math.floor(ctx.npc.y);
-        }
-
-        if (Math.max(Math.abs(x - startX), Math.abs(y - startY)) >= ctx.wanderRadius) {
-            return;
-        }
+    ctx.setStatus('Exploring unknown');
+    if (ctx.isHypothetical) {
+        ctx.simMove(frontier.x, frontier.y, endTick);
+        ctx.addDiscoveredTile(frontier.x, frontier.y, endTick);
+    } else {
+        await ctx.moveToward(frontier.x, frontier.y, endTick - ctx.tickCount);
     }
 }
 
