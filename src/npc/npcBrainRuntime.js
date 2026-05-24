@@ -6,12 +6,13 @@
  * Defaults to "task" (full perception + plans + optional LLM planner).
  */
 import { createDefaultTaskBrain, createThomasBrain, createWanderBrain, noopNpcBrain } from './npcBrain.js';
+import { createCarolBrain } from './carol/carolBrain.js';
 
 /** @typedef {import('./npcBrain.js').NpcBrain} NpcBrain */
 /** @typedef {import('./llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
-/** @typedef {'task' | 'wander' | 'noop' | 'thomas'} BrainType */
+/** @typedef {'task' | 'wander' | 'noop' | 'thomas' | 'carol'} BrainType */
 
-const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['task', 'wander', 'noop', 'thomas']);
+const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['task', 'wander', 'noop', 'thomas', 'carol']);
 
 /**
  * @returns {BrainType}
@@ -40,5 +41,6 @@ export function createBrainForType(brainType, opts = {}) {
     if (brainType === 'wander') return createWanderBrain();
     if (brainType === 'noop') return noopNpcBrain();
     if (brainType === 'thomas') return createThomasBrain();
+    if (brainType === 'carol') return createCarolBrain();
     return createDefaultTaskBrain(opts);
 }
