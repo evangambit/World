@@ -2,7 +2,7 @@
  * Test helpers — drive NPC locomotion until async travel/plan work settles.
  */
 import assert from 'node:assert/strict';
-import { tickNpcLocomotion } from '../../actors/npcLocomotion.js';
+import { tickNpcLocomotionFrame } from '../../actors/npcSimulation.js';
 
 /** @typedef {import('../../actors/npcSimulation.js').NpcEntity} NpcEntity */
 
@@ -10,6 +10,7 @@ import { tickNpcLocomotion } from '../../actors/npcLocomotion.js';
  * @typedef {Object} DriveLocomotionOptions
  * @property {number} [maxTicks] - hard cap (default 10000)
  * @property {number} [dt] - seconds per tick (default 0.05)
+ * @property {import('../../world/world.js').World3D} world - required (applies pending move actions)
  * @property {(npc: NpcEntity) => void} [onTick] - e.g. syncMemoryRefTravelGoal
  */
 
@@ -22,6 +23,8 @@ import { tickNpcLocomotion } from '../../actors/npcLocomotion.js';
  * @returns {Promise<T>}
  */
 export async function driveLocomotionUntil(npc, promise, opts = {}) {
+    const { world } = opts;
+    assert.ok(world, 'driveLocomotionUntil requires opts.world');
     const maxTicks = opts.maxTicks ?? 10_000;
     const dt = opts.dt ?? 0.05;
     let settled = false;
@@ -31,7 +34,7 @@ export async function driveLocomotionUntil(npc, promise, opts = {}) {
 
     for (let i = 0; i < maxTicks && !settled; i++) {
         opts.onTick?.(npc);
-        tickNpcLocomotion(npc, dt);
+        tickNpcLocomotionFrame(npc, world, dt);
         // Let travel/plan promise continuations run (finally() is a microtask).
         await Promise.resolve();
     }

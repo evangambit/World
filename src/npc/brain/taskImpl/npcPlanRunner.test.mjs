@@ -41,7 +41,7 @@ describe('goto with rememberLocationsOfNearby', () => {
                 type: 'goto',
                 ref: 'rememberLocationsOfNearby(stove)',
             }),
-            { onTick: (n) => syncMemoryRefTravelGoal(n, world) },
+            { world, onTick: (n) => syncMemoryRefTravelGoal(n, world) },
         );
         assert.equal(result.ok, true);
         assert.equal(Math.floor(npc.x), 12);

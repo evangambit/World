@@ -1,8 +1,11 @@
 /**
  * NPC pathfinding and path following (no task/plan AI).
  */
+import { isAdjacentToTile } from '../domain/entityActions.js';
 import { DIR } from './entity.js';
 import { findPath } from '../world/pathfinding.js';
+
+/** @typedef {{ x: number, y: number, z: number }} TileCoord */
 
 /** @typedef {import('./entity.js').Entity} Entity */
 /** @typedef {import('../world/world.js').World3D} World3D */
@@ -62,42 +65,48 @@ export function setNpcGoal(npc, gx, gy, gz, world) {
 }
 
 /**
+ * @param {World3D} world
+ * @param {Entity} npc
+ * @param {TileCoord} target
+ * @returns {TileCoord|null}
+ */
+export function findApproachTile(world, npc, target) {
+    const sx = Math.floor(npc.x);
+    const sy = Math.floor(npc.y);
+    const sz = npc.z;
+    const candidates = [];
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            const ax = target.x + dx;
+            const ay = target.y + dy;
+            if (!world.isWalkable(ax, ay, target.z)) continue;
+            if (!findPath(world, sx, sy, sz, ax, ay, target.z)) continue;
+            if (Math.max(Math.abs(ax - target.x), Math.abs(ay - target.y)) > 1) continue;
+            candidates.push({ x: ax, y: ay, z: target.z });
+        }
+    }
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => {
+        const da = Math.abs(a.x - sx) + Math.abs(a.y - sy);
+        const db = Math.abs(b.x - sx) + Math.abs(b.y - sy);
+        return da - db;
+    });
+    return candidates[0];
+}
+
+/**
  * @param {Entity & NpcLocomotionState} npc
  * @param {number} tx
  * @param {number} ty
  * @param {number} tz
- * @param {World3D} world
- * @returns {Promise<void>}
+ * @param {boolean} onto
+ * @returns {boolean}
  */
-export function travelNpcToTile(npc, tx, ty, tz, world) {
-    if (npc._dead) {
-        return Promise.reject(new Error('dead'));
+export function isAtMoveGoal(npc, tx, ty, tz, onto) {
+    if (onto) {
+        return Math.floor(npc.x) === tx && Math.floor(npc.y) === ty && npc.z === tz;
     }
-    if (npc.timedAction.isBusy()) {
-        npc.timedAction.cancel();
-    }
-    if (npc._trip) {
-        npc._trip.reject(new Error('travel superseded'));
-        npc._trip = null;
-    }
-
-    const px = Math.floor(npc.x);
-    const py = Math.floor(npc.y);
-    if (px === tx && py === ty && npc.z === tz) {
-        return Promise.resolve();
-    }
-
-    return new Promise((resolve, reject) => {
-        if (!setNpcGoal(npc, tx, ty, tz, world)) {
-            reject(new Error(`no path to (${tx}, ${ty}, ${tz})`));
-            return;
-        }
-        if (npc._state === 'idle' && px === tx && py === ty && npc.z === tz) {
-            resolve();
-            return;
-        }
-        npc._trip = { x: tx, y: ty, z: tz, resolve, reject };
-    });
+    return isAdjacentToTile(npc, tx, ty) && npc.z === tz;
 }
 
 /**
@@ -153,20 +162,28 @@ export function tickNpcLocomotion(npc, dt) {
  */
 function finishNpcTripIfAtGoal(npc) {
     if (!npc._trip) return;
-    const px = Math.floor(npc.x);
-    const py = Math.floor(npc.y);
-    const { x, y, z, resolve } = npc._trip;
-    if (px === x && py === y && npc.z === z) {
+    const { x, y, z, onto, resolve } = npc._trip;
+    if (isAtMoveGoal(npc, x, y, z, onto)) {
         npc._trip = null;
         resolve();
     }
 }
 
 /**
+ * @typedef {Object} NpcTrip
+ * @property {number} x
+ * @property {number} y
+ * @property {number} z
+ * @property {boolean} onto
+ * @property {() => void} resolve
+ * @property {(err: Error) => void} reject
+ */
+
+/**
  * @typedef {Object} NpcLocomotionState
  * @property {Array<{x:number,y:number,z:number}>|null} path
  * @property {number} pathIndex
  * @property {'idle'|'walking'} _state
- * @property {{ x: number, y: number, z: number, resolve: () => void, reject: (err: Error) => void }|null} _trip
+ * @property {NpcTrip|null} _trip
  * @property {boolean} _dead
  */

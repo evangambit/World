@@ -8,9 +8,10 @@ import {
     initNpcLocomotion,
     setNpcGoal,
     tickNpcLocomotion,
-    travelNpcToTile,
+    isAtMoveGoal,
 } from './npcLocomotion.js';
-import { actionDuration, pickUpAction } from '../domain/entityActions.js';
+import { actionDuration, isEntityActionComplete, pickUpAction } from '../domain/entityActions.js';
+import { moveToAction } from './npcActions.js';
 import { Entity } from './entity.js';
 
 /** @typedef {import('../domain/entityActions.js').EntityAction} EntityAction */
@@ -100,7 +101,7 @@ export function initNpcEntity(entity, opts = {}) {
 
     const loco = /** @type {NpcEntity} */ (entity);
     loco.setGoal = (gx, gy, gz, world) => setNpcGoal(loco, gx, gy, gz, world);
-    loco.travelToTile = (tx, ty, tz, world) => travelNpcToTile(loco, tx, ty, tz, world);
+    loco.travelToTile = (tx, ty, tz, world, opts) => travelNpcToTile(loco, tx, ty, tz, world, opts);
     loco.pickUpAt = (tileX, tileY, tileZ, world) => pickUpAction(loco, tileX, tileY, tileZ).apply(world);
     loco._pendingAction = null;
     loco.scheduleAction = (action) => scheduleNpcAction(loco, action);
@@ -164,10 +165,87 @@ export function applyNpcAction(npc, action, world) {
     }
     npc.currentAction = action;
     const ok = action.apply(world);
-    if (!ok || actionDuration(action) === 0) {
+    if (!ok) {
+        npc.currentAction = null;
+        if (npc._trip) {
+            const { reject } = npc._trip;
+            npc._trip = null;
+            reject(new Error('action failed'));
+        }
+        return false;
+    }
+    if (isEntityActionComplete(action, npc)) {
+        npc.currentAction = null;
+    } else if (actionDuration(action) > 0 && !npc.timedAction.isBusy()) {
         npc.currentAction = null;
     }
-    return ok;
+    return true;
+}
+
+/**
+ * @param {NpcEntity} npc
+ */
+function finishNpcCurrentAction(npc) {
+    if (!npc.currentAction) return;
+    if (!isEntityActionComplete(npc.currentAction, npc)) return;
+    npc.currentAction = null;
+    if (npc._trip) {
+        const { resolve } = npc._trip;
+        npc._trip = null;
+        resolve();
+    }
+}
+
+/**
+ * @param {NpcEntity} npc
+ * @param {number} tx
+ * @param {number} ty
+ * @param {number} tz
+ * @param {World3D} world
+ * @param {{ onto?: boolean }} [opts] - default `{ onto: true }` for exact tile (legacy travel)
+ * @returns {Promise<void>}
+ */
+export function travelNpcToTile(npc, tx, ty, tz, world, opts = {}) {
+    const onto = opts.onto !== false;
+
+    if (npc._dead) {
+        return Promise.reject(new Error('dead'));
+    }
+    if (npc._trip) {
+        npc._trip.reject(new Error('travel superseded'));
+        npc._trip = null;
+    }
+
+    if (isAtMoveGoal(npc, tx, ty, tz, onto)) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+        npc._trip = { x: tx, y: ty, z: tz, onto, resolve, reject };
+        scheduleNpcAction(npc, moveToAction(npc, tx, ty, tz, { onto }));
+    });
+}
+
+/**
+ * Locomotion + pending actions only (no brain). For tests and memory-ref travel drivers.
+ * @param {NpcEntity} entity
+ * @param {World3D} world
+ * @param {number} dt
+ */
+export function tickNpcLocomotionFrame(entity, world, dt) {
+    if (entity._dead) return;
+
+    let pending;
+    while ((pending = takePendingNpcAction(entity))) {
+        applyNpcAction(entity, pending, world);
+    }
+
+    if (entity.timedAction.isBusy()) {
+        entity.timedAction.tick(dt, world);
+    } else {
+        tickNpcLocomotion(entity, dt);
+        finishNpcCurrentAction(entity);
+    }
 }
 
 /**
@@ -204,6 +282,7 @@ export function tickNpc(entity, world, dt, gameTime) {
         entity.timedAction.tick(dt, world);
     } else {
         tickNpcLocomotion(entity, dt);
+        finishNpcCurrentAction(entity);
     }
 
     return applied;

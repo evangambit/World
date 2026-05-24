@@ -93,6 +93,7 @@ describe('travelNpcToMemoryRef', () => {
         assert.equal(npc._memoryRefTravel?.goalKey, '12,10,0');
 
         await driveLocomotionUntil(npc, travelPromise, {
+            world,
             onTick: (n) => syncMemoryRefTravelGoal(n, world),
         });
         assert.equal(Math.floor(npc.x), 12);
@@ -129,6 +130,7 @@ describe('travelNpcToMemoryRef', () => {
         );
 
         await driveLocomotionUntil(npc, travelPromise, {
+            world,
             onTick: (n) => syncMemoryRefTravelGoal(n, world),
         });
         assert.equal(isTileMemoryReachable(npc, 14, 10, 0), false);

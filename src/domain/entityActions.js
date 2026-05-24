@@ -53,6 +53,7 @@ import {
  * @property {() => ActionPrereq} prereq
  * @property {(world: World3D) => boolean} apply
  * @property {number} [duration=0] - seconds; 0 = instant apply, >0 starts TimedActionRunner until complete
+ * @property {(entity: Entity) => boolean} [isComplete] - when set, currentAction held until this is true (locomotion)
  */
 
 /**
@@ -61,6 +62,16 @@ import {
  */
 export function actionDuration(action) {
     return action.duration ?? 0;
+}
+
+/**
+ * @param {EntityAction} action
+ * @param {Entity} entity
+ * @returns {boolean}
+ */
+export function isEntityActionComplete(action, entity) {
+    if (action.isComplete) return action.isComplete(entity);
+    return actionDuration(action) === 0;
 }
 
 /**

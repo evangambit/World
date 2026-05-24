@@ -76,6 +76,7 @@ describe('runExplore', () => {
                 radius: 16,
                 anchor: 'home',
             }),
+            { world },
         );
 
         assert.ok(npc.inventory?.some((s) => s.objType === Obj.FLOWER && s.count > 0));
@@ -102,6 +103,7 @@ describe('runExplore', () => {
                 radius: 12,
                 anchor: 'home',
             }),
+            { world },
         );
 
         assert.ok(npc.inventory?.some((s) => s.objType === Obj.FLOWER));
@@ -129,6 +131,7 @@ describe('explore plan step', () => {
                 anchor: 'home',
                 pickup: true,
             }),
+            { world },
         );
         assert.equal(result.ok, true);
     });

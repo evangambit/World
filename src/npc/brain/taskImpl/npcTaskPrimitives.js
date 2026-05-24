@@ -9,6 +9,7 @@ import {
     takeFromContainerAction,
     toggleDoorLock,
 } from '../../../domain/entityActions.js';
+import { findApproachTile } from '../../../actors/npcLocomotion.js';
 import { scheduleNpcAction } from '../../../actors/npcSimulation.js';
 import { findPath } from '../../../world/pathfinding.js';
 import { isPickableObject, Obj, OBJ_NAMES } from '../../../world/tileTypes.js';
@@ -183,33 +184,4 @@ export async function runTimedAction(npc, world, actionId, tx, ty, tz) {
     }
 }
 
-/**
- * @param {import('../world/world.js').World3D} world
- * @param {import('../actors/npc.js').NPC} npc
- * @param {TileCoord} target
- * @returns {TileCoord|null}
- */
-export function findApproachTile(world, npc, target) {
-    const sx = Math.floor(npc.x);
-    const sy = Math.floor(npc.y);
-    const sz = npc.z;
-    const candidates = [];
-    for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-            const tx = target.x + dx;
-            const ty = target.y + dy;
-            if (!world.isWalkable(tx, ty, target.z)) continue;
-            if (!findPath(world, sx, sy, sz, tx, ty, target.z)) continue;
-            const dist = Math.max(Math.abs(tx - target.x), Math.abs(ty - target.y));
-            if (dist > 1) continue;
-            candidates.push({ x: tx, y: ty, z: target.z });
-        }
-    }
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => {
-        const da = Math.abs(a.x - sx) + Math.abs(a.y - sy);
-        const db = Math.abs(b.x - sx) + Math.abs(b.y - sy);
-        return da - db;
-    });
-    return candidates[0];
-}
+export { findApproachTile } from '../../../actors/npcLocomotion.js';

@@ -11,7 +11,9 @@ import {
     tickNpcSimulation,
     scheduleNpcAction,
     applyNpcAction,
+    travelNpcToTile,
 } from './npcSimulation.js';
+import { moveToAction } from './npcActions.js';
 import {
     goTo,
     find,
@@ -28,8 +30,10 @@ export {
     tickNpcSimulation,
     scheduleNpcAction,
     applyNpcAction,
+    travelNpcToTile,
     NPC_PRESETS,
 } from './npcSimulation.js';
+export { moveToAction } from './npcActions.js';
 export {
     attachNpcBrain,
     createTaskBrain,
