@@ -25,14 +25,15 @@ import {
 } from './world/tileTypes.js';
 import {
     canOpenContainerAt,
-    cookAtStove,
-    dropFromInventory,
-    pickUpAtTile,
-    stashToContainer,
-    takeFromContainer,
+    cookBreadAtStoveAction,
+    cookSteakAtStoveAction,
+    dropAction,
+    pickUpAction,
+    satisfiesInventoryPrereq,
+    stashToContainerAction,
+    takeFromContainerAction,
     toggleDoorLock,
 } from './domain/entityActions.js';
-import { inventoryHasUncookedSteak, inventoryHasWheat } from './domain/cooking.js';
 import {
     harvestWheatAtTile,
     plantWheatSeedAtTile,
@@ -233,18 +234,22 @@ class Game {
                     }
                 }
                 if (tile && isStoveObject(tile.obj)) {
-                    const cooked = cookAtStove(this.player, this.world, tx, ty);
-                    if (cooked === 'steak') {
+                    const steak = cookSteakAtStoveAction(this.player, tx, ty);
+                    if (steak.apply(this.world)) {
                         this._showGameMessage('Cooked a steak.');
                         this._syncInventoryUI();
-                    } else if (cooked === 'bread') {
+                    } else if (cookBreadAtStoveAction(this.player, tx, ty).apply(this.world)) {
                         this._showGameMessage('Baked some bread.');
                         this._syncInventoryUI();
-                    } else {
-                        const inv = this.player.inventory ?? [];
-                        if (!inventoryHasUncookedSteak(inv) && !inventoryHasWheat(inv)) {
-                            this._showGameMessage('You need uncooked steak or wheat in your pack.');
-                        }
+                    } else if (
+                        !satisfiesInventoryPrereq(this.player, {
+                            inventoryOneOf: [
+                                [{ objType: Obj.UNCOOKED_STEAK }],
+                                [{ objType: Obj.WHEAT }],
+                            ],
+                        })
+                    ) {
+                        this._showGameMessage('You need uncooked steak or wheat in your pack.');
                     }
                     return;
                 }
@@ -253,7 +258,7 @@ class Game {
                     return;
                 }
             }
-            if (pickUpAtTile(this.player, this.world, tx, ty, this.player.z)) {
+            if (pickUpAction(this.player, tx, ty, this.player.z).apply(this.world)) {
                 this._syncInventoryUI();
             }
         });
@@ -406,9 +411,10 @@ class Game {
     }
 
     _dropFromInventory(objType, buildingId) {
-        const { message } = dropFromInventory(this.player, this.world, objType, buildingId);
+        const action = dropAction(this.player, objType, buildingId);
+        action.apply(this.world);
         this._syncInventoryUI();
-        this._showGameMessage(message);
+        this._showGameMessage(action.lastResult.message);
     }
 
     _openContainerAt(tx, ty) {
@@ -474,7 +480,7 @@ class Game {
     _takeFromContainer(objType, buildingId) {
         const open = this.openContainer;
         if (!open) return;
-        if (!takeFromContainer(this.player, this.world, open.x, open.y, open.z, objType, buildingId)) {
+        if (!takeFromContainerAction(this.player, open.x, open.y, open.z, objType, buildingId).apply(this.world)) {
             return;
         }
         this._syncContainerPanel();
@@ -484,7 +490,7 @@ class Game {
     _stashToContainer(objType, buildingId) {
         const open = this.openContainer;
         if (!open || !canStashInContainer(objType)) return;
-        if (!stashToContainer(this.player, this.world, open.x, open.y, open.z, objType, buildingId)) {
+        if (!stashToContainerAction(this.player, open.x, open.y, open.z, objType, buildingId).apply(this.world)) {
             return;
         }
         this._syncContainerPanel();

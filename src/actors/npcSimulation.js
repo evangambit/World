@@ -10,7 +10,7 @@ import {
     tickNpcLocomotion,
     travelNpcToTile,
 } from './npcLocomotion.js';
-import { pickUpAtTile } from '../domain/entityActions.js';
+import { pickUpAction } from '../domain/entityActions.js';
 import { Entity } from './entity.js';
 import { attachNpcBrain } from '../npc/brain/attach.js';
 import { ThomasBrain } from '../npc/brain/thomasImpl/thomasBrain.js';
@@ -96,7 +96,7 @@ export function initNpcEntity(entity, opts = {}) {
     const loco = /** @type {NpcEntity} */ (entity);
     loco.setGoal = (gx, gy, gz, world) => setNpcGoal(loco, gx, gy, gz, world);
     loco.travelToTile = (tx, ty, tz, world) => travelNpcToTile(loco, tx, ty, tz, world);
-    loco.pickUpAt = (tileX, tileY, tileZ, world) => pickUpAtTile(loco, world, tileX, tileY, tileZ);
+    loco.pickUpAt = (tileX, tileY, tileZ, world) => pickUpAction(loco, tileX, tileY, tileZ).apply(world);
 
     Object.defineProperty(entity, 'isAlive', {
         get() {

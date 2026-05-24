@@ -20,6 +20,70 @@ import {
 /** @typedef {import('../world/world.js').World3D} World3D */
 
 /**
+ * Static requirements for an entity action (inventory + target tile semantics).
+ * Tile contents are validated in `apply` using `world`; `prereq` captures intent for planners/UI.
+ *
+ * @typedef {Object} InventoryReq
+ * @property {number} objType
+ * @property {number} [count=1]
+ * @property {number} [buildingId]
+ *
+ * @typedef {Object} TileReq
+ * @property {number} x
+ * @property {number} y
+ * @property {number} [z]
+ * @property {number} [object] - required tile.obj
+ * @property {boolean} [pickable] - tile.obj must be pickable
+ * @property {boolean} [container] - tile.obj must be a container
+ * @property {number} [terrain] - required tile.terrain
+ *
+ * @typedef {Object} ContainerItemReq
+ * @property {number} objType
+ * @property {number} [buildingId]
+ *
+ * @typedef {Object} ActionPrereq
+ * @property {InventoryReq[]} [inventory] - all listed stacks required (AND)
+ * @property {InventoryReq[][]} [inventoryOneOf] - at least one group fully satisfied (OR)
+ * @property {ContainerItemReq} [containerItem] - stack required inside target container
+ * @property {TileReq} [tile]
+ * @property {TileCoord} [adjacentTo] - entity must be adjacent to this tile
+ *
+ * @typedef {Object} EntityAction
+ * @property {() => ActionPrereq} prereq
+ * @property {(world: World3D) => boolean} apply
+ */
+
+/**
+ * @param {Entity} entity
+ * @param {InventoryReq} req
+ */
+export function inventoryHasReq(entity, req) {
+    const count = req.count ?? 1;
+    return (entity.inventory ?? []).some(
+        (s) =>
+            s.objType === req.objType &&
+            s.count >= count &&
+            (req.buildingId == null || s.buildingId === req.buildingId),
+    );
+}
+
+/**
+ * @param {Entity} entity
+ * @param {ActionPrereq} prereq
+ */
+export function satisfiesInventoryPrereq(entity, prereq) {
+    for (const req of prereq.inventory ?? []) {
+        if (!inventoryHasReq(entity, req)) return false;
+    }
+    const groups = prereq.inventoryOneOf ?? [];
+    if (groups.length > 0) {
+        const any = groups.some((group) => group.every((req) => inventoryHasReq(entity, req)));
+        if (!any) return false;
+    }
+    return true;
+}
+
+/**
  * @param {Entity} entity
  * @param {number} tileX
  * @param {number} tileY
@@ -50,13 +114,145 @@ export function mergeStackInto(list, objType, count, buildingId) {
 
 /**
  * @param {Entity} entity
+ * @param {number} tileX
+ * @param {number} tileY
+ * @param {number} [tileZ]
+ * @returns {EntityAction}
+ */
+export function pickUpAction(entity, tileX, tileY, tileZ = entity.z) {
+    return {
+        prereq: () => ({
+            adjacentTo: { x: tileX, y: tileY, z: tileZ },
+            tile: { x: tileX, y: tileY, z: tileZ, pickable: true },
+        }),
+        apply: (world) => applyPickUpAtTile(entity, world, tileX, tileY, tileZ),
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @param {number} tileX
+ * @param {number} tileY
+ * @returns {EntityAction}
+ */
+export function cookSteakAtStoveAction(entity, tileX, tileY) {
+    return {
+        prereq: () => ({
+            inventory: [{ objType: Obj.UNCOOKED_STEAK }],
+            adjacentTo: { x: tileX, y: tileY, z: entity.z },
+            tile: { x: tileX, y: tileY, z: entity.z, object: Obj.STOVE },
+        }),
+        apply: (world) => applyCookSteakAtStove(entity, world, tileX, tileY),
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @param {number} tileX
+ * @param {number} tileY
+ * @returns {EntityAction}
+ */
+export function cookBreadAtStoveAction(entity, tileX, tileY) {
+    return {
+        prereq: () => ({
+            inventory: [{ objType: Obj.WHEAT }],
+            adjacentTo: { x: tileX, y: tileY, z: entity.z },
+            tile: { x: tileX, y: tileY, z: entity.z, object: Obj.STOVE },
+        }),
+        apply: (world) => applyCookBreadAtStove(entity, world, tileX, tileY),
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @returns {EntityAction}
+ */
+export function toggleDoorLockAction(entity) {
+    return {
+        prereq: () => ({ adjacentTo: { x: Math.floor(entity.x), y: Math.floor(entity.y), z: entity.z } }),
+        apply: (world) => toggleDoorLock(entity, world).ok,
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @param {number} objType
+ * @param {number} [buildingId]
+ * @param {number} [count]
+ * @returns {EntityAction & { lastResult: DropResult }}
+ */
+export function dropAction(entity, objType, buildingId, count) {
+    /** @type {DropResult} */
+    let lastResult = { placed: 0, requested: 0, message: '' };
+    const inventoryReq = { objType, count: count ?? 1 };
+    if (objType === Obj.KEY && buildingId != null) inventoryReq.buildingId = buildingId;
+    return {
+        get lastResult() {
+            return lastResult;
+        },
+        prereq: () => ({ inventory: [inventoryReq] }),
+        apply: (world) => {
+            lastResult = applyDropFromInventory(entity, world, objType, buildingId, count);
+            return lastResult.placed > 0;
+        },
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} cz
+ * @param {number} objType
+ * @param {number} [buildingId]
+ * @returns {EntityAction}
+ */
+export function takeFromContainerAction(entity, cx, cy, cz, objType, buildingId) {
+    /** @type {ContainerItemReq} */
+    const containerItem = { objType };
+    if (objType === Obj.KEY && buildingId != null) containerItem.buildingId = buildingId;
+    return {
+        prereq: () => ({
+            adjacentTo: { x: cx, y: cy, z: cz },
+            tile: { x: cx, y: cy, z: cz, container: true },
+            containerItem,
+        }),
+        apply: (world) => applyTakeFromContainer(entity, world, cx, cy, cz, objType, buildingId),
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} cz
+ * @param {number} objType
+ * @param {number} [buildingId]
+ * @returns {EntityAction}
+ */
+export function stashToContainerAction(entity, cx, cy, cz, objType, buildingId) {
+    const inventoryReq = { objType };
+    if (objType === Obj.KEY && buildingId != null) inventoryReq.buildingId = buildingId;
+    return {
+        prereq: () => ({
+            inventory: [inventoryReq],
+            adjacentTo: { x: cx, y: cy, z: cz },
+            tile: { x: cx, y: cy, z: cz, container: true },
+        }),
+        apply: (world) => applyStashToContainer(entity, world, cx, cy, cz, objType, buildingId),
+    };
+}
+
+// --- apply implementations ---
+
+/**
+ * @param {Entity} entity
  * @param {World3D} world
  * @param {number} tileX
  * @param {number} tileY
- * @param {number} [tileZ] - defaults to entity.z
- * @returns {boolean}
+ * @param {number} tileZ
  */
-export function pickUpAtTile(entity, world, tileX, tileY, tileZ = entity.z) {
+function applyPickUpAtTile(entity, world, tileX, tileY, tileZ) {
     if (tileZ !== entity.z) return false;
     if (!isAdjacentToTile(entity, tileX, tileY)) return false;
 
@@ -77,18 +273,31 @@ export function pickUpAtTile(entity, world, tileX, tileY, tileZ = entity.z) {
  * @param {World3D} world
  * @param {number} tileX
  * @param {number} tileY
- * @returns {false | 'steak' | 'bread'}
  */
-export function cookAtStove(entity, world, tileX, tileY) {
+function applyCookSteakAtStove(entity, world, tileX, tileY) {
     if (!entity.inventory) entity.inventory = [];
     if (!isAdjacentToTile(entity, tileX, tileY)) return false;
 
     const tile = world.getTile(tileX, tileY, entity.z);
     if (!tile || !isStoveObject(tile.obj)) return false;
 
-    if (cookUncookedSteakInInventory(entity.inventory)) return 'steak';
-    if (cookWheatIntoBread(entity.inventory)) return 'bread';
-    return false;
+    return cookUncookedSteakInInventory(entity.inventory);
+}
+
+/**
+ * @param {Entity} entity
+ * @param {World3D} world
+ * @param {number} tileX
+ * @param {number} tileY
+ */
+function applyCookBreadAtStove(entity, world, tileX, tileY) {
+    if (!entity.inventory) entity.inventory = [];
+    if (!isAdjacentToTile(entity, tileX, tileY)) return false;
+
+    const tile = world.getTile(tileX, tileY, entity.z);
+    if (!tile || !isStoveObject(tile.obj)) return false;
+
+    return cookWheatIntoBread(entity.inventory);
 }
 
 /**
@@ -242,15 +451,14 @@ function findDropSpot(entity, world, objType, used) {
 /** @typedef {{ placed: number, requested: number, message: string }} DropResult */
 
 /**
- * Drop one or more of an inventory stack onto nearby walkable tiles.
  * @param {Entity} entity
  * @param {World3D} world
  * @param {number} objType
  * @param {number} [buildingId]
- * @param {number} [count] - default: entire stack
+ * @param {number} [count]
  * @returns {DropResult}
  */
-export function dropFromInventory(entity, world, objType, buildingId, count) {
+function applyDropFromInventory(entity, world, objType, buildingId, count) {
     const inv = entity.inventory ?? [];
     const i = inv.findIndex(
         (e) => e.objType === objType && (objType !== Obj.KEY || e.buildingId === buildingId),
@@ -277,8 +485,7 @@ export function dropFromInventory(entity, world, objType, buildingId, count) {
     stack.count -= placed;
     if (stack.count <= 0) inv.splice(i, 1);
 
-    const message =
-        placed === n ? 'Dropped' : `Dropped ${placed} (no room for rest)`;
+    const message = placed === n ? 'Dropped' : `Dropped ${placed} (no room for rest)`;
     return { placed, requested: n, message };
 }
 
@@ -288,7 +495,6 @@ export function dropFromInventory(entity, world, objType, buildingId, count) {
  * @param {number} cx
  * @param {number} cy
  * @param {number} cz
- * @returns {boolean}
  */
 export function canOpenContainerAt(entity, world, cx, cy, cz) {
     if (cz !== entity.z) return false;
@@ -305,9 +511,8 @@ export function canOpenContainerAt(entity, world, cx, cy, cz) {
  * @param {number} cz
  * @param {number} objType
  * @param {number} [buildingId]
- * @returns {boolean}
  */
-export function takeFromContainer(entity, world, cx, cy, cz, objType, buildingId) {
+function applyTakeFromContainer(entity, world, cx, cy, cz, objType, buildingId) {
     if (!canOpenContainerAt(entity, world, cx, cy, cz)) return false;
 
     const contents = world.ensureTileContents(cx, cy, cz);
@@ -332,9 +537,8 @@ export function takeFromContainer(entity, world, cx, cy, cz, objType, buildingId
  * @param {number} cz
  * @param {number} objType
  * @param {number} [buildingId]
- * @returns {boolean}
  */
-export function stashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
+function applyStashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
     if (!canStashInContainer(objType)) return false;
     if (!canOpenContainerAt(entity, world, cx, cy, cz)) return false;
 
@@ -374,4 +578,73 @@ export function findContainerStack(world, cx, cy, cz, inventoryTypes) {
         }
     }
     return null;
+}
+
+// --- legacy function wrappers (delegate to actions) ---
+
+/**
+ * @param {Entity} entity
+ * @param {World3D} world
+ * @param {number} tileX
+ * @param {number} tileY
+ * @param {number} [tileZ]
+ * @returns {boolean}
+ */
+export function pickUpAtTile(entity, world, tileX, tileY, tileZ = entity.z) {
+    return pickUpAction(entity, tileX, tileY, tileZ).apply(world);
+}
+
+/**
+ * @param {Entity} entity
+ * @param {World3D} world
+ * @param {number} tileX
+ * @param {number} tileY
+ * @returns {false | 'steak' | 'bread'}
+ */
+export function cookAtStove(entity, world, tileX, tileY) {
+    if (cookSteakAtStoveAction(entity, tileX, tileY).apply(world)) return 'steak';
+    if (cookBreadAtStoveAction(entity, tileX, tileY).apply(world)) return 'bread';
+    return false;
+}
+
+/**
+ * @param {Entity} entity
+ * @param {World3D} world
+ * @param {number} objType
+ * @param {number} [buildingId]
+ * @param {number} [count]
+ * @returns {DropResult}
+ */
+export function dropFromInventory(entity, world, objType, buildingId, count) {
+    const action = dropAction(entity, objType, buildingId, count);
+    action.apply(world);
+    return action.lastResult;
+}
+
+/**
+ * @param {Entity} entity
+ * @param {World3D} world
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} cz
+ * @param {number} objType
+ * @param {number} [buildingId]
+ * @returns {boolean}
+ */
+export function takeFromContainer(entity, world, cx, cy, cz, objType, buildingId) {
+    return takeFromContainerAction(entity, cx, cy, cz, objType, buildingId).apply(world);
+}
+
+/**
+ * @param {Entity} entity
+ * @param {World3D} world
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} cz
+ * @param {number} objType
+ * @param {number} [buildingId]
+ * @returns {boolean}
+ */
+export function stashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
+    return stashToContainerAction(entity, cx, cy, cz, objType, buildingId).apply(world);
 }

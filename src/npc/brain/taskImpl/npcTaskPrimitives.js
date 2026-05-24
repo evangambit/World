@@ -2,10 +2,10 @@
  * Low-level NPC task primitives (movement, pickup search, shared actions).
  */
 import {
-    dropFromInventory,
+    dropAction,
     findContainerStack,
-    stashToContainer,
-    takeFromContainer,
+    stashToContainerAction,
+    takeFromContainerAction,
     toggleDoorLock,
 } from '../../../domain/entityActions.js';
 import { findPath } from '../../../world/pathfinding.js';
@@ -88,8 +88,8 @@ export async function runDoor(npc, world) {
  * @param {number} [count]
  */
 export async function runDrop(npc, world, objType, buildingId, count) {
-    const { placed } = dropFromInventory(npc, world, objType, buildingId, count);
-    if (placed === 0) throw new Error('Drop: no place to drop');
+    const action = dropAction(npc, objType, buildingId, count);
+    if (!action.apply(world)) throw new Error('Drop: no place to drop');
 }
 
 /**
@@ -103,7 +103,7 @@ export async function runDrop(npc, world, objType, buildingId, count) {
 export async function runTakeFromContainer(npc, world, cx, cy, cz, objTypes) {
     const match = findContainerStack(world, cx, cy, cz, objTypes);
     if (!match) throw new Error('Take: container empty or no matching item');
-    if (!takeFromContainer(npc, world, cx, cy, cz, match.objType, match.buildingId)) {
+    if (!takeFromContainerAction(npc, cx, cy, cz, match.objType, match.buildingId).apply(world)) {
         throw new Error('Take: failed (not adjacent or invalid container)');
     }
 }
@@ -118,7 +118,7 @@ export async function runTakeFromContainer(npc, world, cx, cy, cz, objTypes) {
  * @param {number} [buildingId]
  */
 export async function runStashToContainer(npc, world, cx, cy, cz, objType, buildingId) {
-    if (!stashToContainer(npc, world, cx, cy, cz, objType, buildingId)) {
+    if (!stashToContainerAction(npc, cx, cy, cz, objType, buildingId).apply(world)) {
         throw new Error('Stash: failed (not adjacent, not stashable, or missing item)');
     }
 }

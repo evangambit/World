@@ -6,7 +6,7 @@
  */
 import { T, Obj, WHEAT_CROP_STAGES, isStoveObject, isWheatCropObject } from '../../../world/tileTypes.js';
 import { canPlantWheatAt, harvestWheatAtTile, isWheatMature, plantWheatSeedAtTile, wheatStageForTile } from '../../../domain/crops.js';
-import { cookAtStove } from '../../../domain/entityActions.js';
+import { cookBreadAtStoveAction } from '../../../domain/entityActions.js';
 import { consumeFoodFromInventory } from '../../../domain/vitality.js';
 import {
     SeekResult,
@@ -170,8 +170,7 @@ function tryCookBreadAtAdjacentStove(ctx) {
             if (dx === 0 && dy === 0) continue;
             const tile = world.getTile(px + dx, py + dy, z);
             if (!tile || !isStoveObject(tile.obj)) continue;
-            const cooked = cookAtStove(npc, world, px + dx, py + dy);
-            if (cooked === 'bread') return true;
+            if (cookBreadAtStoveAction(npc, px + dx, py + dy).apply(world)) return true;
         }
     }
     return false;

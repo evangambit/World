@@ -3,7 +3,7 @@
  * For tests without AI, use createNpcEntity / tickNpcSimulation from npcSimulation.js.
  */
 import { Entity } from './entity.js';
-import { pickUpAtTile } from '../domain/entityActions.js';
+import { pickUpAction } from '../domain/entityActions.js';
 import { attachNpcBrain, createDefaultTaskBrain } from '../npc/brain/index.js';
 import { initNpcEntity, tickNpcSimulation } from './npcSimulation.js';
 import {
@@ -66,7 +66,7 @@ export class NPC extends Entity {
     }
 
     pickUpAt(tileX, tileY, tileZ, world) {
-        return pickUpAtTile(this, world, tileX, tileY, tileZ);
+        return pickUpAction(this, tileX, tileY, tileZ).apply(world);
     }
 
     /**
