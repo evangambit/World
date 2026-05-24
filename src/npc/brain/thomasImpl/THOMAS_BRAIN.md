@@ -88,7 +88,7 @@ Wheat can only be planted on `T.DIRT` — enforced by `canPlantWheatAt` in `doma
 ```js
 import { buildVillage } from '../content/builder.js';
 import { createNpcEntity } from '../actors/npcSimulation.js';
-import { createThomasBrain } from './brain/index.js';
+import { ThomasBrain } from './brain/index.js';
 import { tickSimulation } from '../simulation/tickSimulation.js';
 
 async function runTicks(world, npcs, ticks, dt = 0.05) {
@@ -102,7 +102,7 @@ async function runTicks(world, npcs, ticks, dt = 0.05) {
 
 // In a node:test it() block:
 const world = buildVillage();
-const npc = createNpcEntity(x, y, z, { brain: createThomasBrain(myBehavior) });
+const npc = createNpcEntity(x, y, z, { brain: new ThomasBrain(myBehavior) });
 await runTicks(world, [npc], 10_000);
 // assert on npc.inventory, npc.isAlive, etc.
 ```

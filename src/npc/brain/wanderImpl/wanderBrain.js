@@ -49,8 +49,3 @@ export class WanderBrain {
         this._traveling = false;
     }
 }
-
-/** @returns {WanderBrain} */
-export function createWanderBrain() {
-    return new WanderBrain();
-}

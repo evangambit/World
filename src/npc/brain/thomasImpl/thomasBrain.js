@@ -117,10 +117,3 @@ export class ThomasBrain {
     }
 }
 
-/**
- * @param {((ctx: import('./thomasTasks.js').TaskContext) => Promise<void>)} [behavior]
- * @returns {ThomasBrain}
- */
-export function createThomasBrain(behavior) {
-    return new ThomasBrain(behavior);
-}

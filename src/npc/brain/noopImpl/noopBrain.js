@@ -30,7 +30,3 @@ export class NoopNpcBrain {
     }
 }
 
-/** @returns {NpcBrain} */
-export function noopNpcBrain() {
-    return new NoopNpcBrain();
-}

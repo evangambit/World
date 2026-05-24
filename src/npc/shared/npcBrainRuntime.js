@@ -7,9 +7,9 @@
  */
 import {
     createDefaultTaskBrain,
-    createThomasBrain,
-    createWanderBrain,
-    noopNpcBrain,
+    ThomasBrain,
+    WanderBrain,
+    NoopNpcBrain,
 } from '../brain/index.js';
 
 /** @typedef {import('../brain/interface.js').NpcBrain} NpcBrain */
@@ -42,8 +42,8 @@ export function resolveBrainType() {
  * @returns {NpcBrain}
  */
 export function createBrainForType(brainType, opts = {}) {
-    if (brainType === 'wander') return createWanderBrain();
-    if (brainType === 'noop') return noopNpcBrain();
-    if (brainType === 'thomas') return createThomasBrain();
+    if (brainType === 'wander') return new WanderBrain();
+    if (brainType === 'noop') return new NoopNpcBrain();
+    if (brainType === 'thomas') return new ThomasBrain();
     return createDefaultTaskBrain(opts);
 }

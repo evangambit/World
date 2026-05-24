@@ -25,8 +25,6 @@ export {
     attachNpcBrain,
     createTaskBrain,
     createDefaultTaskBrain,
-    createWanderBrain,
-    noopNpcBrain,
     NoopNpcBrain,
     NpcTaskBrain,
     WanderBrain,

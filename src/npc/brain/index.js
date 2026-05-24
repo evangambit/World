@@ -3,13 +3,13 @@
  */
 export { attachNpcBrain } from './attach.js';
 
-export { NoopNpcBrain, noopNpcBrain } from './noopImpl/noopBrain.js';
-export { WanderBrain, createWanderBrain } from './wanderImpl/wanderBrain.js';
+export { NoopNpcBrain } from './noopImpl/noopBrain.js';
+export { WanderBrain } from './wanderImpl/wanderBrain.js';
 export {
     NpcTaskBrain,
     createTaskBrain,
     createDefaultTaskBrain,
 } from './taskImpl/taskBrain.js';
-export { ThomasBrain, createThomasBrain } from './thomasImpl/thomasBrain.js';
+export { ThomasBrain } from './thomasImpl/thomasBrain.js';
 
 export {};
