@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { Obj, T } from '../world/tileTypes.js';
 import { createNpcEntity } from '../actors/npcSimulation.js';
-import { createTaskBrain } from './npcBrain.js';
+import { createTaskBrain } from './brain/index.js';
 import { snapshotTileState } from './npcMemory.js';
 import {
     normalizePlanRef,

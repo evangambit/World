@@ -4,7 +4,7 @@
  */
 import { Entity } from './entity.js';
 import { pickUpAtTile } from '../domain/entityActions.js';
-import { attachNpcBrain, createDefaultTaskBrain } from '../npc/npcBrain.js';
+import { attachNpcBrain, createDefaultTaskBrain } from '../npc/brain/index.js';
 import { initNpcEntity, tickNpcSimulation } from './npcSimulation.js';
 import {
     goTo,
@@ -30,7 +30,7 @@ export {
     NoopNpcBrain,
     NpcTaskBrain,
     WanderBrain,
-} from '../npc/npcBrain.js';
+} from '../npc/brain/index.js';
 
 /** @typedef {import('./npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../npc/brain/interface.js').NpcBrain} NpcBrain */

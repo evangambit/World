@@ -27,8 +27,6 @@ brain/
   thomasImpl/thomasBrain.js
 ```
 
-`npcBrain.js` re-exports `brain/index.js` for older imports.
-
 Attach explicitly for test entities:
 
 ```js

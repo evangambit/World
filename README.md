@@ -30,7 +30,6 @@ src/
     npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
     brain/                # Pluggable brain interface + impls (task / wander / thomas / noop)
-    npcBrain.js           # Re-exports brain/ (backward compat)
     npcBrainRuntime.js    # Resolves ?brain= URL param to a brain instance
     thomasPerception.js   # Wall-respecting LOS perception (supercover DDA raycast)
     thomasTasks.js        # Async task framework: tick bridge, moveTowardLocation, seekKnownDesires
@@ -150,7 +149,7 @@ When a plan step needs a remembered place (stove, chest), use **`ref`: `remember
 
 ### NPC brain
 
-Each NPC has a pluggable **brain** (`npcBrain.js`):
+Each NPC has a pluggable **brain** (`npc/brain/`):
 
 - **`NpcTaskBrain`** — perception + task/plan queue with optional LLM planner (default for the `NPC` class).
 - **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there.

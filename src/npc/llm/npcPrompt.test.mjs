@@ -4,7 +4,7 @@ import { World3D } from '../../world/world.js';
 import { VITALITY } from '../../domain/vitality.js';
 import { Obj, T } from '../../world/tileTypes.js';
 import { createNpcEntity } from '../../actors/npcSimulation.js';
-import { createTaskBrain } from '../npcBrain.js';
+import { createTaskBrain } from '../brain/index.js';
 import { snapshotTileState, tickNpcPerception } from '../npcMemory.js';
 import {
     buildSystemPrompt,
