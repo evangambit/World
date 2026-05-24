@@ -4,10 +4,12 @@
 import {
     dropAction,
     findContainerStack,
+    startTimedWorldAction,
     stashToContainerAction,
     takeFromContainerAction,
     toggleDoorLock,
 } from '../../../domain/entityActions.js';
+import { scheduleNpcAction } from '../../../actors/npcSimulation.js';
 import { findPath } from '../../../world/pathfinding.js';
 import { isPickableObject, Obj, OBJ_NAMES } from '../../../world/tileTypes.js';
 import { travelNpcToMemoryRef } from './npcMemoryTravel.js';
@@ -168,10 +170,17 @@ export async function runTimedAction(npc, world, actionId, tx, ty, tz) {
         await npc.travelToTile(approach.x, approach.y, approach.z, world);
     }
 
-    const start = npc.timedAction.start(actionId, world, tx, ty, tz);
-    if (!start.ok) throw new Error(start.message);
+    scheduleNpcAction(
+        npc,
+        startTimedWorldAction(npc, actionId, tx, ty, tz),
+    );
 
-    await npc.timedAction.waitForCompletion();
+    try {
+        await npc.timedAction.waitForCompletion();
+    } catch (err) {
+        if (err?.name !== 'ActionInterruptedError') throw err;
+        throw new Error(err.message);
+    }
 }
 
 /**

@@ -58,10 +58,11 @@ export class ThomasBrain {
      * @param {World3D} world
      * @param {number} _dt
      * @param {number} gameTime
+     * @returns {null}
      */
     tick(world, _dt, gameTime) {
         const npc = this.npc;
-        if (!npc || npc._dead) return;
+        if (!npc || npc._dead) return null;
 
         this._world = world;
         this._gameTime = gameTime;
@@ -78,6 +79,7 @@ export class ThomasBrain {
         if (!this._taskRunning && this._behavior) {
             this._startBehavior();
         }
+        return null;
     }
 
     /**

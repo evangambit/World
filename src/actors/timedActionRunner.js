@@ -130,6 +130,7 @@ export class TimedActionRunner {
         const wait = this._wait;
         this.active = null;
         this._wait = null;
+        this.entity.currentAction = null;
         if (wait) {
             if (success) wait.resolve();
             else wait.reject(err ?? new Error('Action failed'));

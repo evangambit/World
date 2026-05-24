@@ -34,6 +34,8 @@ export class Entity {
         /** 100 = healthy, 0 = down */
         this.health = 100;
         this.timedAction = new TimedActionRunner(this);
+        /** @type {import('../domain/entityActions.js').EntityAction | null} */
+        this.currentAction = null;
     }
 
     /** Try to move by (dx, dy) with collision against the world. */

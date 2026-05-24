@@ -22,8 +22,11 @@ export class NoopNpcBrain {
      * @param {World3D} _world
      * @param {number} _dt
      * @param {number} _gameTime
+     * @returns {null}
      */
-    tick(_world, _dt, _gameTime) {}
+    tick(_world, _dt, _gameTime) {
+        return null;
+    }
 
     destroy() {
         this.npc = null;

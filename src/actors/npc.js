@@ -5,7 +5,13 @@
 import { Entity } from './entity.js';
 import { pickUpAction } from '../domain/entityActions.js';
 import { attachNpcBrain, createDefaultTaskBrain } from '../npc/brain/index.js';
-import { initNpcEntity, tickNpcSimulation } from './npcSimulation.js';
+import {
+    initNpcEntity,
+    tickNpc,
+    tickNpcSimulation,
+    scheduleNpcAction,
+    applyNpcAction,
+} from './npcSimulation.js';
 import {
     goTo,
     find,
@@ -18,7 +24,10 @@ export { EAT_FOOD_PLAN } from '../npc/brain/taskImpl/npcPlanTemplates.js';
 export {
     createNpcEntity,
     initNpcEntity,
+    tickNpc,
     tickNpcSimulation,
+    scheduleNpcAction,
+    applyNpcAction,
     NPC_PRESETS,
 } from './npcSimulation.js';
 export {

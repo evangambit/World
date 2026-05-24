@@ -3,6 +3,7 @@
  * Input UI and plan runners call these — implement a capability once here.
  */
 import { cookUncookedSteakInInventory, cookWheatIntoBread } from './cooking.js';
+import { getTimedAction } from './timedActions.js';
 import {
     Obj,
     T,
@@ -51,7 +52,16 @@ import {
  * @typedef {Object} EntityAction
  * @property {() => ActionPrereq} prereq
  * @property {(world: World3D) => boolean} apply
+ * @property {number} [duration=0] - seconds; 0 = instant apply, >0 starts TimedActionRunner until complete
  */
+
+/**
+ * @param {EntityAction} action
+ * @returns {number}
+ */
+export function actionDuration(action) {
+    return action.duration ?? 0;
+}
 
 /**
  * @param {Entity} entity
@@ -647,4 +657,22 @@ export function takeFromContainer(entity, world, cx, cy, cz, objType, buildingId
  */
 export function stashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
     return stashToContainerAction(entity, cx, cy, cz, objType, buildingId).apply(world);
+}
+
+/**
+ * Timed registry action at a tile (e.g. clear_grass). apply() starts the runner; world updates on complete.
+ * @param {Entity} entity
+ * @param {string} actionId
+ * @param {number} tx
+ * @param {number} ty
+ * @param {number} [tz]
+ * @returns {EntityAction}
+ */
+export function startTimedWorldAction(entity, actionId, tx, ty, tz = entity.z) {
+    const duration = getTimedAction(actionId)?.duration ?? 0;
+    return {
+        duration,
+        prereq: () => ({ adjacentTo: { x: tx, y: ty, z: tz } }),
+        apply: (world) => entity.timedAction.start(actionId, world, tx, ty, tz).ok,
+    };
 }

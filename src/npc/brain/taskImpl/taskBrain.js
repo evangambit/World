@@ -40,13 +40,15 @@ export class NpcTaskBrain {
      * @param {World3D} world
      * @param {number} _dt
      * @param {number} gameTime
+     * @returns {null}
      */
     tick(world, _dt, gameTime) {
         const npc = this.npc;
-        if (!npc || npc._dead) return;
+        if (!npc || npc._dead) return null;
 
         tickNpcPerception(npc, world, gameTime);
         this._tasks?.update(world);
+        return null;
     }
 
     destroy() {

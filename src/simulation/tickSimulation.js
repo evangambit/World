@@ -3,7 +3,6 @@
  * Player is ticked separately — see client/playerController.js or playerSimulation.js.
  */
 import { updateCrops } from '../domain/crops.js';
-import { tickNpcSimulation } from '../actors/npcSimulation.js';
 
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../world/world.js').World3D} World3D */
@@ -23,8 +22,7 @@ export function tickSimulation(opts) {
     updateCrops(world, gameTime);
 
     for (const npc of npcs) {
-        tickNpcSimulation(npc, world, dt);
-        npc.brain?.tick(world, dt, gameTime);
+        npc.tick(world, dt, gameTime);
     }
 
     return { gameTime };

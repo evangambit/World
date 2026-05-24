@@ -24,10 +24,13 @@ export class WanderBrain {
 
     /**
      * @param {World3D} world
+     * @param {number} _dt
+     * @param {number} _gameTime
+     * @returns {null}
      */
     tick(world, _dt, _gameTime) {
         const npc = this.npc;
-        if (!npc || npc._dead || this._traveling) return;
+        if (!npc || npc._dead || this._traveling) return null;
 
         const radius = npc.wanderRadius ?? 10;
         for (let attempt = 0; attempt < 10; attempt++) {
@@ -40,8 +43,9 @@ export class WanderBrain {
                 .finally(() => {
                     this._traveling = false;
                 });
-            return;
+            return null;
         }
+        return null;
     }
 
     destroy() {

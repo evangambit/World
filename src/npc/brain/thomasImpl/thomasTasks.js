@@ -7,6 +7,7 @@
  * Low-level primitives (moveTowardLocation) think in ticks.
  * Higher-level combinators (seekKnownDesires) compose primitives and hide ticks.
  */
+import { startTimedWorldAction } from '../../../domain/entityActions.js';
 import { forEachNpcObservedTile, markTileUnreachable } from '../../shared/npcMemory.js';
 import { findApproachTile } from '../taskImpl/npcTaskPrimitives.js';
 
@@ -237,8 +238,10 @@ export async function doTimedAction(ctx, actionId, tx, ty) {
     const { npc } = ctx;
     const startHealth = npc.health;
 
-    const result = npc.timedAction.start(actionId, ctx.world, tx, ty);
-    if (!result.ok) return ActionResult.FAILED;
+    npc.scheduleAction(startTimedWorldAction(npc, actionId, tx, ty));
+
+    await ctx.nextTick();
+    if (!npc.timedAction.isBusy()) return ActionResult.FAILED;
 
     while (npc.timedAction.isBusy()) {
         await ctx.nextTick();

@@ -10,8 +10,10 @@ import {
     tickNpcLocomotion,
     travelNpcToTile,
 } from './npcLocomotion.js';
-import { pickUpAction } from '../domain/entityActions.js';
+import { actionDuration, pickUpAction } from '../domain/entityActions.js';
 import { Entity } from './entity.js';
+
+/** @typedef {import('../domain/entityActions.js').EntityAction} EntityAction */
 import { attachNpcBrain } from '../npc/brain/attach.js';
 import { ThomasBrain } from '../npc/brain/thomasImpl/thomasBrain.js';
 
@@ -45,6 +47,9 @@ export const NPC_PRESETS = [
  *   setGoal: (gx: number, gy: number, gz: number, world: World3D) => boolean,
  *   travelToTile: (tx: number, ty: number, tz: number, world: World3D) => Promise<void>,
  *   pickUpAt: (tileX: number, tileY: number, tileZ: number, world: World3D) => boolean,
+ *   tick: (world: World3D, dt: number, gameTime: number) => EntityAction | null,
+ *   scheduleAction: (action: EntityAction) => void,
+ *   _pendingAction: EntityAction | null,
  * }} NpcEntity
  */
 
@@ -97,6 +102,9 @@ export function initNpcEntity(entity, opts = {}) {
     loco.setGoal = (gx, gy, gz, world) => setNpcGoal(loco, gx, gy, gz, world);
     loco.travelToTile = (tx, ty, tz, world) => travelNpcToTile(loco, tx, ty, tz, world);
     loco.pickUpAt = (tileX, tileY, tileZ, world) => pickUpAction(loco, tileX, tileY, tileZ).apply(world);
+    loco._pendingAction = null;
+    loco.scheduleAction = (action) => scheduleNpcAction(loco, action);
+    loco.tick = (world, dt, gameTime) => tickNpc(loco, world, dt, gameTime);
 
     Object.defineProperty(entity, 'isAlive', {
         get() {
@@ -117,13 +125,92 @@ export function markNpcDead(entity) {
     if (entity._dead) return;
     entity._dead = true;
     entity.health = 0;
+    entity.currentAction = null;
+    entity._pendingAction = null;
     entity.timedAction.cancel();
     clearNpcLocomotion(entity);
     entity.brain?.destroy?.();
 }
 
 /**
- * Vitality, timed actions, path following, and auto-eat — no task/plan AI.
+ * Queue an action for the next NPC tick (async tasks after travel, etc.).
+ * @param {NpcEntity} npc
+ * @param {EntityAction} action
+ */
+export function scheduleNpcAction(npc, action) {
+    npc._pendingAction = action;
+}
+
+/**
+ * @param {NpcEntity} npc
+ * @returns {EntityAction | null}
+ */
+function takePendingNpcAction(npc) {
+    const action = npc._pendingAction ?? null;
+    npc._pendingAction = null;
+    return action;
+}
+
+/**
+ * Apply an NPC action: interrupts in-progress timed work, sets currentAction.
+ * @param {NpcEntity} npc
+ * @param {EntityAction} action
+ * @param {World3D} world
+ * @returns {boolean}
+ */
+export function applyNpcAction(npc, action, world) {
+    if (npc.timedAction.isBusy()) {
+        npc.timedAction.cancel();
+    }
+    npc.currentAction = action;
+    const ok = action.apply(world);
+    if (!ok || actionDuration(action) === 0) {
+        npc.currentAction = null;
+    }
+    return ok;
+}
+
+/**
+ * Per-frame NPC tick: brain/pending action first (with interrupt), then body sim.
+ * @param {NpcEntity} entity
+ * @param {World3D} world
+ * @param {number} dt
+ * @param {number} gameTime
+ * @returns {EntityAction | null} action applied this frame, if any
+ */
+export function tickNpc(entity, world, dt, gameTime) {
+    if (entity._dead) return null;
+
+    tickVitality(entity, dt);
+    if (entity.health <= 0) {
+        markNpcDead(entity);
+        return null;
+    }
+
+    const brainAction = entity.brain?.tick(world, dt, gameTime) ?? null;
+    /** @type {EntityAction | null} */
+    let applied = null;
+    if (brainAction) {
+        applyNpcAction(entity, brainAction, world);
+        applied = brainAction;
+    }
+    let pending;
+    while ((pending = takePendingNpcAction(entity))) {
+        applyNpcAction(entity, pending, world);
+        applied = pending;
+    }
+
+    if (entity.timedAction.isBusy()) {
+        entity.timedAction.tick(dt, world);
+    } else {
+        tickNpcLocomotion(entity, dt);
+    }
+
+    return applied;
+}
+
+/**
+ * Vitality, timed actions, path following — no brain. Prefer tickNpc in the sim loop.
  * @param {NpcEntity} entity
  * @param {World3D} world
  * @param {number} dt
