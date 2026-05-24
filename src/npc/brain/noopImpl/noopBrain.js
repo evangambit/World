@@ -2,16 +2,35 @@
  * No-op brain — body-only simulation, no cognition.
  */
 
-/** No cognition — body-only simulation. */
-export class NoopNpcBrain {
-    attach(_npc) {}
+/** @typedef {import('../interface.js').NpcEntity} NpcEntity */
+/** @typedef {import('../interface.js').World3D} World3D */
+/** @typedef {import('../interface.js').NpcBrain} NpcBrain */
 
+/** @implements {NpcBrain} */
+export class NoopNpcBrain {
+    constructor() {
+        /** @type {NpcEntity | null} */
+        this.npc = null;
+    }
+
+    /** @param {NpcEntity} npc */
+    attach(npc) {
+        this.npc = npc;
+    }
+
+    /**
+     * @param {World3D} _world
+     * @param {number} _dt
+     * @param {number} _gameTime
+     */
     tick(_world, _dt, _gameTime) {}
 
-    destroy() {}
+    destroy() {
+        this.npc = null;
+    }
 }
 
-/** @returns {NoopNpcBrain} */
+/** @returns {NpcBrain} */
 export function noopNpcBrain() {
     return new NoopNpcBrain();
 }
