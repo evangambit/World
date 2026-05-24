@@ -6,8 +6,23 @@
  * interface: hypothetical(), utility(), movement helpers, and inventory deltas.
  */
 import { findPath } from '../../world/pathfinding.js';
+import {
+    T,
+    Obj,
+    WHEAT_CROP_STAGES,
+    isStoveObject,
+    isWheatCropObject,
+} from '../../world/tileTypes.js';
 import { World3D } from '../../world/world.js';
-import { Obj } from '../../world/tileTypes.js';
+import {
+    canPlantWheatAt,
+    harvestWheatAtTile,
+    isWheatMature,
+    plantWheatSeedAtTile,
+    wheatStageForTile,
+} from '../../domain/crops.js';
+import { cookAtStove } from '../../domain/entityActions.js';
+import { consumeFoodFromInventory, getFoodNutrition } from '../../domain/vitality.js';
 import { findApproachTile } from '../npcTaskPrimitives.js';
 import { MemoryWorldView } from '../npcMemoryWorld.js';
 import { NPC_PERCEPTION_RADIUS } from '../npcConstants.js';
@@ -16,7 +31,7 @@ import {
     MoveResult,
     SeekResult,
     doTimedAction,
-    inventoryCount,
+    inventoryCount as npcInventoryCount,
     moveTowardLocation,
     seekKnownDesires,
     wanderOnce,
@@ -32,6 +47,9 @@ export const HUNGER_C = 0.05;
 export const BREAD_SATIETY_K = 30;
 export const TICK_COST = 0.01;
 export const TICKS_PER_TILE = 4;
+const CLEAR_GRASS_TICKS = 100;
+
+/** @typedef {'bread' | 'steak'} CookMode */
 
 /**
  * @param {Iterable<string>} keys
@@ -218,7 +236,7 @@ export class RealCarolContext {
             tileMemory: this.tileMemory,
             z: this.z,
             hunger: this.hunger,
-            breadCount: inventoryCount(this.npc, Obj.BREAD),
+            breadCount: npcInventoryCount(this.npc, Obj.BREAD),
             elapsedTicks: 0,
         });
     }
@@ -237,6 +255,82 @@ export class RealCarolContext {
     isActive() {
         return this._brain._taskEpoch === this._taskEpoch;
     }
+
+    /** @returns {boolean} */
+    isAlive() {
+        return !this.npc._dead;
+    }
+
+    /**
+     * @param {number} objType
+     * @returns {number}
+     */
+    inventoryCount(objType) {
+        return npcInventoryCount(this.npc, objType);
+    }
+
+    /** @param {number} objType */
+    eatFood(objType) {
+        consumeFoodFromInventory(this.npc, objType);
+    }
+
+    /**
+     * @param {CookMode} mode
+     * @returns {boolean}
+     */
+    cookAtAdjacentStove(mode) {
+        const { npc, world } = this;
+        const px = Math.floor(npc.x);
+        const py = Math.floor(npc.y);
+        const z = npc.z;
+
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                if (dx === 0 && dy === 0) continue;
+                const tile = world.getTile(px + dx, py + dy, z);
+                if (!tile || !isStoveObject(tile.obj)) continue;
+                const result = cookAtStove(npc, world, px + dx, py + dy);
+                if (result === mode) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param {number} px
+     * @param {number} py
+     */
+    async interactAt(px, py) {
+        const { npc, world, gameTime } = this;
+        const tz = npc.z;
+
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const tx = px + dx;
+                const ty = py + dy;
+                const tile = world.getTile(tx, ty, tz);
+                if (!tile) continue;
+
+                if (isWheatCropObject(tile.obj) && isWheatMature(tile, gameTime)) {
+                    harvestWheatAtTile(npc, world, tx, ty, gameTime, tz);
+                    return;
+                }
+
+                if (tile.terrain === T.TALL_GRASS && !tile.obj) {
+                    await this.doAction('clear_grass', tx, ty);
+                    return;
+                }
+
+                if (canPlantWheatAt(world, tx, ty, tz) && this.inventoryCount(Obj.WHEAT_SEED) > 0) {
+                    plantWheatSeedAtTile(npc, world, tx, ty, gameTime, tz);
+                    return;
+                }
+            }
+        }
+    }
+
+    /** @param {number} _tx @param {number} _ty */
+    addDiscoveredTile(_tx, _ty) {}
 
     /** @returns {import('../thomasTasks.js').TaskContext} */
     _taskContext() {
@@ -278,36 +372,6 @@ export class RealCarolContext {
      */
     async moveToward(tx, ty, maxTicks) {
         return moveTowardLocation(this._taskContext(), tx, ty, maxTicks);
-    }
-
-    /**
-     * @param {number} tx
-     * @param {number} ty
-     * @param {number} endTick
-     * @returns {string}
-     */
-    simDirectStep(tx, ty, endTick) {
-        throw new Error('simDirectStep is only available on hypothetical contexts');
-    }
-
-    /**
-     * @param {number} tx
-     * @param {number} ty
-     * @param {number} endTick
-     * @returns {string}
-     */
-    simMove(tx, ty, endTick) {
-        throw new Error('simMove is only available on hypothetical contexts');
-    }
-
-    /**
-     * @param {number} tx
-     * @param {number} ty
-     * @param {number} endTick
-     * @returns {string}
-     */
-    addDiscoveredTile(tx, ty, endTick) {
-        throw new Error('addDiscoveredTile is only available on hypothetical contexts');
     }
 }
 
@@ -418,12 +482,77 @@ export class HypotheticalCarolContext {
         return true;
     }
 
+    /** @returns {boolean} */
+    isAlive() {
+        return true;
+    }
+
     /**
      * @param {number} objType
      * @returns {number}
      */
     inventoryCount(objType) {
         return this._inventory.get(objType) ?? 0;
+    }
+
+    /** @param {number} objType */
+    eatFood(objType) {
+        this.adjustInventory(objType, -1);
+        this.adjustHunger(-getFoodNutrition(objType));
+    }
+
+    /**
+     * @param {CookMode} mode
+     * @returns {boolean}
+     */
+    cookAtAdjacentStove(mode) {
+        if (mode === 'steak') {
+            if (this.inventoryCount(Obj.UNCOOKED_STEAK) <= 0) return false;
+            this.adjustInventory(Obj.UNCOOKED_STEAK, -1);
+            this.adjustInventory(Obj.STEAK, +1);
+            return true;
+        }
+        if (this.inventoryCount(Obj.WHEAT) <= 0) return false;
+        this.adjustInventory(Obj.WHEAT, -1);
+        this.adjustInventory(Obj.BREAD, +1);
+        return true;
+    }
+
+    /**
+     * @param {number} px
+     * @param {number} py
+     */
+    async interactAt(px, py) {
+        const pz = this._z;
+
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const key = `${px + dx},${py + dy},${pz}`;
+                const entry = this.tileMemory.get(key);
+                if (!entry) continue;
+                const s = entry.state;
+
+                if (
+                    isWheatCropObject(s.obj) &&
+                    wheatStageForTile(s, this.gameTime) >= WHEAT_CROP_STAGES - 1
+                ) {
+                    this.adjustInventory(Obj.WHEAT, +1);
+                    this.adjustInventory(Obj.WHEAT_SEED, +2);
+                    return;
+                }
+
+                if (s.terrain === T.TALL_GRASS && !s.obj) {
+                    await this.doAction('clear_grass', px + dx, py + dy, CLEAR_GRASS_TICKS);
+                    this.adjustInventory(Obj.WHEAT_SEED, +1);
+                    return;
+                }
+
+                if (!s.obj && s.terrain === T.DIRT && this.inventoryCount(Obj.WHEAT_SEED) > 0) {
+                    this.adjustInventory(Obj.WHEAT_SEED, -1);
+                    return;
+                }
+            }
+        }
     }
 
     /**
@@ -463,8 +592,9 @@ export class HypotheticalCarolContext {
      * @param {number} ty
      * @param {number} endTick
      * @returns {string}
+     * @private
      */
-    simDirectStep(tx, ty, endTick) {
+    _simDirectStep(tx, ty, endTick) {
         const ticks = TICKS_PER_TILE;
         if (this._currentTick + ticks > endTick) return MoveResult.MAX_TICKS;
 
@@ -481,8 +611,9 @@ export class HypotheticalCarolContext {
      * @param {number} ty
      * @param {number} endTick
      * @returns {string}
+     * @private
      */
-    simMove(tx, ty, endTick) {
+    _simMove(tx, ty, endTick) {
         if (this._x === tx && this._y === ty) return MoveResult.ARRIVED;
 
         const memWorld = new MemoryWorldView(this.tileMemory);
@@ -507,14 +638,12 @@ export class HypotheticalCarolContext {
     /**
      * @param {number} tx
      * @param {number} ty
-     * @param {number} endTick
      */
-    addDiscoveredTile(tx, ty, endTick) {
+    addDiscoveredTile(tx, ty) {
         const key = World3D.key(tx, ty, this._z);
         if (!this.tileMemory.has(key)) {
             this._extraTileKeys.add(key);
         }
-        void endTick;
     }
 
     /**
@@ -540,7 +669,7 @@ export class HypotheticalCarolContext {
             );
             if (!dest) continue;
 
-            const result = this.simMove(dest.x, dest.y, endTick);
+            const result = this._simMove(dest.x, dest.y, endTick);
             if (result === MoveResult.ARRIVED) return SeekResult.ARRIVED;
             if (result === MoveResult.IMPOSSIBLE) continue;
             return SeekResult.MAX_TICKS;
@@ -567,7 +696,7 @@ export class HypotheticalCarolContext {
         });
 
         if (candidates.length === 0) return MoveResult.IMPOSSIBLE;
-        return this.simMove(candidates[0][0], candidates[0][1], endTick);
+        return this._simMove(candidates[0][0], candidates[0][1], endTick);
     }
 
     /**
@@ -590,6 +719,6 @@ export class HypotheticalCarolContext {
      * @returns {Promise<string>}
      */
     async moveToward(tx, ty, maxTicks) {
-        return this.simMove(tx, ty, this._currentTick + maxTicks);
+        return this._simMove(tx, ty, this._currentTick + maxTicks);
     }
 }
