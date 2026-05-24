@@ -11,5 +11,6 @@ export {
     createDefaultTaskBrain,
 } from './taskImpl/taskBrain.js';
 export { ThomasBrain } from './thomasImpl/thomasBrain.js';
+export { XBrain } from './expectimax/xbrain.js';
 
 export {};

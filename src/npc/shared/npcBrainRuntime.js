@@ -10,13 +10,14 @@ import {
     ThomasBrain,
     WanderBrain,
     NoopNpcBrain,
+    XBrain,
 } from '../brain/index.js';
 
 /** @typedef {import('../brain/interface.js').NpcBrain} NpcBrain */
 /** @typedef {import('./llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
-/** @typedef {'task' | 'wander' | 'noop' | 'thomas'} BrainType */
+/** @typedef {'task' | 'wander' | 'noop' | 'thomas' | 'expectimax'} BrainType */
 
-const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['task', 'wander', 'noop', 'thomas']);
+const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['task', 'wander', 'noop', 'thomas', 'expectimax']);
 
 /**
  * @returns {BrainType}
@@ -45,5 +46,6 @@ export function createBrainForType(brainType, opts = {}) {
     if (brainType === 'wander') return new WanderBrain();
     if (brainType === 'noop') return new NoopNpcBrain();
     if (brainType === 'thomas') return new ThomasBrain();
+    if (brainType === 'expectimax') return new XBrain();
     return createDefaultTaskBrain(opts);
 }
