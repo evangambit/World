@@ -142,8 +142,5 @@ export function tickNpcSimulation(entity, world, dt) {
         entity.timedAction.tick(dt, world);
     } else {
         tickNpcLocomotion(entity, dt);
-        if (!(entity.brain instanceof ThomasBrain)) {
-            tryEatFromInventoryIfHungry(entity, 55);
-        }
     }
 }

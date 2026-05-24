@@ -68,14 +68,4 @@ export class NPC extends Entity {
     pickUpAt(tileX, tileY, tileZ, world) {
         return pickUpAction(this, tileX, tileY, tileZ).apply(world);
     }
-
-    /**
-     * @param {import('../world/world.js').World3D} world
-     * @param {number} dt
-     * @param {number} [gameTime]
-     */
-    update(world, dt, gameTime = 0) {
-        tickNpcSimulation(/** @type {NpcEntity} */ (this), world, dt);
-        this.brain?.tick(world, dt, gameTime);
-    }
 }
