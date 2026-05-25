@@ -6,17 +6,20 @@ import { tickVitality, tryEatFromInventoryIfHungry } from '../domain/vitality.js
 import {
     clearNpcLocomotion,
     initNpcLocomotion,
-    setNpcGoal,
     tickNpcLocomotion,
     isAtMoveGoal,
 } from './npcLocomotion.js';
-import { actionDuration, isEntityActionComplete, pickUpAction } from '../domain/entityActions.js';
+import {
+    actionDuration,
+    isAdjacentToTile,
+    isEntityActionComplete,
+    pickUpAction,
+} from '../domain/entityActions.js';
 import { moveToAction } from './npcActions.js';
 import { Entity } from './entity.js';
+import { attachNpcBrain } from '../npc/brain/attach.js';
 
 /** @typedef {import('../domain/entityActions.js').EntityAction} EntityAction */
-import { attachNpcBrain } from '../npc/brain/attach.js';
-import { ThomasBrain } from '../npc/brain/thomasImpl/thomasBrain.js';
 
 /** NPC appearance presets (skin, hair, shirt, pants). */
 export const NPC_PRESETS = [
@@ -45,9 +48,6 @@ export const NPC_PRESETS = [
  *   wanderRadius: number,
  *   isAlive: boolean,
  *   brain?: NpcBrain,
- *   setGoal: (gx: number, gy: number, gz: number, world: World3D) => boolean,
- *   travelToTile: (tx: number, ty: number, tz: number, world: World3D) => Promise<void>,
- *   pickUpAt: (tileX: number, tileY: number, tileZ: number, world: World3D) => boolean,
  *   tick: (world: World3D, dt: number, gameTime: number) => EntityAction | null,
  *   scheduleAction: (action: EntityAction) => void,
  *   _pendingAction: EntityAction | null,
@@ -100,9 +100,6 @@ export function initNpcEntity(entity, opts = {}) {
     initNpcLocomotion(/** @type {Entity & NpcLocomotionState} */ (entity));
 
     const loco = /** @type {NpcEntity} */ (entity);
-    loco.setGoal = (gx, gy, gz, world) => setNpcGoal(loco, gx, gy, gz, world);
-    loco.travelToTile = (tx, ty, tz, world, opts) => travelNpcToTile(loco, tx, ty, tz, world, opts);
-    loco.pickUpAt = (tileX, tileY, tileZ, world) => pickUpAction(loco, tileX, tileY, tileZ).apply(world);
     loco._pendingAction = null;
     loco.scheduleAction = (action) => scheduleNpcAction(loco, action);
     loco.tick = (world, dt, gameTime) => tickNpc(loco, world, dt, gameTime);
@@ -224,6 +221,24 @@ export function travelNpcToTile(npc, tx, ty, tz, world, opts = {}) {
         npc._trip = { x: tx, y: ty, z: tz, onto, resolve, reject };
         scheduleNpcAction(npc, moveToAction(npc, tx, ty, tz, { onto }));
     });
+}
+
+/**
+ * Travel adjacent if needed, then apply pickup.
+ * @param {NpcEntity} npc
+ * @param {World3D} world
+ * @param {number} tileX
+ * @param {number} tileY
+ * @param {number} [tileZ]
+ * @returns {Promise<void>}
+ */
+export async function runPickUpAtTile(npc, world, tileX, tileY, tileZ = npc.z) {
+    if (!isAdjacentToTile(npc, tileX, tileY) || npc.z !== tileZ) {
+        await travelNpcToTile(npc, tileX, tileY, tileZ, world, { onto: false });
+    }
+    if (!applyNpcAction(npc, pickUpAction(npc, tileX, tileY, tileZ), world)) {
+        throw new Error(`Pick up failed at (${tileX}, ${tileY}, ${tileZ})`);
+    }
 }
 
 /**

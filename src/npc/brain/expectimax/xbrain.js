@@ -36,22 +36,7 @@ export class XBrain {
         const npc = this.npc;
         if (!npc || npc._dead) return null;
 
-        this._world = world;
-        this._gameTime = gameTime;
-        this._tickCount++;
-
-        tickThomasPerception(npc, world, gameTime);
-
-        if (this._tickResolve) {
-            const resolve = this._tickResolve;
-            this._tickResolve = null;
-            resolve();
-        }
-
-        if (!this._taskRunning && this._behavior) {
-            this._startBehavior();
-        }
-        return null;
+        return moveToAction(npc, 0, 0, 0);
     }
 
     /**

@@ -10,7 +10,8 @@ import { isTileMemoryReachable } from '../../shared/npcMemory.js';
 import { pathStepsFromNpc } from './npcMemoryTravel.js';
 import { getObjectTagSpec } from '../../shared/npcObjectTags.js';
 import { rememberLocationsOfNearby } from './npcPlanRefs.js';
-import { findApproachTile, runFind } from './npcTaskPrimitives.js';
+import { runPickUpAtTile, travelNpcToTile } from '../../../actors/npcSimulation.js';
+import { runFind } from './npcTaskPrimitives.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -92,11 +93,12 @@ async function tryPickupRememberedTarget(npc, world, objectTag, objType, buildin
         if (!tile || tile.obj !== objType || !isPickableObject(tile.obj)) continue;
         if (buildingId != null && tile.keyBuildingId !== buildingId) continue;
 
-        const approach = findApproachTile(world, npc, target);
-        if (!approach) continue;
-
-        await npc.travelToTile(approach.x, approach.y, approach.z, world);
-        if (npc.pickUpAt(target.x, target.y, target.z, world)) return true;
+        try {
+            await runPickUpAtTile(npc, world, target.x, target.y, target.z);
+            return true;
+        } catch {
+            continue;
+        }
     }
     return false;
 }
@@ -155,7 +157,7 @@ export async function runExplore(npc, world, opts) {
         if (sx === next.x && sy === next.y && npc.z === next.z) continue;
 
         if (!findPath(world, sx, sy, npc.z, next.x, next.y, next.z)) continue;
-        await npc.travelToTile(next.x, next.y, next.z, world);
+        await travelNpcToTile(npc, next.x, next.y, next.z, world);
     }
 
     throw new Error(`Explore: no ${opts.objectTag} within radius ${opts.radius}`);

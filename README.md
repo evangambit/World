@@ -117,12 +117,12 @@ Do **not** put world-changing logic in `main.js` or `npcPlanRunner.js` except to
 2. Add pure logic in a domain module if it is inventory-only and actor-agnostic.
 3. If the action takes time, add an entry to `domain/timedActions.js`; otherwise add **`entityActions.yourAction(entity, world, …)`** with all placement, adjacency, and permission checks.
 4. **Player:** hook input in `main.js` → call the action → refresh UI.
-5. **NPC:** add a plan leaf type (and/or `runYourAction` in `npcTaskPrimitives.js`) that calls the **same** function after `travelToTile` if needed.
+5. **NPC:** add a plan leaf type (and/or `runYourAction` in `npcTaskPrimitives.js`) that calls the **same** function after `travelNpcToTile` if needed.
 6. If NPCs need to refer to a place or thing abstractly, add an object tag and/or a memory ref query; do not reimplement the effect in the plan runner.
 
 ### Movement is separate (on purpose)
 
-Movement uses two paths today: player `tryMove` (continuous input) vs NPC pathfinding (`travelToTile`). That is fine—control differs, but **interactions** must not fork. After both stand next to a stove, they both call `cookAtStove`.
+Movement uses two paths today: player `tryMove` (continuous input) vs NPC `moveToAction` / `travelNpcToTile`. That is fine—control differs, but **interactions** must not fork. After both stand next to a stove, they both call `cookAtStove`.
 
 ### Plans vs tasks
 

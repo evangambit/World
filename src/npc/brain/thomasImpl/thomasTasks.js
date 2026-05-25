@@ -7,7 +7,9 @@
  * Low-level primitives (moveTowardLocation) think in ticks.
  * Higher-level combinators (seekKnownDesires) compose primitives and hide ticks.
  */
-import { startTimedWorldAction } from '../../../domain/entityActions.js';
+import { isEntityActionComplete, startTimedWorldAction } from '../../../domain/entityActions.js';
+import { moveToAction } from '../../../actors/npcActions.js';
+import { scheduleNpcAction } from '../../../actors/npcSimulation.js';
 import { forEachNpcObservedTile, markTileUnreachable } from '../../shared/npcMemory.js';
 import { findApproachTile } from '../taskImpl/npcTaskPrimitives.js';
 
@@ -66,7 +68,7 @@ export class TaskContext {
 /**
  * Walk toward a tile on the NPC's current floor.
  *
- * Uses `setGoal` (live-world pathfinding) and then polls locomotion each tick.
+ * Schedules `moveToAction` and polls until arrival or failure.
  *
  * @param {TaskContext} ctx
  * @param {number} x   Target tile X
@@ -82,7 +84,9 @@ export async function moveTowardLocation(ctx, x, y, maxTicks) {
         return MoveResult.ARRIVED;
     }
 
-    if (!npc.setGoal(x, y, npc.z, ctx.world)) {
+    scheduleNpcAction(npc, moveToAction(npc, x, y, npc.z, { onto: true }));
+    await ctx.nextTick();
+    if (!npc.currentAction && npc._state === 'idle') {
         return MoveResult.IMPOSSIBLE;
     }
 
@@ -91,7 +95,10 @@ export async function moveTowardLocation(ctx, x, y, maxTicks) {
 
         if (npc._dead || npc.health < startHealth) return MoveResult.TOOK_DAMAGE;
         if (Math.floor(npc.x) === x && Math.floor(npc.y) === y) return MoveResult.ARRIVED;
-        if (npc._state === 'idle') return MoveResult.IMPOSSIBLE;
+        if (!npc.currentAction && npc._state === 'idle') return MoveResult.IMPOSSIBLE;
+        if (npc.currentAction && isEntityActionComplete(npc.currentAction, npc)) {
+            return MoveResult.ARRIVED;
+        }
     }
 
     return MoveResult.MAX_TICKS;

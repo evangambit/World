@@ -10,7 +10,12 @@ import {
     toggleDoorLock,
 } from '../../../domain/entityActions.js';
 import { findApproachTile } from '../../../actors/npcLocomotion.js';
-import { scheduleNpcAction } from '../../../actors/npcSimulation.js';
+import {
+    applyNpcAction,
+    scheduleNpcAction,
+    travelNpcToTile,
+} from '../../../actors/npcSimulation.js';
+import { pickUpAction } from '../../../domain/entityActions.js';
 import { findPath } from '../../../world/pathfinding.js';
 import { isPickableObject, Obj, OBJ_NAMES } from '../../../world/tileTypes.js';
 import { travelNpcToMemoryRef } from './npcMemoryTravel.js';
@@ -25,7 +30,7 @@ import { travelNpcToMemoryRef } from './npcMemoryTravel.js';
  * @param {number} gz
  */
 export async function runGoTo(npc, world, gx, gy, gz) {
-    await npc.travelToTile(gx, gy, gz, world);
+    await travelNpcToTile(npc, gx, gy, gz, world);
 }
 
 /**
@@ -62,8 +67,8 @@ export async function runFind(npc, world, objType, radius, buildingId) {
             continue;
         }
         try {
-            await npc.travelToTile(approach.x, approach.y, approach.z, world);
-            if (!npc.pickUpAt(target.x, target.y, target.z, world)) {
+            await travelNpcToTile(npc, approach.x, approach.y, approach.z, world);
+            if (!applyNpcAction(npc, pickUpAction(npc, target.x, target.y, target.z), world)) {
                 throw new Error(`Find: pickup failed at (${target.x}, ${target.y})`);
             }
             return;
@@ -168,7 +173,7 @@ export async function runTimedAction(npc, world, actionId, tx, ty, tz) {
     if (!npc.isAdjacentToTile(tx, ty) || npc.z !== tz) {
         const approach = findApproachTile(world, npc, { x: tx, y: ty, z: tz });
         if (!approach) throw new Error(`action: no approach tile for (${tx}, ${ty})`);
-        await npc.travelToTile(approach.x, approach.y, approach.z, world);
+        await travelNpcToTile(npc, approach.x, approach.y, approach.z, world);
     }
 
     scheduleNpcAction(

@@ -3,7 +3,6 @@
  * For tests without AI, use createNpcEntity / tickNpcSimulation from npcSimulation.js.
  */
 import { Entity } from './entity.js';
-import { pickUpAction } from '../domain/entityActions.js';
 import { attachNpcBrain, createDefaultTaskBrain } from '../npc/brain/index.js';
 import {
     initNpcEntity,
@@ -31,6 +30,7 @@ export {
     scheduleNpcAction,
     applyNpcAction,
     travelNpcToTile,
+    runPickUpAtTile,
     NPC_PRESETS,
 } from './npcSimulation.js';
 export { moveToAction } from './npcActions.js';
@@ -76,9 +76,5 @@ export class NPC extends Entity {
 
     get isAlive() {
         return !this._dead;
-    }
-
-    pickUpAt(tileX, tileY, tileZ, world) {
-        return pickUpAction(this, tileX, tileY, tileZ).apply(world);
     }
 }

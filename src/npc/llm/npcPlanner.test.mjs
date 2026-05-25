@@ -32,7 +32,6 @@ describe('NPCTaskRunner with mock planner', () => {
             isAlive: true,
             _dead: false,
             wanderRadius: 1,
-            async travelToTile() {},
         };
         let plannerCalls = 0;
         const runner = new NPCTaskRunner(npc, {
