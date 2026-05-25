@@ -9,6 +9,7 @@
  */
 import { isEntityActionComplete, startTimedWorldAction } from '../../../domain/entityActions.js';
 import { moveToAction } from '../../../actors/npcActions.js';
+import { isHostMoving } from '../../locomotion/brainLocomotionMixin.js';
 import { scheduleNpcAction } from '../../../actors/npcSimulation.js';
 import { forEachNpcObservedTile, markTileUnreachable } from '../../shared/npcMemory.js';
 import { findApproachTile } from '../taskImpl/npcTaskPrimitives.js';
@@ -86,7 +87,7 @@ export async function moveTowardLocation(ctx, x, y, maxTicks) {
 
     scheduleNpcAction(npc, moveToAction(npc, x, y, npc.z, { onto: true }));
     await ctx.nextTick();
-    if (!npc.currentAction && npc._state === 'idle') {
+    if (!npc.currentAction && !isHostMoving(ctx._brain, npc)) {
         return MoveResult.IMPOSSIBLE;
     }
 
@@ -95,7 +96,7 @@ export async function moveTowardLocation(ctx, x, y, maxTicks) {
 
         if (npc._dead || npc.health < startHealth) return MoveResult.TOOK_DAMAGE;
         if (Math.floor(npc.x) === x && Math.floor(npc.y) === y) return MoveResult.ARRIVED;
-        if (!npc.currentAction && npc._state === 'idle') return MoveResult.IMPOSSIBLE;
+        if (!npc.currentAction && !isHostMoving(ctx._brain, npc)) return MoveResult.IMPOSSIBLE;
         if (npc.currentAction && isEntityActionComplete(npc.currentAction, npc)) {
             return MoveResult.ARRIVED;
         }

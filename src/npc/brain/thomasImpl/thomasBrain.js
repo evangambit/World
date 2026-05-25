@@ -4,6 +4,13 @@
 import { tickThomasPerception } from './thomasPerception.js';
 import { TaskContext } from './thomasTasks.js';
 import { farmBehavior } from './thomasBehaviors.js';
+import {
+    applyHostAction,
+    advanceHostLocomotion,
+    destroyBrainLocomotionHost,
+    hostTravelToTile,
+    initBrainLocomotionHost,
+} from '../../locomotion/brainLocomotionMixin.js';
 import { initTileStore } from '../tileStore.js';
 
 /** @typedef {import('../interface.js').NpcEntity} NpcEntity */
@@ -40,6 +47,7 @@ export class ThomasBrain {
         this._taskRunning = false;
         /** @type {string} */
         this._statusLine = 'Idle';
+        initBrainLocomotionHost(this);
     }
 
     /** @returns {{ lines: string[] }} */
@@ -50,6 +58,21 @@ export class ThomasBrain {
     /** @param {NpcEntity} npc */
     attach(npc) {
         this.npc = npc;
+    }
+
+    /** @param {NpcEntity} npc @param {import('../../../domain/entityActions.js').EntityAction} action @param {World3D} world */
+    applyAction(npc, action, world) {
+        return applyHostAction(this, npc, action, world);
+    }
+
+    /** @param {NpcEntity} npc @param {number} dt */
+    advanceLocomotion(npc, dt) {
+        advanceHostLocomotion(this, npc, dt);
+    }
+
+    /** @param {NpcEntity} npc @param {number} tx @param {number} ty @param {number} tz @param {World3D} world @param {{ onto?: boolean }} [opts] */
+    travelToTile(npc, tx, ty, tz, world, opts) {
+        return hostTravelToTile(this, npc, tx, ty, tz, world, opts);
     }
 
     /**
@@ -114,6 +137,7 @@ export class ThomasBrain {
     destroy() {
         this._tickResolve = null;
         this._taskRunning = false;
+        destroyBrainLocomotionHost(this);
         this.npc = null;
         this._tileStore.clear();
     }

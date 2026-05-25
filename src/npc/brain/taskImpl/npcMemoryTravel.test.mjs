@@ -83,14 +83,14 @@ describe('travelNpcToMemoryRef', () => {
             'rememberLocationsOfNearby(stove)',
             world,
         );
-        assert.equal(npc._memoryRefTravel?.goalKey, '14,10,0');
+        assert.equal(npc.brain._memoryRefTravel?.goalKey, '14,10,0');
 
         npc.brain.observeTile(12, 10, 0, {
             seenAt: 2,
             state: snapshotTileState({ terrain: T.GRASS, obj: Obj.STOVE }),
         });
         syncMemoryRefTravelGoal(npc, world);
-        assert.equal(npc._memoryRefTravel?.goalKey, '12,10,0');
+        assert.equal(npc.brain._memoryRefTravel?.goalKey, '12,10,0');
 
         await driveLocomotionUntil(npc, travelPromise, {
             world,

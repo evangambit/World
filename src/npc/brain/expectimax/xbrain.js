@@ -1,18 +1,29 @@
 /**
- * Thomas brain — wall-respecting perception + async behavior coroutines.
+ * Expectimax / experimental brain stub.
  */
+import { moveToAction } from '../../../actors/npcActions.js';
+import {
+    applyHostAction,
+    advanceHostLocomotion,
+    destroyBrainLocomotionHost,
+    initBrainLocomotionHost,
+    isHostMoving,
+} from '../../locomotion/brainLocomotionMixin.js';
 import { initTileStore } from '../tileStore.js';
 
 /** @typedef {import('../interface.js').NpcEntity} NpcEntity */
 /** @typedef {import('../interface.js').World3D} World3D */
+/** @typedef {import('../../../domain/entityActions.js').EntityAction} EntityAction */
 
+/** @implements {import('../interface.js').NpcBrain} */
 export class XBrain {
-    /**
-     */
     constructor() {
         /** @type {NpcEntity | null} */
         this.npc = null;
+        /** @type {string} */
+        this._statusLine = 'Idle';
         initTileStore(this);
+        initBrainLocomotionHost(this);
     }
 
     /** @returns {{ lines: string[] }} */
@@ -25,52 +36,32 @@ export class XBrain {
         this.npc = npc;
     }
 
+    /** @param {NpcEntity} npc @param {EntityAction} action @param {World3D} world */
+    applyAction(npc, action, world) {
+        return applyHostAction(this, npc, action, world);
+    }
+
+    /** @param {NpcEntity} npc @param {number} dt */
+    advanceLocomotion(npc, dt) {
+        advanceHostLocomotion(this, npc, dt);
+    }
+
     /**
-     * Called every simulation frame by the engine.
-     * Runs perception, then advances the async behavior by one tick.
      * @param {World3D} world
      * @param {number} _dt
-     * @param {number} gameTime
+     * @param {number} _gameTime
+     * @returns {EntityAction | null}
      */
-    tick(world, _dt, gameTime) {
+    tick(world, _dt, _gameTime) {
         const npc = this.npc;
         if (!npc || npc._dead) return null;
+        if (isHostMoving(this, npc)) return null;
 
         return moveToAction(npc, 0, 0, 0);
     }
 
-    /**
-     * Returns a promise that resolves on the next `tick()` call.
-     * Used by TaskContext — not called directly by behavior code.
-     * @returns {Promise<void>}
-     */
-    _nextTick() {
-        return new Promise(resolve => {
-            this._tickResolve = resolve;
-        });
-    }
-
-    /** @private */
-    _startBehavior() {
-        this._taskRunning = true;
-        const ctx = new TaskContext(this);
-        Promise.resolve(this._behavior(ctx))
-            .catch(err => {
-                if (err?.message !== 'dead') {
-                    console.log(
-                        `[ThomasBrain ${this.npc?.name ?? '?'}] behavior error:`,
-                        err?.message ?? err,
-                    );
-                }
-            })
-            .finally(() => {
-                this._taskRunning = false;
-            });
-    }
-
     destroy() {
-        this._tickResolve = null;
-        this._taskRunning = false;
+        destroyBrainLocomotionHost(this);
         this.npc = null;
         this._tileStore.clear();
     }

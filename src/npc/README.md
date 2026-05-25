@@ -87,7 +87,7 @@ Optional flag on each memory entry:
 **Set `false` when:**
 
 - `findPath` finds no route while selecting a memory-ref target  
-- `setNpcGoal` fails for that tile  
+- `moveToAction` / pathfinding fails for that tile  
 
 **Set `true` when:**
 

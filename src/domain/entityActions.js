@@ -53,7 +53,9 @@ import {
  * @property {() => ActionPrereq} prereq
  * @property {(world: World3D) => boolean} apply
  * @property {number} [duration=0] - seconds; 0 = instant apply, >0 starts TimedActionRunner until complete
- * @property {(entity: Entity) => boolean} [isComplete] - when set, currentAction held until this is true (locomotion)
+ * @property {(entity: Entity) => boolean} [isComplete] - when set, currentAction held until this is true
+ * @property {'move'} [type] - immutable move intent; path state lives on the brain
+ * @property {import('../npc/locomotion/pathUtils.js').MoveGoal} [goal]
  */
 
 /**

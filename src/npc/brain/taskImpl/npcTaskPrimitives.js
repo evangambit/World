@@ -9,7 +9,6 @@ import {
     takeFromContainerAction,
     toggleDoorLock,
 } from '../../../domain/entityActions.js';
-import { findApproachTile } from '../../../actors/npcLocomotion.js';
 import {
     applyNpcAction,
     scheduleNpcAction,
@@ -189,4 +188,4 @@ export async function runTimedAction(npc, world, actionId, tx, ty, tz) {
     }
 }
 
-export { findApproachTile } from '../../../actors/npcLocomotion.js';
+export { findApproachTile } from '../../locomotion/pathUtils.js';

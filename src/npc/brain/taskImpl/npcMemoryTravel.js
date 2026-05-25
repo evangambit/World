@@ -1,21 +1,25 @@
 /**
- * Travel toward rememberLocationsOfNearby refs — picks the best reachable
- * target and retargets when memory or path cost improves mid-trip.
+ * Travel toward rememberLocationsOfNearby refs — state on NpcTaskBrain only.
  */
+import { moveToAction } from '../../../actors/npcActions.js';
+import { applyHostAction, hostIsLocomotionActive, hostRemainingPathSteps } from '../../locomotion/brainLocomotionMixin.js';
+import {
+    findApproachTile,
+    pathStepsFromNpc as countPathStepsFromNpc,
+} from '../../locomotion/pathUtils.js';
 import { findPath } from '../../../world/pathfinding.js';
 import { World3D } from '../../../world/world.js';
-import { setNpcGoal } from '../../../actors/npcLocomotion.js';
 import {
     isTileMemoryReachable,
     markTileReachable,
     markTileUnreachable,
 } from '../../shared/npcMemory.js';
 import { resolvePlanRefs } from './npcPlanRefs.js';
-import { findApproachTile } from './npcTaskPrimitives.js';
 
 /** @typedef {{ x: number, y: number, z: number }} TileRef */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../world/world.js').World3D} World3D */
+/** @typedef {import('./taskBrain.js').NpcTaskBrain} NpcTaskBrain */
 
 /**
  * @typedef {Object} MemoryRefTravelState
@@ -29,6 +33,18 @@ import { findApproachTile } from './npcTaskPrimitives.js';
 
 /**
  * @param {NpcEntity} npc
+ * @returns {NpcTaskBrain}
+ */
+function requireTaskBrain(npc) {
+    const brain = /** @type {NpcTaskBrain | undefined} */ (npc.brain);
+    if (!brain?.tasks) {
+        throw new Error('memory travel requires NpcTaskBrain');
+    }
+    return brain;
+}
+
+/**
+ * @param {NpcEntity} npc
  * @param {World3D} world
  * @param {number} tx
  * @param {number} ty
@@ -36,11 +52,7 @@ import { findApproachTile } from './npcTaskPrimitives.js';
  * @returns {number}
  */
 export function pathStepsFromNpc(npc, world, tx, ty, tz) {
-    const sx = Math.floor(npc.x);
-    const sy = Math.floor(npc.y);
-    const path = findPath(world, sx, sy, npc.z, tx, ty, tz);
-    if (!path || path.length === 0) return Infinity;
-    return Math.max(0, path.length - 1);
+    return countPathStepsFromNpc(world, npc, tx, ty, tz);
 }
 
 /**
@@ -48,12 +60,10 @@ export function pathStepsFromNpc(npc, world, tx, ty, tz) {
  * @returns {number}
  */
 export function remainingPathSteps(npc) {
-    if (!npc.path || npc.pathIndex >= npc.path.length) return 0;
-    return npc.path.length - npc.pathIndex;
+    return hostRemainingPathSteps(requireTaskBrain(npc));
 }
 
 /**
- * Walkable tile to path toward a remembered location (objects like stoves block their tile).
  * @param {World3D} world
  * @param {NpcEntity} npc
  * @param {number} tx
@@ -73,7 +83,6 @@ export function resolveTravelDestinationForMemory(world, npc, tx, ty, tz) {
  * @param {World3D} world
  * @param {string} ref
  * @param {Set<string>} [excludeKeys]
- * @returns {({ x: number, y: number, z: number, key: string, pathSteps: number }|null)}
  */
 export function findBestReachableMemoryRefTarget(npc, world, ref, excludeKeys = new Set()) {
     const candidates = resolvePlanRefs(npc, world, ref);
@@ -97,13 +106,13 @@ export function findBestReachableMemoryRefTarget(npc, world, ref, excludeKeys = 
             continue;
         }
 
-        const pathSteps = pathStepsFromNpc(npc, world, travel.x, travel.y, travel.z);
-        if (!Number.isFinite(pathSteps)) {
+        const steps = countPathStepsFromNpc(world, npc, travel.x, travel.y, travel.z);
+        if (!Number.isFinite(steps)) {
             markTileUnreachable(npc, target.x, target.y, target.z);
             continue;
         }
-        if (!best || pathSteps < best.pathSteps) {
-            best = { x: travel.x, y: travel.y, z: travel.z, key, pathSteps };
+        if (!best || steps < best.pathSteps) {
+            best = { x: travel.x, y: travel.y, z: travel.z, key, pathSteps: steps };
         }
     }
 
@@ -132,14 +141,15 @@ function isAtAnyMemoryRefTarget(npc, world, ref) {
  * @param {NpcEntity} npc
  */
 export function clearMemoryRefTravel(npc) {
-    npc._memoryRefTravel = null;
+    requireTaskBrain(npc)._memoryRefTravel = null;
 }
 
 /**
  * @param {NpcEntity} npc
  */
 function finishMemoryRefTravel(npc) {
-    const travel = npc._memoryRefTravel;
+    const brain = requireTaskBrain(npc);
+    const travel = brain._memoryRefTravel;
     if (!travel) return;
     if (travel.goalKey) {
         const parts = travel.goalKey.split(',').map(Number);
@@ -152,53 +162,55 @@ function finishMemoryRefTravel(npc) {
 /**
  * @param {NpcEntity} npc
  * @param {{ x: number, y: number, z: number }} target
+ * @param {string} memoryKey
  * @returns {boolean}
  */
-/**
- * @param {NpcEntity} npc
- * @param {{ x: number, y: number, z: number }} target - walkable destination
- * @param {string} memoryKey - remembered tile key (may be a blocking object)
- */
 function applyMemoryRefGoal(npc, target, memoryKey) {
-    if (!setNpcGoal(npc, target.x, target.y, target.z, npc._memoryRefTravel.world)) {
+    const brain = requireTaskBrain(npc);
+    const travel = brain._memoryRefTravel;
+    if (!travel) return false;
+
+    if (isAtAnyMemoryRefTarget(npc, travel.world, travel.ref)) {
+        finishMemoryRefTravel(npc);
+        return true;
+    }
+
+    const action = moveToAction(npc, target.x, target.y, target.z, { onto: true });
+    if (!applyHostAction(brain, npc, action, travel.world)) {
         const parts = memoryKey.split(',').map(Number);
         markTileUnreachable(npc, parts[0], parts[1], parts[2]);
         return false;
     }
 
-    const travel = npc._memoryRefTravel;
-    if (npc._state === 'idle' && isAtAnyMemoryRefTarget(npc, travel.world, travel.ref)) {
-        finishMemoryRefTravel(npc);
-        return true;
-    }
-
-    if (!npc._trip) {
-        npc._trip = {
+    if (!brain._trip) {
+        brain._trip = {
             x: target.x,
             y: target.y,
             z: target.z,
+            onto: true,
             resolve: () => finishMemoryRefTravel(npc),
             reject: (err) => {
-                const trip = npc._memoryRefTravel;
+                const trip = brain._memoryRefTravel;
                 clearMemoryRefTravel(npc);
                 if (trip) trip.reject(err);
             },
         };
     } else {
-        npc._trip.x = target.x;
-        npc._trip.y = target.y;
-        npc._trip.z = target.z;
+        brain._trip.x = target.x;
+        brain._trip.y = target.y;
+        brain._trip.z = target.z;
+        brain._trip.onto = true;
     }
     return true;
 }
 
 /**
- * After locomotion and perception — retarget if a strictly closer reachable match exists.
  * @param {NpcEntity} npc
  * @param {World3D} world
  */
 export function syncMemoryRefTravelGoal(npc, world) {
-    const travel = /** @type {MemoryRefTravelState|undefined} */ (npc._memoryRefTravel);
+    const brain = requireTaskBrain(npc);
+    const travel = brain._memoryRefTravel;
     if (!travel || npc._dead) return;
 
     const activeWorld = travel.world ?? world;
@@ -215,7 +227,7 @@ export function syncMemoryRefTravelGoal(npc, world) {
     if (best.key === travel.goalKey) return;
 
     let costToCurrent = Infinity;
-    if (npc._state === 'walking' && travel.goalKey) {
+    if (hostIsLocomotionActive(brain) && travel.goalKey) {
         costToCurrent = remainingPathSteps(npc);
     } else if (travel.goalKey) {
         const parts = travel.goalKey.split(',').map(Number);
@@ -227,7 +239,7 @@ export function syncMemoryRefTravelGoal(npc, world) {
             parts[2],
         );
         costToCurrent = currentDest
-            ? pathStepsFromNpc(npc, activeWorld, currentDest.x, currentDest.y, currentDest.z)
+            ? countPathStepsFromNpc(activeWorld, npc, currentDest.x, currentDest.y, currentDest.z)
             : Infinity;
     }
 
@@ -248,7 +260,8 @@ export function travelNpcToMemoryRef(npc, ref, world, opts = {}) {
     if (npc._dead) {
         return Promise.reject(new Error('dead'));
     }
-    if (npc._memoryRefTravel) {
+    const brain = requireTaskBrain(npc);
+    if (brain._memoryRefTravel) {
         return Promise.reject(new Error('memory travel already active'));
     }
     if (npc.timedAction?.isBusy?.()) {
@@ -269,7 +282,7 @@ export function travelNpcToMemoryRef(npc, ref, world, opts = {}) {
             return;
         }
 
-        npc._memoryRefTravel = {
+        brain._memoryRefTravel = {
             ref,
             world,
             goalKey: best.key,

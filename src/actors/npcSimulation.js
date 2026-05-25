@@ -1,25 +1,22 @@
 /**
- * NPC body simulation — vitality, eating, movement, death.
- * No task queue or plans; safe to import from headless tests.
+ * NPC body simulation — vitality, eating, death, and the action tick pipeline.
  */
-import { tickVitality, tryEatFromInventoryIfHungry } from '../domain/vitality.js';
-import {
-    clearNpcLocomotion,
-    initNpcLocomotion,
-    tickNpcLocomotion,
-    isAtMoveGoal,
-} from './npcLocomotion.js';
+import { tickVitality } from '../domain/vitality.js';
 import {
     actionDuration,
     isAdjacentToTile,
     isEntityActionComplete,
     pickUpAction,
 } from '../domain/entityActions.js';
-import { moveToAction } from './npcActions.js';
+import { isMoveAction, moveToAction } from './npcActions.js';
+import { isAtMoveGoal } from '../npc/locomotion/pathUtils.js';
 import { Entity } from './entity.js';
 import { attachNpcBrain } from '../npc/brain/attach.js';
 
 /** @typedef {import('../domain/entityActions.js').EntityAction} EntityAction */
+/** @typedef {import('./entity.js').Entity} Entity */
+/** @typedef {import('../world/world.js').World3D} World3D */
+/** @typedef {import('../npc/brain/interface.js').NpcBrain} NpcBrain */
 
 /** NPC appearance presets (skin, hair, shirt, pants). */
 export const NPC_PRESETS = [
@@ -33,14 +30,9 @@ export const NPC_PRESETS = [
     ['#c49060', '#3a3a3a', '#aa8a40', '#3a3020'],
 ];
 
-/** @typedef {import('./entity.js').Entity} Entity */
-/** @typedef {import('./npcLocomotion.js').NpcLocomotionState} NpcLocomotionState */
-/** @typedef {import('../world/world.js').World3D} World3D */
-/** @typedef {import('../npc/brain/interface.js').NpcBrain} NpcBrain */
-
 /**
  * Entity with NPC village fields (optional brain).
- * @typedef {Entity & NpcLocomotionState & {
+ * @typedef {Entity & {
  *   name: string,
  *   homeX: number,
  *   homeY: number,
@@ -97,8 +89,6 @@ export function initNpcEntity(entity, opts = {}) {
     entity.homeZ = entity.z;
     entity.wanderRadius = 10;
 
-    initNpcLocomotion(/** @type {Entity & NpcLocomotionState} */ (entity));
-
     const loco = /** @type {NpcEntity} */ (entity);
     loco._pendingAction = null;
     loco.scheduleAction = (action) => scheduleNpcAction(loco, action);
@@ -126,12 +116,10 @@ export function markNpcDead(entity) {
     entity.currentAction = null;
     entity._pendingAction = null;
     entity.timedAction.cancel();
-    clearNpcLocomotion(entity);
     entity.brain?.destroy?.();
 }
 
 /**
- * Queue an action for the next NPC tick (async tasks after travel, etc.).
  * @param {NpcEntity} npc
  * @param {EntityAction} action
  */
@@ -150,7 +138,6 @@ function takePendingNpcAction(npc) {
 }
 
 /**
- * Apply an NPC action: interrupts in-progress timed work, sets currentAction.
  * @param {NpcEntity} npc
  * @param {EntityAction} action
  * @param {World3D} world
@@ -160,15 +147,24 @@ export function applyNpcAction(npc, action, world) {
     if (npc.timedAction.isBusy()) {
         npc.timedAction.cancel();
     }
+
+    if (isMoveAction(action)) {
+        npc.currentAction = action;
+        const ok = npc.brain?.applyAction?.(npc, action, world) ?? false;
+        if (!ok) {
+            npc.currentAction = null;
+            return false;
+        }
+        if (isEntityActionComplete(action, npc)) {
+            npc.currentAction = null;
+        }
+        return true;
+    }
+
     npc.currentAction = action;
     const ok = action.apply(world);
     if (!ok) {
         npc.currentAction = null;
-        if (npc._trip) {
-            const { reject } = npc._trip;
-            npc._trip = null;
-            reject(new Error('action failed'));
-        }
         return false;
     }
     if (isEntityActionComplete(action, npc)) {
@@ -186,11 +182,6 @@ function finishNpcCurrentAction(npc) {
     if (!npc.currentAction) return;
     if (!isEntityActionComplete(npc.currentAction, npc)) return;
     npc.currentAction = null;
-    if (npc._trip) {
-        const { resolve } = npc._trip;
-        npc._trip = null;
-        resolve();
-    }
 }
 
 /**
@@ -199,32 +190,23 @@ function finishNpcCurrentAction(npc) {
  * @param {number} ty
  * @param {number} tz
  * @param {World3D} world
- * @param {{ onto?: boolean }} [opts] - default `{ onto: true }` for exact tile (legacy travel)
+ * @param {{ onto?: boolean }} [opts]
  * @returns {Promise<void>}
  */
 export function travelNpcToTile(npc, tx, ty, tz, world, opts = {}) {
+    if (!npc.brain?.travelToTile) {
+        return Promise.reject(new Error('NPC has no brain that supports travel'));
+    }
     const onto = opts.onto !== false;
-
-    if (npc._dead) {
-        return Promise.reject(new Error('dead'));
-    }
-    if (npc._trip) {
-        npc._trip.reject(new Error('travel superseded'));
-        npc._trip = null;
-    }
-
-    if (isAtMoveGoal(npc, tx, ty, tz, onto)) {
+    if (isAtMoveGoal(npc, { tx, ty, tz, onto })) {
         return Promise.resolve();
     }
-
-    return new Promise((resolve, reject) => {
-        npc._trip = { x: tx, y: ty, z: tz, onto, resolve, reject };
-        scheduleNpcAction(npc, moveToAction(npc, tx, ty, tz, { onto }));
-    });
+    const promise = npc.brain.travelToTile(npc, tx, ty, tz, world, opts);
+    scheduleNpcAction(npc, moveToAction(npc, tx, ty, tz, { onto }));
+    return promise;
 }
 
 /**
- * Travel adjacent if needed, then apply pickup.
  * @param {NpcEntity} npc
  * @param {World3D} world
  * @param {number} tileX
@@ -242,7 +224,6 @@ export async function runPickUpAtTile(npc, world, tileX, tileY, tileZ = npc.z) {
 }
 
 /**
- * Locomotion + pending actions only (no brain). For tests and memory-ref travel drivers.
  * @param {NpcEntity} entity
  * @param {World3D} world
  * @param {number} dt
@@ -258,18 +239,17 @@ export function tickNpcLocomotionFrame(entity, world, dt) {
     if (entity.timedAction.isBusy()) {
         entity.timedAction.tick(dt, world);
     } else {
-        tickNpcLocomotion(entity, dt);
+        entity.brain?.advanceLocomotion?.(entity, dt);
         finishNpcCurrentAction(entity);
     }
 }
 
 /**
- * Per-frame NPC tick: brain/pending action first (with interrupt), then body sim.
  * @param {NpcEntity} entity
  * @param {World3D} world
  * @param {number} dt
  * @param {number} gameTime
- * @returns {EntityAction | null} action applied this frame, if any
+ * @returns {EntityAction | null}
  */
 export function tickNpc(entity, world, dt, gameTime) {
     if (entity._dead) return null;
@@ -296,7 +276,7 @@ export function tickNpc(entity, world, dt, gameTime) {
     if (entity.timedAction.isBusy()) {
         entity.timedAction.tick(dt, world);
     } else {
-        tickNpcLocomotion(entity, dt);
+        entity.brain?.advanceLocomotion?.(entity, dt);
         finishNpcCurrentAction(entity);
     }
 
@@ -304,7 +284,7 @@ export function tickNpc(entity, world, dt, gameTime) {
 }
 
 /**
- * Vitality, timed actions, path following — no brain. Prefer tickNpc in the sim loop.
+ * Vitality and timed actions only — no brain locomotion.
  * @param {NpcEntity} entity
  * @param {World3D} world
  * @param {number} dt
@@ -321,7 +301,5 @@ export function tickNpcSimulation(entity, world, dt) {
 
     if (entity.timedAction.isBusy()) {
         entity.timedAction.tick(dt, world);
-    } else {
-        tickNpcLocomotion(entity, dt);
     }
 }

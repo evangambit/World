@@ -4,6 +4,13 @@
 
 import { moveToAction } from '../../../actors/npcActions.js';
 import { isEntityActionComplete } from '../../../domain/entityActions.js';
+import {
+    applyHostAction,
+    advanceHostLocomotion,
+    destroyBrainLocomotionHost,
+    initBrainLocomotionHost,
+    isHostMoving,
+} from '../../locomotion/brainLocomotionMixin.js';
 
 /** @typedef {import('../interface.js').NpcEntity} NpcEntity */
 /** @typedef {import('../interface.js').World3D} World3D */
@@ -18,11 +25,22 @@ export class WanderBrain {
     constructor() {
         /** @type {NpcEntity | null} */
         this.npc = null;
+        initBrainLocomotionHost(this);
     }
 
     /** @param {NpcEntity} npc */
     attach(npc) {
         this.npc = npc;
+    }
+
+    /** @param {NpcEntity} npc @param {import('../../../domain/entityActions.js').EntityAction} action @param {World3D} world */
+    applyAction(npc, action, world) {
+        return applyHostAction(this, npc, action, world);
+    }
+
+    /** @param {NpcEntity} npc @param {number} dt */
+    advanceLocomotion(npc, dt) {
+        advanceHostLocomotion(this, npc, dt);
     }
 
     /**
@@ -34,6 +52,9 @@ export class WanderBrain {
     tick(world, _dt, _gameTime) {
         const npc = this.npc;
         if (!npc || npc._dead) return null;
+        if (isHostMoving(this, npc)) {
+            return null;
+        }
         if (npc.currentAction && !isEntityActionComplete(npc.currentAction, npc)) {
             return null;
         }
@@ -49,6 +70,7 @@ export class WanderBrain {
     }
 
     destroy() {
+        destroyBrainLocomotionHost(this);
         this.npc = null;
     }
 }

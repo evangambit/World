@@ -3,6 +3,13 @@
  */
 import { mockRequestPlan } from '../../llm/mockPlanner.js';
 import { tickNpcPerception } from '../../shared/npcMemory.js';
+import {
+    applyHostAction,
+    advanceHostLocomotion,
+    destroyBrainLocomotionHost,
+    hostTravelToTile,
+    initBrainLocomotionHost,
+} from '../../locomotion/brainLocomotionMixin.js';
 import { NPCTaskRunner } from './npcTasks.js';
 import { initTileStore } from '../tileStore.js';
 
@@ -23,12 +30,46 @@ export class NpcTaskBrain {
         this.npc = null;
         /** @type {NPCTaskRunner | null} */
         this._tasks = null;
+        /** @type {import('./npcMemoryTravel.js').MemoryRefTravelState | null} */
+        this._memoryRefTravel = null;
+        initBrainLocomotionHost(this);
     }
 
     /** @param {NpcEntity} npc */
     attach(npc) {
         this.npc = npc;
         this._tasks = new NPCTaskRunner(npc, this._opts);
+    }
+
+    /**
+     * @param {NpcEntity} npc
+     * @param {import('../../../domain/entityActions.js').EntityAction} action
+     * @param {World3D} world
+     * @returns {boolean}
+     */
+    applyAction(npc, action, world) {
+        return applyHostAction(this, npc, action, world);
+    }
+
+    /**
+     * @param {NpcEntity} npc
+     * @param {number} dt
+     */
+    advanceLocomotion(npc, dt) {
+        advanceHostLocomotion(this, npc, dt);
+    }
+
+    /**
+     * @param {NpcEntity} npc
+     * @param {number} tx
+     * @param {number} ty
+     * @param {number} tz
+     * @param {World3D} world
+     * @param {{ onto?: boolean }} [opts]
+     * @returns {Promise<void>}
+     */
+    travelToTile(npc, tx, ty, tz, world, opts) {
+        return hostTravelToTile(this, npc, tx, ty, tz, world, opts);
     }
 
     /** @returns {NPCTaskRunner | null} */
@@ -53,6 +94,8 @@ export class NpcTaskBrain {
 
     destroy() {
         this._tasks?.clear();
+        this._memoryRefTravel = null;
+        destroyBrainLocomotionHost(this);
         this._tileStore.clear();
     }
 }
