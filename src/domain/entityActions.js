@@ -3,6 +3,7 @@
  * Input UI and plan runners call these — implement a capability once here.
  */
 import { cookUncookedSteakInInventory, cookWheatIntoBread } from './cooking.js';
+import { harvestWheatAtTile, plantWheatSeedAtTile } from './crops.js';
 import { getTimedAction } from './timedActions.js';
 import {
     Obj,
@@ -339,6 +340,43 @@ export function stashToContainerAction(entity, cx, cy, cz, objType, buildingId) 
             tile: { x: cx, y: cy, z: cz, container: true },
         }),
         apply: (world) => applyStashToContainer(entity, world, cx, cy, cz, objType, buildingId),
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @param {number} tileX
+ * @param {number} tileY
+ * @param {number} gameTime
+ * @param {number} [tileZ]
+ * @returns {EntityAction}
+ */
+export function plantWheatSeedAction(entity, tileX, tileY, gameTime, tileZ = entity.z) {
+    return {
+        prereq: () => ({
+            inventoryAnyOf: [[{ objType: Obj.WHEAT_SEED }]],
+            adjacentTo: { x: tileX, y: tileY, z: tileZ },
+            tile: { x: tileX, y: tileY, z: tileZ, terrain: T.DIRT },
+        }),
+        apply: (world) => plantWheatSeedAtTile(entity, world, tileX, tileY, gameTime, tileZ).ok,
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @param {number} tileX
+ * @param {number} tileY
+ * @param {number} gameTime
+ * @param {number} [tileZ]
+ * @returns {EntityAction}
+ */
+export function harvestWheatAction(entity, tileX, tileY, gameTime, tileZ = entity.z) {
+    return {
+        prereq: () => ({
+            adjacentTo: { x: tileX, y: tileY, z: tileZ },
+            tile: { x: tileX, y: tileY, z: tileZ, object: Obj.WHEAT_CROP },
+        }),
+        apply: (world) => harvestWheatAtTile(entity, world, tileX, tileY, gameTime, tileZ).ok,
     };
 }
 

@@ -5,8 +5,8 @@
  * primitives.  Pass one to the ThomasBrain constructor.
  */
 import { T, Obj, WHEAT_CROP_STAGES, isStoveObject, isWheatCropObject } from '../../../world/tileTypes.js';
-import { canPlantWheatAt, harvestWheatAtTile, isWheatMature, plantWheatSeedAtTile, wheatStageForTile } from '../../../domain/crops.js';
-import { cookBreadAtStoveAction } from '../../../domain/entityActions.js';
+import { canPlantWheatAt, isWheatMature, wheatStageForTile } from '../../../domain/crops.js';
+import { cookBreadAtStoveAction, harvestWheatAction, plantWheatSeedAction } from '../../../domain/entityActions.js';
 import { consumeFoodFromInventory } from '../../../domain/vitality.js';
 import {
     SeekResult,
@@ -140,7 +140,7 @@ async function interactAtCurrentTile(ctx) {
     if (!tile) return;
 
     if (isWheatCropObject(tile.obj) && isWheatMature(tile, gameTime)) {
-        harvestWheatAtTile(npc, world, tx, ty, gameTime, tz);
+        harvestWheatAction(npc, tx, ty, gameTime, tz).apply(world);
         return;
     }
 
@@ -150,7 +150,7 @@ async function interactAtCurrentTile(ctx) {
     }
 
     if (canPlantWheatAt(world, tx, ty, tz) && inventoryCount(npc, Obj.WHEAT_SEED) > 0) {
-        plantWheatSeedAtTile(npc, world, tx, ty, gameTime, tz);
+        plantWheatSeedAction(npc, tx, ty, gameTime, tz).apply(world);
     }
 }
 

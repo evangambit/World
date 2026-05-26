@@ -25,16 +25,14 @@ import {
     cookBreadAtStoveAction,
     cookSteakAtStoveAction,
     dropAction,
+    harvestWheatAction,
+    plantWheatSeedAction,
     pickUpAction,
     satisfiesInventoryPrereq,
     stashToContainerAction,
     takeFromContainerAction,
     toggleDoorLock,
 } from './domain/entityActions.js';
-import {
-    harvestWheatAtTile,
-    plantWheatSeedAtTile,
-} from './domain/crops.js';
 import { consumeFoodFromInventory, isEdible, VITALITY } from './domain/vitality.js';
 
 const GAME_SPEED_FAST = 5;
@@ -178,27 +176,15 @@ class Game {
                     return;
                 }
                 if (tile && isWheatCropObject(tile.obj)) {
-                    const result = harvestWheatAtTile(
-                        this.player,
-                        this.world,
-                        tx,
-                        ty,
-                        this.gameTime,
-                    );
-                    if (result.message) this._showGameMessage(result.message);
-                    if (result.ok) this._syncInventoryUI();
+                    const ok = harvestWheatAction(this.player, tx, ty, this.gameTime).apply(this.world);
+                    this._showGameMessage(ok ? 'Harvested wheat and seeds' : 'Wheat is not ready yet');
+                    if (ok) this._syncInventoryUI();
                     return;
                 }
                 if (tile && !tile.obj) {
-                    const plant = plantWheatSeedAtTile(
-                        this.player,
-                        this.world,
-                        tx,
-                        ty,
-                        this.gameTime,
-                    );
-                    if (plant.ok) {
-                        this._showGameMessage(plant.message);
+                    const ok = plantWheatSeedAction(this.player, tx, ty, this.gameTime).apply(this.world);
+                    if (ok) {
+                        this._showGameMessage('Planted wheat');
                         this._syncInventoryUI();
                         return;
                     }

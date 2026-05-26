@@ -1,9 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { World3D } from '../world/world.js';
-import { T } from '../world/tileTypes.js';
+import { Obj, T } from '../world/tileTypes.js';
+import { WHEAT_STAGE_SECONDS } from './crops.js';
 import {
+    harvestWheatAction,
     moveDirectionAction,
+    plantWheatSeedAction,
     satisfiesInventoryPrereq,
     satisfiesTilePrereq,
     tickEntityAction,
@@ -78,5 +81,28 @@ describe('satisfiesInventoryPrereq', () => {
             }),
             false,
         );
+    });
+});
+
+describe('crop actions', () => {
+    it('plants and harvests wheat via EntityAction wrappers', () => {
+        const world = new World3D();
+        world.setTile(1, 1, 0, { terrain: T.DIRT, obj: 0 });
+        const entity = new Entity(1.5, 2.5, 0);
+        entity.inventory = [{ objType: Obj.WHEAT_SEED, count: 1 }];
+
+        const planted = plantWheatSeedAction(entity, 1, 1, 0).apply(world);
+        assert.equal(planted, true);
+
+        const matureAt = WHEAT_STAGE_SECONDS * 3;
+        const tile = world.getTile(1, 1, 0);
+        world.setTile(1, 1, 0, {
+            cropPlantedAt: 0,
+            cropStage: 3,
+            obj: tile?.obj ?? Obj.WHEAT_CROP,
+        });
+        const harvested = harvestWheatAction(entity, 1, 1, matureAt).apply(world);
+        assert.equal(harvested, true);
+        assert.ok(entity.inventory.some((s) => s.objType === Obj.WHEAT && s.count >= 1));
     });
 });
