@@ -26,6 +26,7 @@ import {
     cookSteakAtStoveAction,
     dropAction,
     harvestWheatAction,
+    lookInsideContainerAction,
     plantWheatSeedAction,
     pickUpAction,
     satisfiesInventoryPrereq,
@@ -375,8 +376,8 @@ class Game {
 
     _openContainerAt(tx, ty) {
         const z = this.player.z;
-        if (!canOpenContainerAt(this.player, this.world, tx, ty, z)) return;
-        this.world.ensureTileContents(tx, ty, z);
+        const look = lookInsideContainerAction(this.player, tx, ty, z);
+        if (!look.apply(this.world)) return;
         this.openContainer = { x: tx, y: ty, z };
         this._refreshContainerUI();
     }
@@ -411,8 +412,7 @@ class Game {
             return;
         }
         this.containerTitleEl.textContent = OBJ_NAMES[tile.obj] || 'Storage';
-        this.world.ensureTileContents(open.x, open.y, open.z);
-        const contents = tile.contents ?? [];
+        const contents = this.world.ensureTileContents(open.x, open.y, open.z) ?? [];
         this.containerItemsEl.replaceChildren();
         if (contents.length === 0) {
             const empty = document.createElement('div');

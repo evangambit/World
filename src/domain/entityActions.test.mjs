@@ -5,6 +5,7 @@ import { Obj, T } from '../world/tileTypes.js';
 import { WHEAT_STAGE_SECONDS } from './crops.js';
 import {
     harvestWheatAction,
+    lookInsideContainerAction,
     moveDirectionAction,
     plantWheatSeedAction,
     satisfiesInventoryPrereq,
@@ -104,5 +105,23 @@ describe('crop actions', () => {
         const harvested = harvestWheatAction(entity, 1, 1, matureAt).apply(world);
         assert.equal(harvested, true);
         assert.ok(entity.inventory.some((s) => s.objType === Obj.WHEAT && s.count >= 1));
+    });
+});
+
+describe('lookInsideContainerAction', () => {
+    it('returns a snapshot of container contents', () => {
+        const world = new World3D();
+        world.setTile(2, 2, 0, {
+            terrain: T.DIRT,
+            obj: Obj.CHEST,
+            contents: [{ objType: Obj.WHEAT, count: 2 }],
+        });
+        const entity = new Entity(1.5, 1.5, 0);
+        const action = lookInsideContainerAction(entity, 2, 2, 0);
+        const ok = action.apply(world);
+        assert.equal(ok, true);
+        assert.equal(action.lastResult.ok, true);
+        assert.equal(action.lastResult.contents.length, 1);
+        assert.equal(action.lastResult.contents[0].objType, Obj.WHEAT);
     });
 });

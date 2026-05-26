@@ -41,15 +41,15 @@ describe('snapshotTileState', () => {
         world.setTile(0, 0, 0, {
             terrain: T.GRASS,
             obj: Obj.CHEST,
-            contents: [{ objType: Obj.WHEAT, count: 2 }],
+            doorLocked: false,
         });
         const live = world.getTile(0, 0, 0);
         const snap = snapshotTileState(live);
         live.obj = Obj.NONE;
-        live.contents.push({ objType: Obj.ROCK, count: 1 });
+        live.doorLocked = true;
 
         assert.equal(snap.obj, Obj.CHEST);
-        assert.equal(snap.contents?.length, 1);
+        assert.equal(snap.doorLocked, false);
     });
 });
 

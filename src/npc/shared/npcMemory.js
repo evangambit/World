@@ -52,7 +52,6 @@ export function snapshotTileState(tile) {
         ceiling: tile.ceiling,
         buildingId: tile.buildingId,
         interior: tile.interior,
-        contents: tile.contents?.map((s) => ({ ...s })),
         doorLocked: tile.doorLocked,
         doorInsideDx: tile.doorInsideDx,
         doorInsideDy: tile.doorInsideDy,

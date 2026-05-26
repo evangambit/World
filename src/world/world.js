@@ -2,14 +2,17 @@
  * World3D — sparse 3D tile grid indexed by (x, y, z).
  * Multiple z-layers can exist at the same (x, y) coordinate.
  */
-import { isTileWalkable, T } from './tileTypes.js';
+import { isContainerObject, isTileWalkable, T } from './tileTypes.js';
 
-/** @typedef {{ terrain: number, obj: number, transition: {tx:number,ty:number,tz:number,type:string}|null, ceiling: boolean, buildingId: number|null, interior: boolean, contents?: {objType:number, count:number, buildingId?:number}[], doorLocked?: boolean, doorInsideDx?: number, doorInsideDy?: number, keyBuildingId?: number|null, cropStage?: number, cropPlantedAt?: number }} TileData */
+/** @typedef {{ terrain: number, obj: number, transition: {tx:number,ty:number,tz:number,type:string}|null, ceiling: boolean, buildingId: number|null, interior: boolean, doorLocked?: boolean, doorInsideDx?: number, doorInsideDy?: number, keyBuildingId?: number|null, cropStage?: number, cropPlantedAt?: number }} TileData */
+/** @typedef {Partial<TileData> & { contents?: {objType:number, count:number, buildingId?:number}[] }} TilePatch */
 
 export class World3D {
     constructor() {
         /** @type {Map<string, TileData>} "x,y,z" → tile data */
         this.tiles = new Map();
+        /** @type {Map<string, {objType:number, count:number, buildingId?:number}[]>} "x,y,z" → private container contents */
+        this.containerContents = new Map();
         /** @type {Map<string, Set<number>>} "x,y" → set of z-levels present */
         this.columns = new Map();
         /** World bounds (updated on setTile) */
@@ -26,15 +29,28 @@ export class World3D {
      * @param {number} x
      * @param {number} y
      * @param {number} z
-     * @param {Partial<TileData>} data
+     * @param {TilePatch} data
      */
     setTile(x, y, z, data) {
         const key = World3D.key(x, y, z);
         const existing = this.tiles.get(key);
+        const { contents: incomingContents, ...tilePatch } = data;
         const tile = existing
-            ? Object.assign(existing, data)
-            : { terrain: 0, obj: 0, transition: null, ceiling: false, buildingId: null, interior: false, contents: [], ...data };
+            ? Object.assign(existing, tilePatch)
+            : { terrain: 0, obj: 0, transition: null, ceiling: false, buildingId: null, interior: false, ...tilePatch };
         this.tiles.set(key, tile);
+
+        if (incomingContents) {
+            this.containerContents.set(
+                key,
+                incomingContents.map((s) => ({ objType: s.objType, count: s.count, buildingId: s.buildingId })),
+            );
+        }
+        if (!isContainerObject(tile.obj)) {
+            this.containerContents.delete(key);
+        } else if (!this.containerContents.has(key)) {
+            this.containerContents.set(key, []);
+        }
 
         // Update column index
         const ck = World3D.colKey(x, y);
@@ -67,8 +83,18 @@ export class World3D {
     ensureTileContents(x, y, z) {
         const tile = this.getTile(x, y, z);
         if (!tile) return null;
-        if (!tile.contents) tile.contents = [];
-        return tile.contents;
+        if (!isContainerObject(tile.obj)) return null;
+        const key = World3D.key(x, y, z);
+        if (!this.containerContents.has(key)) this.containerContents.set(key, []);
+        return this.containerContents.get(key) ?? null;
+    }
+
+    /**
+     * Read-only view of private container contents at a tile.
+     * @returns {{objType:number, count:number, buildingId?:number}[]}
+     */
+    getTileContents(x, y, z) {
+        return this.containerContents.get(World3D.key(x, y, z)) ?? [];
     }
 
     /** Get all z-levels present at (x, y), sorted ascending. */

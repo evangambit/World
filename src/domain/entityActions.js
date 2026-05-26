@@ -398,7 +398,7 @@ function applyPickUpAtTile(entity, world, tileX, tileY, tileZ) {
 
     const objType = tile.obj;
     const keyBuildingId = objType === Obj.KEY ? tile.keyBuildingId : undefined;
-    world.setTile(tileX, tileY, tileZ, { obj: 0, contents: [], keyBuildingId: null });
+    world.setTile(tileX, tileY, tileZ, { obj: 0, keyBuildingId: null });
 
     if (!entity.inventory) entity.inventory = [];
     mergeStackInto(entity.inventory, objType, 1, keyBuildingId ?? undefined);
@@ -640,6 +640,39 @@ export function canOpenContainerAt(entity, world, cx, cy, cz) {
     return isAdjacentToTile(entity, cx, cy);
 }
 
+/** @typedef {{ ok: boolean, contents: {objType:number, count:number, buildingId?:number}[] }} LookInsideContainerResult */
+
+/**
+ * Look inside a container and read a snapshot of its contents.
+ * @param {Entity} entity
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} cz
+ * @returns {EntityAction & { lastResult: LookInsideContainerResult }}
+ */
+export function lookInsideContainerAction(entity, cx, cy, cz) {
+    /** @type {LookInsideContainerResult} */
+    let lastResult = { ok: false, contents: [] };
+    return {
+        get lastResult() {
+            return lastResult;
+        },
+        prereq: () => ({
+            adjacentTo: { x: cx, y: cy, z: cz },
+            tile: { x: cx, y: cy, z: cz, container: true },
+        }),
+        apply: (world) => {
+            if (!canOpenContainerAt(entity, world, cx, cy, cz)) {
+                lastResult = { ok: false, contents: [] };
+                return false;
+            }
+            const contents = world.ensureTileContents(cx, cy, cz) ?? [];
+            lastResult = { ok: true, contents: contents.map((s) => ({ ...s })) };
+            return true;
+        },
+    };
+}
+
 /**
  * @param {Entity} entity
  * @param {World3D} world
@@ -650,7 +683,8 @@ export function canOpenContainerAt(entity, world, cx, cy, cz) {
  * @param {number} [buildingId]
  */
 function applyTakeFromContainer(entity, world, cx, cy, cz, objType, buildingId) {
-    if (!canOpenContainerAt(entity, world, cx, cy, cz)) return false;
+    const look = lookInsideContainerAction(entity, cx, cy, cz);
+    if (!look.apply(world)) return false;
 
     const contents = world.ensureTileContents(cx, cy, cz);
     if (!contents) return false;
@@ -677,7 +711,8 @@ function applyTakeFromContainer(entity, world, cx, cy, cz, objType, buildingId) 
  */
 function applyStashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
     if (!canStashInContainer(objType)) return false;
-    if (!canOpenContainerAt(entity, world, cx, cy, cz)) return false;
+    const look = lookInsideContainerAction(entity, cx, cy, cz);
+    if (!look.apply(world)) return false;
 
     const inv = entity.inventory ?? [];
     const i = inv.findIndex(
@@ -707,8 +742,7 @@ function applyStashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
 export function findContainerStack(world, cx, cy, cz, inventoryTypes) {
     const tile = world.getTile(cx, cy, cz);
     if (!tile || !isContainerObject(tile.obj)) return null;
-    world.ensureTileContents(cx, cy, cz);
-    const contents = tile.contents ?? [];
+    const contents = world.ensureTileContents(cx, cy, cz) ?? [];
     for (const stack of contents) {
         if (inventoryTypes.includes(stack.objType) && stack.count > 0) {
             return { objType: stack.objType, buildingId: stack.buildingId };
