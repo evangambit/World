@@ -2,7 +2,7 @@
  * Test helpers — drive NPC locomotion until async travel/plan work settles.
  */
 import assert from 'node:assert/strict';
-import { tickNpcLocomotionFrame } from '../../actors/npcSimulation.js';
+import { tickNpc } from '../../actors/npcSimulation.js';
 
 /** @typedef {import('../../actors/npcSimulation.js').NpcEntity} NpcEntity */
 
@@ -34,7 +34,7 @@ export async function driveLocomotionUntil(npc, promise, opts = {}) {
 
     for (let i = 0; i < maxTicks && !settled; i++) {
         opts.onTick?.(npc);
-        tickNpcLocomotionFrame(npc, world, dt);
+        tickNpc(npc, world, dt, 0);
         // Let travel/plan promise continuations run (finally() is a microtask).
         await Promise.resolve();
     }

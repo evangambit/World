@@ -275,26 +275,6 @@ export async function runPickUpAtTile(npc, world, tileX, tileY, tileZ = npc.z) {
  * @param {NpcEntity} entity
  * @param {World3D} world
  * @param {number} dt
- */
-export function tickNpcLocomotionFrame(entity, world, dt) {
-    if (entity._dead) return;
-
-    if (tickNpcTravel(entity, world, dt)) return;
-
-    let pending;
-    while ((pending = takePendingNpcAction(entity))) {
-        applyNpcAction(entity, pending, world, dt);
-    }
-
-    if (entity.timedAction.isBusy()) {
-        entity.timedAction.tick(dt, world);
-    }
-}
-
-/**
- * @param {NpcEntity} entity
- * @param {World3D} world
- * @param {number} dt
  * @param {number} gameTime
  * @returns {EntityAction | null}
  */
