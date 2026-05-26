@@ -116,7 +116,7 @@ Do **not** put world-changing logic in `main.js` or `npcPlanRunner.js` except to
 2. Add pure logic in a domain module if it is inventory-only and actor-agnostic.
 3. If the action takes time, add an entry to `domain/timedActions.js`; otherwise add **`entityActions.yourAction(entity, world, …)`** with all placement, adjacency, and permission checks.
 4. **Player:** hook input in `main.js` → call the action → refresh UI.
-5. **NPC:** add a plan leaf type (and/or `runYourAction` in `npcTaskPrimitives.js`) that calls the **same** function after `travelNpcToTile` if needed.
+5. **NPC:** add a plan leaf type (and/or `runYourAction` in `npcTaskPrimitives.js`) that calls the **same** function; the brain should emit movement actions per tick when repositioning is needed.
 6. If NPCs need to refer to a place or thing abstractly, add an object tag and/or a memory ref query; do not reimplement the effect in the plan runner.
 
 ### Movement/action execution

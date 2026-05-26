@@ -9,7 +9,6 @@ import {
     tickNpc,
     scheduleNpcAction,
     applyNpcAction,
-    travelNpcToTile,
 } from './npcSimulation.js';
 export {
     createNpcEntity,
@@ -17,8 +16,6 @@ export {
     tickNpc,
     scheduleNpcAction,
     applyNpcAction,
-    travelNpcToTile,
-    isNpcTraveling,
     runPickUpAtTile,
     NPC_PRESETS,
 } from './npcSimulation.js';

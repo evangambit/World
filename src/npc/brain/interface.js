@@ -12,7 +12,6 @@
  * @property {(npc: NpcEntity) => void} attach
  * @property {(world: World3D, dt: number, gameTime: number) => EntityAction | null | void} tick
  * @property {() => void} [destroy]
- * @property {(npc: NpcEntity, tx: number, ty: number, tz: number, world: World3D, opts?: { onto?: boolean }) => Promise<void>} [travelToTile]
  * @property {(x: number, y: number, z: number, entry: TileMemoryEntry) => void} [observeTile]
  * @property {() => { lines: string[] }} [getStatus]
  */

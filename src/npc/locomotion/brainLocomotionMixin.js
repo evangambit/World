@@ -1,8 +1,6 @@
 /**
  * Legacy locomotion helpers — brains now drive movement via per-tick actions.
  */
-import { isNpcTraveling } from '../../actors/npcSimulation.js';
-
 /** @typedef {import('../../actors/npcSimulation.js').NpcEntity} NpcEntity */
 
 /**
@@ -11,7 +9,8 @@ import { isNpcTraveling } from '../../actors/npcSimulation.js';
  * @returns {boolean}
  */
 export function isHostMoving(_host, npc) {
-    return isNpcTraveling(npc);
+    void npc;
+    return false;
 }
 
 /**

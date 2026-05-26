@@ -135,12 +135,6 @@ function takePendingNpcAction(npc) {
     return action;
 }
 
-/** @param {NpcEntity} npc */
-export function isNpcTraveling(npc) {
-    void npc;
-    return false;
-}
-
 /**
  * @param {NpcEntity} npc
  * @param {EntityAction} action
@@ -150,27 +144,6 @@ export function isNpcTraveling(npc) {
  */
 export function applyNpcAction(npc, action, world, dt) {
     return tickEntityAction(npc, action, world, dt);
-}
-
-/**
- * @param {NpcEntity} npc
- * @param {number} tx
- * @param {number} ty
- * @param {number} tz
- * @param {World3D} world
- * @param {{ onto?: boolean }} [opts]
- * @returns {Promise<void>}
- */
-export function travelNpcToTile(npc, tx, ty, tz, world, opts = {}) {
-    void npc;
-    void tx;
-    void ty;
-    void tz;
-    void world;
-    void opts;
-    return Promise.reject(
-        new Error('travelNpcToTile is deprecated; brains must return moveDirectionAction each tick'),
-    );
 }
 
 /**
