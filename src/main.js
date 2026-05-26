@@ -7,11 +7,8 @@ import { Renderer } from './client/renderer.js';
 import { Entity } from './actors/entity.js';
 import { updatePlayerFromInput } from './client/playerController.js';
 import { tickSimulation } from './simulation/tickSimulation.js';
-import { NPC, find } from './actors/npc.js';
-import { createNpcPlannerFromConfig } from './npc/llm/createLlmPlanner.js';
-import { resolveBrowserPlannerConfig } from './npc/llm/plannerRuntime.js';
+import { NPC } from './actors/npc.js';
 import { resolveBrainType, createBrainForType } from './npc/shared/npcBrainRuntime.js';
-import { clearGrass } from './npc/brain/taskImpl/npcTasks.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
 import {
     Obj,
@@ -103,44 +100,17 @@ class Game {
         this.player.appearance = ['#e8c090', '#5a3020', '#2a5a8a', '#3a3a4a'];
         this.camera.snapTo(this.player.x, this.player.y);
 
-        /** @type {import('./npc/llm/npcPlanner.js').NpcPlannerFn | undefined} */
-        let llmPlanner;
-        const llmConfig = resolveBrowserPlannerConfig();
-        if (llmConfig) {
-            try {
-                llmPlanner = createNpcPlannerFromConfig(llmConfig);
-                const modelLabel = llmConfig.model ?? 'default model';
-                console.log(`[World] LLM planner: ${llmConfig.providerId} (${modelLabel})`);
-                const hint = document.getElementById('controls-hint');
-                if (hint) {
-                    hint.textContent += ` · LLM: ${llmConfig.providerId}`;
-                }
-            } catch (err) {
-                console.warn('[World] LLM planner failed to start', err);
-            }
-        }
-
         // Spawn NPCs inside their homes (see VILLAGE_NPC_SPAWNS in builder.js)
         const brainType = resolveBrainType();
-        if (brainType !== 'task') {
+        if (brainType !== 'thomas') {
             console.log(`[World] NPC brain: ${brainType}`);
         }
         for (const def of VILLAGE_NPC_SPAWNS) {
             const inventory = [...NPC_DEFAULT_INVENTORY, ...(def.inventory ?? [])];
-            const plannerOpts = llmPlanner ? { planner: llmPlanner } : {};
-            const brain = createBrainForType(brainType, plannerOpts);
+            const brain = createBrainForType(brainType);
             const npc = new NPC(def.x, def.y, def.z, def.preset, def.name, inventory, { brain });
-            const homeBid = this.world.getBuildingId(Math.floor(def.x), Math.floor(def.y), def.z);
-            if (homeBid != null) {
-                npc.tasks?.enqueue(find(Obj.KEY, 16, { buildingId: homeBid }));
-            }
-            if (def.tasks?.length) npc.tasks?.enqueueMany(def.tasks);
             this.npcs.push(npc);
         }
-
-        // Finn clears a grass patch outside his house, then resumes wandering
-        const finn = this.npcs.find((n) => n.name === 'Finn');
-        if (finn) finn.tasks?.enqueue(clearGrass(13, 32, 0));
 
         // Handle resize
         this._resize();
@@ -509,7 +479,7 @@ class Game {
 
         panel.classList.remove('hidden');
         this.npcPanelNameEl.textContent = npc.name;
-        const status = npc.tasks?.getPlanStatus() ?? npc.brain?.getStatus?.() ?? { lines: ['Wandering'] };
+        const status = npc.brain?.getStatus?.() ?? { lines: ['Idle'] };
         const inv = npc.inventory ?? [];
         const invLines = inv.length
             ? ['', 'Inventory:', ...inv.map(s => `  ${formatItemStackLabel(s.objType, s.count, s.buildingId)}`)]

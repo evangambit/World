@@ -8,7 +8,7 @@ import {
     isEntityActionComplete,
     pickUpAction,
 } from '../domain/entityActions.js';
-import { isMoveAction, moveToAction } from './npcActions.js';
+import { isMoveAction, travelToTileAction } from './npcActions.js';
 import { isAtMoveGoal } from '../npc/locomotion/pathUtils.js';
 import { Entity } from './entity.js';
 import { attachNpcBrain } from '../npc/brain/attach.js';
@@ -202,7 +202,7 @@ export function travelNpcToTile(npc, tx, ty, tz, world, opts = {}) {
         return Promise.resolve();
     }
     const promise = npc.brain.travelToTile(npc, tx, ty, tz, world, opts);
-    scheduleNpcAction(npc, moveToAction(npc, tx, ty, tz, { onto }));
+    scheduleNpcAction(npc, travelToTileAction(npc, tx, ty, tz, { onto }));
     return promise;
 }
 

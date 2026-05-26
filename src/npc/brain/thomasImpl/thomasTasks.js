@@ -8,11 +8,11 @@
  * Higher-level combinators (seekKnownDesires) compose primitives and hide ticks.
  */
 import { isEntityActionComplete, startTimedWorldAction } from '../../../domain/entityActions.js';
-import { moveToAction } from '../../../actors/npcActions.js';
+import { travelToTileAction } from '../../../actors/npcActions.js';
 import { isHostMoving } from '../../locomotion/brainLocomotionMixin.js';
 import { scheduleNpcAction } from '../../../actors/npcSimulation.js';
 import { forEachNpcObservedTile, markTileUnreachable } from '../../shared/npcMemory.js';
-import { findApproachTile } from '../taskImpl/npcTaskPrimitives.js';
+import { findApproachTile } from '../../locomotion/pathUtils.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -69,7 +69,7 @@ export class TaskContext {
 /**
  * Walk toward a tile on the NPC's current floor.
  *
- * Schedules `moveToAction` and polls until arrival or failure.
+ * Schedules `travelToTileAction` and polls until arrival or failure.
  *
  * @param {TaskContext} ctx
  * @param {number} x   Target tile X
@@ -85,7 +85,7 @@ export async function moveTowardLocation(ctx, x, y, maxTicks) {
         return MoveResult.ARRIVED;
     }
 
-    scheduleNpcAction(npc, moveToAction(npc, x, y, npc.z, { onto: true }));
+    scheduleNpcAction(npc, travelToTileAction(npc, x, y, npc.z, { onto: true }));
     await ctx.nextTick();
     if (!npc.currentAction && !isHostMoving(ctx._brain, npc)) {
         return MoveResult.IMPOSSIBLE;

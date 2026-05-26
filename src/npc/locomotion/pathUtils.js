@@ -13,7 +13,8 @@ import { findPath } from '../../world/pathfinding.js';
  * @property {number} tx
  * @property {number} ty
  * @property {number} tz
- * @property {boolean} onto
+ * @property {boolean} [step] - single adjacent step onto the tile
+ * @property {boolean} [onto] - long travel: stand on tile; false = adjacent only
  */
 
 /**
@@ -22,7 +23,7 @@ import { findPath } from '../../world/pathfinding.js';
  * @returns {boolean}
  */
 export function isAtMoveGoal(npc, goal) {
-    if (goal.onto) {
+    if (goal.step || goal.onto) {
         return Math.floor(npc.x) === goal.tx && Math.floor(npc.y) === goal.ty && npc.z === goal.tz;
     }
     return isAdjacentToTile(npc, goal.tx, goal.ty) && npc.z === goal.tz;

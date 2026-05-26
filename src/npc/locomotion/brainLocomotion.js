@@ -48,11 +48,39 @@ export function remainingBrainLocomotionSteps(loco) {
 /**
  * @param {BrainLocomotionState} loco
  * @param {Entity} npc
+ * @param {number} tx
+ * @param {number} ty
+ * @param {number} tz
+ * @returns {boolean}
+ */
+export function beginBrainStep(loco, npc, tx, ty, tz) {
+    const sx = Math.floor(npc.x);
+    const sy = Math.floor(npc.y);
+    if (sx === tx && sy === ty && npc.z === tz) {
+        clearBrainLocomotion(loco);
+        return true;
+    }
+
+    loco.path = [
+        { x: sx, y: sy, z: npc.z },
+        { x: tx, y: ty, z: tz },
+    ];
+    loco.pathIndex = 1;
+    return true;
+}
+
+/**
+ * @param {BrainLocomotionState} loco
+ * @param {Entity} npc
  * @param {MoveGoal} goal
  * @param {import('../../world/world.js').World3D} world
  * @returns {boolean}
  */
 export function beginBrainMove(loco, npc, goal, world) {
+    if (goal.step) {
+        return beginBrainStep(loco, npc, goal.tx, goal.ty, goal.tz);
+    }
+
     const dest = resolveMoveDestination(world, npc, goal);
     if (!dest) return false;
 

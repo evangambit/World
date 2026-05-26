@@ -1,29 +1,22 @@
 /**
  * Resolve NPC brain type from URL parameters.
  *
- * Usage: ?brain=wander  (valid values: task, wander, noop)
+ * Usage: ?brain=thomas  (valid values: thomas, wander, noop)
  *
- * Defaults to "task" (full perception + plans + optional LLM planner).
+ * Defaults to "thomas".
  */
-import {
-    createDefaultTaskBrain,
-    ThomasBrain,
-    WanderBrain,
-    NoopNpcBrain,
-    XBrain,
-} from '../brain/index.js';
+import { ThomasBrain, WanderBrain, NoopNpcBrain } from '../brain/index.js';
 
 /** @typedef {import('../brain/interface.js').NpcBrain} NpcBrain */
-/** @typedef {import('./llm/npcPlanner.js').NpcPlannerFn} NpcPlannerFn */
-/** @typedef {'task' | 'wander' | 'noop' | 'thomas' | 'expectimax'} BrainType */
+/** @typedef {'thomas' | 'wander' | 'noop'} BrainType */
 
-const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['task', 'wander', 'noop', 'thomas', 'expectimax']);
+const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['thomas', 'wander', 'noop']);
 
 /**
  * @returns {BrainType}
  */
 export function resolveBrainType() {
-    if (typeof globalThis.location === 'undefined') return 'task';
+    if (typeof globalThis.location === 'undefined') return 'thomas';
     const params = new URLSearchParams(globalThis.location.search);
     const value = /** @type {string | null} */ (params.get('brain'))?.toLowerCase();
     if (value && VALID_BRAIN_TYPES.includes(/** @type {BrainType} */ (value))) {
@@ -31,21 +24,18 @@ export function resolveBrainType() {
     }
     if (value) {
         console.warn(
-            `[World] Unknown brain type "${value}", using "task". Valid: ${VALID_BRAIN_TYPES.join(', ')}`,
+            `[World] Unknown brain type "${value}", using "thomas". Valid: ${VALID_BRAIN_TYPES.join(', ')}`,
         );
     }
-    return 'task';
+    return 'thomas';
 }
 
 /**
  * @param {BrainType} brainType
- * @param {{ planner?: NpcPlannerFn }} [opts]
  * @returns {NpcBrain}
  */
-export function createBrainForType(brainType, opts = {}) {
+export function createBrainForType(brainType) {
     if (brainType === 'wander') return new WanderBrain();
     if (brainType === 'noop') return new NoopNpcBrain();
-    if (brainType === 'thomas') return new ThomasBrain();
-    if (brainType === 'expectimax') return new XBrain();
-    return createDefaultTaskBrain(opts);
+    return new ThomasBrain();
 }
