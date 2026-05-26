@@ -7,14 +7,12 @@ import { attachNpcBrain, WanderBrain } from '../npc/brain/index.js';
 import {
     initNpcEntity,
     tickNpc,
-    scheduleNpcAction,
     applyNpcAction,
 } from './npcSimulation.js';
 export {
     createNpcEntity,
     initNpcEntity,
     tickNpc,
-    scheduleNpcAction,
     applyNpcAction,
     runPickUpAtTile,
     NPC_PRESETS,

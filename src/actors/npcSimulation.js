@@ -38,8 +38,6 @@ export const NPC_PRESETS = [
  *   isAlive: boolean,
  *   brain?: NpcBrain,
  *   tick: (world: World3D, dt: number, gameTime: number) => EntityAction | null,
- *   scheduleAction: (action: EntityAction) => void,
- *   _pendingAction: EntityAction | null,
  *   resolvingAction: EntityAction | null,
  * }} NpcEntity
  */
@@ -88,8 +86,6 @@ export function initNpcEntity(entity, opts = {}) {
     entity.wanderRadius = 10;
 
     const loco = /** @type {NpcEntity} */ (entity);
-    loco._pendingAction = null;
-    loco.scheduleAction = (action) => scheduleNpcAction(loco, action);
     loco.tick = (world, dt, gameTime) => tickNpc(loco, world, dt, gameTime);
 
     Object.defineProperty(entity, 'isAlive', {
@@ -112,27 +108,8 @@ function markNpcDead(entity) {
     entity._dead = true;
     entity.health = 0;
     entity.currentAction = null;
-    entity._pendingAction = null;
     entity.timedAction.cancel();
     entity.brain?.destroy?.();
-}
-
-/**
- * @param {NpcEntity} npc
- * @param {EntityAction} action
- */
-export function scheduleNpcAction(npc, action) {
-    npc._pendingAction = action;
-}
-
-/**
- * @param {NpcEntity} npc
- * @returns {EntityAction | null}
- */
-function takePendingNpcAction(npc) {
-    const action = npc._pendingAction ?? null;
-    npc._pendingAction = null;
-    return action;
 }
 
 /**
@@ -186,12 +163,6 @@ export function tickNpc(entity, world, dt, gameTime) {
     if (!entity.resolvingAction && brainAction) {
         tickEntityAction(entity, brainAction, world, dt);
         applied = brainAction;
-    }
-
-    let pending;
-    while ((pending = takePendingNpcAction(entity))) {
-        tickEntityAction(entity, pending, world, dt);
-        applied = pending;
     }
 
     if (entity.timedAction.isBusy()) {
