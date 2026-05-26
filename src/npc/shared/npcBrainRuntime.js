@@ -1,22 +1,22 @@
 /**
  * Resolve NPC brain type from URL parameters.
  *
- * Usage: ?brain=thomas  (valid values: thomas, wander, noop)
+ * Usage: ?brain=wander  (valid values: wander, noop)
  *
- * Defaults to "thomas".
+ * Defaults to "wander".
  */
-import { ThomasBrain, WanderBrain, NoopNpcBrain } from '../brain/index.js';
+import { WanderBrain, NoopNpcBrain } from '../brain/index.js';
 
 /** @typedef {import('../brain/interface.js').NpcBrain} NpcBrain */
-/** @typedef {'thomas' | 'wander' | 'noop'} BrainType */
+/** @typedef {'wander' | 'noop'} BrainType */
 
-const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['thomas', 'wander', 'noop']);
+const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['wander', 'noop']);
 
 /**
  * @returns {BrainType}
  */
 export function resolveBrainType() {
-    if (typeof globalThis.location === 'undefined') return 'thomas';
+    if (typeof globalThis.location === 'undefined') return 'wander';
     const params = new URLSearchParams(globalThis.location.search);
     const value = /** @type {string | null} */ (params.get('brain'))?.toLowerCase();
     if (value && VALID_BRAIN_TYPES.includes(/** @type {BrainType} */ (value))) {
@@ -24,10 +24,10 @@ export function resolveBrainType() {
     }
     if (value) {
         console.warn(
-            `[World] Unknown brain type "${value}", using "thomas". Valid: ${VALID_BRAIN_TYPES.join(', ')}`,
+            `[World] Unknown brain type "${value}", using "wander". Valid: ${VALID_BRAIN_TYPES.join(', ')}`,
         );
     }
-    return 'thomas';
+    return 'wander';
 }
 
 /**
@@ -35,7 +35,6 @@ export function resolveBrainType() {
  * @returns {NpcBrain}
  */
 export function createBrainForType(brainType) {
-    if (brainType === 'wander') return new WanderBrain();
     if (brainType === 'noop') return new NoopNpcBrain();
-    return new ThomasBrain();
+    return new WanderBrain();
 }

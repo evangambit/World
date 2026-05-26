@@ -29,7 +29,7 @@ src/
     npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
     shared/               # Tile memory, object tags, chunk describe, brain runtime
-    brain/                # Brain interface + task / wander / thomas / noop impls
+    brain/                # Brain interface + wander / noop impls
     llm/                  # LLM planner + prompts (task brain)
       npcPlanner.js       # Planner contract and plan JSON validation
       npcPrompt.js        # System/user prompt builders
@@ -134,12 +134,10 @@ When a plan step needs a remembered place (stove, chest), use **`ref`: `remember
 
 Each NPC has a pluggable **brain** (`npc/brain/`):
 
-- **`NpcTaskBrain`** — perception + task/plan queue with optional LLM planner (default for the `NPC` class).
 - **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there.
-- **`ThomasBrain`** — wall-respecting tile memory (supercover DDA raycast) + async behavior framework; default behavior is autonomous wheat farming. See [`src/npc/README.md`](src/npc/README.md) for the full task API.
 - **`NoopNpcBrain`** — no cognition (body-only tests).
 
-Select at runtime with `?brain=task` (default), `?brain=wander`, `?brain=thomas`, or `?brain=noop` (see `npcBrainRuntime.js`).
+Select at runtime with `?brain=task` (default), `?brain=wander` or `?brain=noop` (see `npcBrainRuntime.js`).
 
 Per-frame simulation order (see `tickSimulation.js`):
 
@@ -181,17 +179,10 @@ Test files live next to the module they cover:
 | `npc/npcPlanDescribe.test.mjs` | Plan step descriptions |
 | `npc/npcExplore.test.mjs` | Wide-area waypoint search |
 | `npc/shared/tileChunkDescribe.test.mjs` | Chunk snapshot and diff strings |
-| `npc/thomasBehaviors.test.mjs` | Behavioral regression: full `farmBehavior` loop over 10 000 ticks |
 | `npc/llm/*.test.mjs` | Prompt building, plan parsing, response cache |
 | `architecture/importLayers.test.mjs` | Layer boundary enforcement |
 
 For new rules, add a `*.test.mjs` next to the module under test.
-
-#### Behavioral regression tests
-
-`thomasBehaviors.test.mjs` runs `ThomasBrain` / `farmBehavior` for 10 000 simulation ticks (~500 game-seconds) in under a second — no browser, no renderer. It uses `buildVillage()` for a realistic world and asserts the NPC survives and ends with ≥ 5 bread (meaning the full farming cycle ran at least once). The `[bread-production]` console line prints a snapshot of final inventory and hunger for comparing productivity across AI-code changes.
-
-The key technique: `tickSimulation` is synchronous, but `ThomasBrain` behaviors are async coroutines. A plain `for` loop would freeze them (microtasks don't drain mid-loop). Adding `await Promise.resolve()` after each tick flushes the queue so the coroutine advances one step per tick, matching how the browser loop works.
 
 ### Layer boundaries (presentation vs logic)
 
@@ -217,7 +208,6 @@ Allowed direction: `main.js` → `client/` + logic layers; `client/` → logic l
 | `main.js` | Player input and UI |
 | `npc/brain/` | Pluggable NPC brain interface + implementations |
 | `npc/shared/npcBrainRuntime.js` | Resolves `?brain=` URL param to a brain instance |
-| `npc/brain/thomasImpl/` | Thomas perception, async tasks, behaviors |
 | `npc/brain/taskImpl/` | Task queue, plans, explore, memory-ref travel |
 | `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
 | `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |

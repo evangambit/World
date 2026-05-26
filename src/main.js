@@ -102,7 +102,7 @@ class Game {
 
         // Spawn NPCs inside their homes (see VILLAGE_NPC_SPAWNS in builder.js)
         const brainType = resolveBrainType();
-        if (brainType !== 'thomas') {
+        if (brainType !== 'wander') {
             console.log(`[World] NPC brain: ${brainType}`);
         }
         for (const def of VILLAGE_NPC_SPAWNS) {
