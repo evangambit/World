@@ -72,7 +72,7 @@ export class WanderBrain {
     tick(world, _dt, _gameTime) {
         this._world = world;
         const npc = this.npc;
-        if (!npc || npc._dead) return null;
+        if (!npc || !npc.isAlive) return null;
         if (npc.resolvingAction || isNpcTraveling(npc)) return null;
 
         if (!this._path || this._pathIndex >= this._path.length) {

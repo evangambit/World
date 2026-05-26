@@ -12,6 +12,9 @@ export { NPC_PERCEPTION_RADIUS };
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../world/world.js').World3D} World3D */
 
+/** @type {WeakMap<NpcEntity, Map<string, TileMemoryEntry>>} */
+const NPC_TILE_MEMORY = new WeakMap();
+
 /**
  * @typedef {Object} TileMemoryEntry
  * @property {number} seenAt
@@ -24,9 +27,20 @@ export { NPC_PERCEPTION_RADIUS };
  * @returns {Map<string, TileMemoryEntry>|undefined}
  */
 function tileStoreFor(npc) {
-    const brain = npc.brain;
-    if (!brain || !('_tileStore' in brain)) return undefined;
-    return /** @type {{ _tileStore: Map<string, TileMemoryEntry> }} */ (brain)._tileStore;
+    return NPC_TILE_MEMORY.get(npc);
+}
+
+/**
+ * @param {NpcEntity} npc
+ * @returns {Map<string, TileMemoryEntry>}
+ */
+function ensureTileStoreFor(npc) {
+    let map = NPC_TILE_MEMORY.get(npc);
+    if (!map) {
+        map = new Map();
+        NPC_TILE_MEMORY.set(npc, map);
+    }
+    return map;
 }
 
 /**
@@ -37,6 +51,28 @@ export function forEachNpcObservedTile(npc, fn) {
     const map = tileStoreFor(npc);
     if (!map) return;
     for (const [key, entry] of map) fn(key, entry);
+}
+
+/**
+ * Public accessor for an NPC's observed tile store.
+ * Callers should treat the returned map as read-only.
+ *
+ * @param {NpcEntity} npc
+ * @returns {Map<string, TileMemoryEntry>|undefined}
+ */
+export function getNpcTileMemoryStore(npc) {
+    return tileStoreFor(npc);
+}
+
+/**
+ * @param {NpcEntity} npc
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ * @param {TileMemoryEntry} entry
+ */
+export function setNpcTileMemory(npc, x, y, z, entry) {
+    ensureTileStoreFor(npc).set(World3D.key(x, y, z), entry);
 }
 
 /**
@@ -124,7 +160,7 @@ export function markTileReachable(npc, x, y, z) {
  */
 export function tickNpcPerception(npc, world, gameTime) {
     const brain = npc.brain;
-    if (npc._dead || !brain?.observeTile) return;
+    if (!npc.isAlive) return;
 
     const cx = Math.floor(npc.x);
     const cy = Math.floor(npc.y);
@@ -146,11 +182,13 @@ export function tickNpcPerception(npc, world, gameTime) {
                 reachable = prev.reachable;
             }
 
-            brain.observeTile(tx, ty, cz, {
+            const entry = {
                 seenAt: gameTime,
                 state,
                 reachable,
-            });
+            };
+            setNpcTileMemory(npc, tx, ty, cz, entry);
+            brain?.observeTile?.(tx, ty, cz, entry);
         }
     }
 }

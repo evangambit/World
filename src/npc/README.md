@@ -53,7 +53,7 @@ Perception runs **before** the task runner so newly seen tiles can influence tra
 ## Tile memory
 
 **Module:** `npcMemory.js`  
-**Storage:** `brain._tileStore` (private); `npc.brain.observeTile` to write, `getNpcTileMemory(npc, …)` to read
+**Storage:** internal `npcMemory` store keyed by NPC; `tickNpcPerception` writes, `getNpcTileMemory(npc, …)` reads
 
 ### Perception
 
