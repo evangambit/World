@@ -7,12 +7,12 @@
  * Low-level primitives (moveTowardLocation) think in ticks.
  * Higher-level combinators (seekKnownDesires) compose primitives and hide ticks.
  */
-import { isEntityActionComplete, startTimedWorldAction } from '../../../domain/entityActions.js';
-import { travelToTileAction } from '../../../actors/npcActions.js';
+import { startTimedWorldAction } from '../../../domain/entityActions.js';
+import { moveToAction } from '../../../actors/npcActions.js';
 import { isHostMoving } from '../../locomotion/brainLocomotionMixin.js';
 import { scheduleNpcAction } from '../../../actors/npcSimulation.js';
 import { forEachNpcObservedTile, markTileUnreachable } from '../../shared/npcMemory.js';
-import { findApproachTile } from '../../locomotion/pathUtils.js';
+import { findApproachTile, planPathToTile } from '../../locomotion/pathUtils.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -85,21 +85,18 @@ export async function moveTowardLocation(ctx, x, y, maxTicks) {
         return MoveResult.ARRIVED;
     }
 
-    scheduleNpcAction(npc, travelToTileAction(npc, x, y, npc.z, { onto: true }));
-    await ctx.nextTick();
-    if (!npc.currentAction && !isHostMoving(ctx._brain, npc)) {
-        return MoveResult.IMPOSSIBLE;
-    }
-
     for (let tick = 0; tick < maxTicks; tick++) {
+        if (!npc.resolvingAction && !isHostMoving(ctx._brain, npc)) {
+            const path = planPathToTile(ctx.world, npc, x, y, npc.z);
+            if (!path || path.length < 2) return MoveResult.IMPOSSIBLE;
+            const nextStep = path[1];
+            scheduleNpcAction(npc, moveToAction(npc, nextStep.x, nextStep.y, nextStep.z));
+        }
+
         await ctx.nextTick();
 
         if (npc._dead || npc.health < startHealth) return MoveResult.TOOK_DAMAGE;
         if (Math.floor(npc.x) === x && Math.floor(npc.y) === y) return MoveResult.ARRIVED;
-        if (!npc.currentAction && !isHostMoving(ctx._brain, npc)) return MoveResult.IMPOSSIBLE;
-        if (npc.currentAction && isEntityActionComplete(npc.currentAction, npc)) {
-            return MoveResult.ARRIVED;
-        }
     }
 
     return MoveResult.MAX_TICKS;

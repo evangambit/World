@@ -94,7 +94,7 @@ export class WanderBrain {
      */
     _isBusy(npc) {
         if (isBrainLocomotionActive(this._locomotion)) return true;
-        if (npc.currentAction && !isEntityActionComplete(npc.currentAction, npc)) {
+        if (npc.resolvingAction && !isEntityActionComplete(npc.resolvingAction, npc)) {
             return true;
         }
         return false;

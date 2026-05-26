@@ -36,6 +36,14 @@ export class Entity {
         this.timedAction = new TimedActionRunner(this);
         /** @type {import('../domain/entityActions.js').EntityAction | null} */
         this.currentAction = null;
+        /** Alias for action-in-progress semantics used by brain tick loops. */
+        Object.defineProperty(this, 'resolvingAction', {
+            get: () => this.currentAction,
+            set: (value) => {
+                this.currentAction = value;
+            },
+            configurable: true,
+        });
     }
 
     /** Try to move by (dx, dy) with collision against the world. */

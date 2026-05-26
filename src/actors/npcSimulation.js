@@ -43,6 +43,7 @@ export const NPC_PRESETS = [
  *   tick: (world: World3D, dt: number, gameTime: number) => EntityAction | null,
  *   scheduleAction: (action: EntityAction) => void,
  *   _pendingAction: EntityAction | null,
+ *   resolvingAction: EntityAction | null,
  * }} NpcEntity
  */
 

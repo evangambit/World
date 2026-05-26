@@ -37,6 +37,7 @@ import {
  * @property {boolean} [pickable] - tile.obj must be pickable
  * @property {boolean} [container] - tile.obj must be a container
  * @property {number} [terrain] - required tile.terrain
+ * @property {boolean} [walkable] - tile must be walkable (terrain + obj, doors unlocked)
  *
  * @typedef {Object} ContainerItemReq
  * @property {number} objType
@@ -103,6 +104,23 @@ export function satisfiesInventoryPrereq(entity, prereq) {
         const any = groups.some((group) => group.every((req) => inventoryHasReq(entity, req)));
         if (!any) return false;
     }
+    return true;
+}
+
+/**
+ * @param {World3D} world
+ * @param {TileReq} req
+ * @returns {boolean}
+ */
+export function satisfiesTilePrereq(world, req) {
+    const z = req.z ?? 0;
+    const tile = world.getTile(req.x, req.y, z);
+    if (!tile) return false;
+    if (req.object != null && tile.obj !== req.object) return false;
+    if (req.pickable === true && !isPickableObject(tile.obj)) return false;
+    if (req.container === true && !isContainerObject(tile.obj)) return false;
+    if (req.terrain != null && tile.terrain !== req.terrain) return false;
+    if (req.walkable === true && !world.isWalkable(req.x, req.y, z)) return false;
     return true;
 }
 

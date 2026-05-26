@@ -1,7 +1,7 @@
 /**
  * Immutable NPC EntityAction factories.
  */
-import { isAdjacentToTile } from '../domain/entityActions.js';
+import { isAdjacentToTile, satisfiesTilePrereq } from '../domain/entityActions.js';
 import { isAtMoveGoal, resolveMoveDestination } from '../npc/locomotion/pathUtils.js';
 
 /** @typedef {import('../domain/entityActions.js').EntityAction} EntityAction */
@@ -28,18 +28,19 @@ export function isMoveAction(action) {
  */
 export function moveToAction(entity, tx, ty, tz = entity.z) {
     const goal = Object.freeze({ tx, ty, tz, step: true });
+    const destTile = Object.freeze({ x: tx, y: ty, z: tz, walkable: true });
 
     return Object.freeze({
         type: 'move',
         duration: 0,
         goal,
-        prereq: () => ({ tile: { x: tx, y: ty, z: tz } }),
+        prereq: () => ({ tile: destTile }),
         isComplete: (e) => isAtMoveGoal(e, goal),
         apply: (world) => {
             if (isAtMoveGoal(entity, goal)) return true;
             if (entity.z !== tz) return false;
             if (!isAdjacentToTile(entity, tx, ty)) return false;
-            return world.isWalkable(tx, ty, tz);
+            return satisfiesTilePrereq(world, destTile);
         },
     });
 }
@@ -60,6 +61,7 @@ export function travelToTileAction(entity, tx, ty, tz = entity.z, opts = {}) {
         tz,
         onto: opts.onto === true,
     });
+    const destTile = Object.freeze({ x: tx, y: ty, z: tz, walkable: true });
 
     return Object.freeze({
         type: 'move',
@@ -67,11 +69,12 @@ export function travelToTileAction(entity, tx, ty, tz = entity.z, opts = {}) {
         goal,
         prereq: () =>
             goal.onto
-                ? { tile: { x: tx, y: ty, z: tz } }
+                ? { tile: destTile }
                 : { adjacentTo: { x: tx, y: ty, z: tz } },
         isComplete: (e) => isAtMoveGoal(e, goal),
         apply: (world) => {
             if (isAtMoveGoal(entity, goal)) return true;
+            if (goal.onto && !satisfiesTilePrereq(world, destTile)) return false;
             return resolveMoveDestination(world, entity, goal) != null;
         },
     });

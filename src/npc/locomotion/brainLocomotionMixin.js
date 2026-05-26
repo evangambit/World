@@ -55,8 +55,8 @@ export function destroyBrainLocomotionHost(host) {
  */
 export function isHostMoving(host, npc) {
     if (isBrainLocomotionActive(host._locomotion)) return true;
-    if (npc.currentAction && isMoveAction(npc.currentAction)) {
-        return !isEntityActionComplete(npc.currentAction, npc);
+    if (npc.resolvingAction && isMoveAction(npc.resolvingAction)) {
+        return !isEntityActionComplete(npc.resolvingAction, npc);
     }
     return false;
 }
