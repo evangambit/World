@@ -8,6 +8,7 @@ import {
     lookInsideContainerAction,
     moveDirectionAction,
     plantWheatSeedAction,
+    runEntityAction,
     satisfiesInventoryPrereq,
     satisfiesTilePrereq,
     tickEntityAction,
@@ -92,7 +93,7 @@ describe('crop actions', () => {
         const entity = new Entity(1.5, 2.5, 0);
         entity.inventory = [{ objType: Obj.WHEAT_SEED, count: 1 }];
 
-        const planted = plantWheatSeedAction(entity, 1, 1, 0).apply(world);
+        const planted = runEntityAction(entity, plantWheatSeedAction(entity, 1, 1, 0), world);
         assert.equal(planted, true);
 
         const matureAt = WHEAT_STAGE_SECONDS * 3;
@@ -102,7 +103,7 @@ describe('crop actions', () => {
             cropStage: 3,
             obj: tile?.obj ?? Obj.WHEAT_CROP,
         });
-        const harvested = harvestWheatAction(entity, 1, 1, matureAt).apply(world);
+        const harvested = runEntityAction(entity, harvestWheatAction(entity, 1, 1, matureAt), world);
         assert.equal(harvested, true);
         assert.ok(entity.inventory.some((s) => s.objType === Obj.WHEAT && s.count >= 1));
     });
@@ -118,7 +119,7 @@ describe('lookInsideContainerAction', () => {
         });
         const entity = new Entity(1.5, 1.5, 0);
         const action = lookInsideContainerAction(entity, 2, 2, 0);
-        const ok = action.apply(world);
+        const ok = runEntityAction(entity, action, world);
         assert.equal(ok, true);
         assert.equal(action.lastResult.ok, true);
         assert.equal(action.lastResult.contents.length, 1);

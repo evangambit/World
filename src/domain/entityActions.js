@@ -23,7 +23,7 @@ import {
 
 /**
  * Static requirements for an entity action (inventory + target tile semantics).
- * Tile contents are validated in `apply` using `world`; `prereq` captures intent for planners/UI.
+ * Dynamic world state is validated in action execution; `prereq` captures intent for planners/UI.
  *
  * @typedef {Object} InventoryReq
  * @property {number} objType
@@ -140,6 +140,18 @@ export function tickEntityAction(entity, action, world, dt) {
     }
 
     return true;
+}
+
+/**
+ * Execute a one-shot action through the shared executor path.
+ * Use this instead of calling `action.apply(world)` directly.
+ * @param {Entity} entity
+ * @param {EntityAction} action
+ * @param {World3D} world
+ * @returns {boolean}
+ */
+export function runEntityAction(entity, action, world) {
+    return tickEntityAction(entity, action, world, 0);
 }
 
 /**
@@ -684,7 +696,7 @@ export function lookInsideContainerAction(entity, cx, cy, cz) {
  */
 function applyTakeFromContainer(entity, world, cx, cy, cz, objType, buildingId) {
     const look = lookInsideContainerAction(entity, cx, cy, cz);
-    if (!look.apply(world)) return false;
+    if (!runEntityAction(entity, look, world)) return false;
 
     const contents = world.ensureTileContents(cx, cy, cz);
     if (!contents) return false;
@@ -712,7 +724,7 @@ function applyTakeFromContainer(entity, world, cx, cy, cz, objType, buildingId) 
 function applyStashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
     if (!canStashInContainer(objType)) return false;
     const look = lookInsideContainerAction(entity, cx, cy, cz);
-    if (!look.apply(world)) return false;
+    if (!runEntityAction(entity, look, world)) return false;
 
     const inv = entity.inventory ?? [];
     const i = inv.findIndex(
@@ -762,7 +774,7 @@ export function findContainerStack(world, cx, cy, cz, inventoryTypes) {
  * @returns {boolean}
  */
 export function pickUpAtTile(entity, world, tileX, tileY, tileZ = entity.z) {
-    return pickUpAction(entity, tileX, tileY, tileZ).apply(world);
+    return runEntityAction(entity, pickUpAction(entity, tileX, tileY, tileZ), world);
 }
 
 /**
@@ -773,8 +785,8 @@ export function pickUpAtTile(entity, world, tileX, tileY, tileZ = entity.z) {
  * @returns {false | 'steak' | 'bread'}
  */
 export function cookAtStove(entity, world, tileX, tileY) {
-    if (cookSteakAtStoveAction(entity, tileX, tileY).apply(world)) return 'steak';
-    if (cookBreadAtStoveAction(entity, tileX, tileY).apply(world)) return 'bread';
+    if (runEntityAction(entity, cookSteakAtStoveAction(entity, tileX, tileY), world)) return 'steak';
+    if (runEntityAction(entity, cookBreadAtStoveAction(entity, tileX, tileY), world)) return 'bread';
     return false;
 }
 
@@ -788,7 +800,7 @@ export function cookAtStove(entity, world, tileX, tileY) {
  */
 export function dropFromInventory(entity, world, objType, buildingId, count) {
     const action = dropAction(entity, objType, buildingId, count);
-    action.apply(world);
+    runEntityAction(entity, action, world);
     return action.lastResult;
 }
 
@@ -803,7 +815,7 @@ export function dropFromInventory(entity, world, objType, buildingId, count) {
  * @returns {boolean}
  */
 export function takeFromContainer(entity, world, cx, cy, cz, objType, buildingId) {
-    return takeFromContainerAction(entity, cx, cy, cz, objType, buildingId).apply(world);
+    return runEntityAction(entity, takeFromContainerAction(entity, cx, cy, cz, objType, buildingId), world);
 }
 
 /**
@@ -817,7 +829,7 @@ export function takeFromContainer(entity, world, cx, cy, cz, objType, buildingId
  * @returns {boolean}
  */
 export function stashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
-    return stashToContainerAction(entity, cx, cy, cz, objType, buildingId).apply(world);
+    return runEntityAction(entity, stashToContainerAction(entity, cx, cy, cz, objType, buildingId), world);
 }
 
 /**

@@ -51,7 +51,7 @@ See [`brain/thomasImpl/THOMAS_BRAIN.md`](brain/thomasImpl/THOMAS_BRAIN.md) for f
 
 `tickSimulation` runs:
 
-1. `tickNpcSimulation` — vitality, locomotion, timed actions  
+1. Vitality update + in-flight travel/timed-action progression  
 2. `npc.brain.tick` — for task brain: perception → task queue (which runs `syncMemoryRefTravelGoal` internally)
 
 Perception runs **before** the task runner so newly seen tiles can influence travel and plans on the same frame.
@@ -87,7 +87,7 @@ Optional flag on each memory entry:
 **Set `false` when:**
 
 - `findPath` finds no route while selecting a memory-ref target  
-- `moveToAction` / pathfinding fails for that tile  
+- memory-ref travel/pathfinding fails for that tile  
 
 **Set `true` when:**
 
@@ -134,7 +134,7 @@ Plans no longer use a top-level `bindings` object. Steps use **`ref`** strings o
 
 Syntax: `rememberLocationsOfNearby(stove)` (object tag from `npcObjectTags.js`, e.g. `stove`, `chest`).
 
-Returns all remembered tiles on the NPC’s floor whose **snapshot** matches the tag (tile `obj` or container `contents`).
+Returns all remembered tiles on the NPC’s floor whose **snapshot** matches the tag (tile `obj` and other visible tile state).
 
 **Travel behavior** (`npcMemoryTravel.js`):
 

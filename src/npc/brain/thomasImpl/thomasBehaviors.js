@@ -6,7 +6,12 @@
  */
 import { T, Obj, WHEAT_CROP_STAGES, isStoveObject, isWheatCropObject } from '../../../world/tileTypes.js';
 import { canPlantWheatAt, isWheatMature, wheatStageForTile } from '../../../domain/crops.js';
-import { cookBreadAtStoveAction, harvestWheatAction, plantWheatSeedAction } from '../../../domain/entityActions.js';
+import {
+    cookBreadAtStoveAction,
+    harvestWheatAction,
+    plantWheatSeedAction,
+    runEntityAction,
+} from '../../../domain/entityActions.js';
 import { consumeFoodFromInventory } from '../../../domain/vitality.js';
 import {
     SeekResult,
@@ -140,7 +145,7 @@ async function interactAtCurrentTile(ctx) {
     if (!tile) return;
 
     if (isWheatCropObject(tile.obj) && isWheatMature(tile, gameTime)) {
-        harvestWheatAction(npc, tx, ty, gameTime, tz).apply(world);
+        runEntityAction(npc, harvestWheatAction(npc, tx, ty, gameTime, tz), world);
         return;
     }
 
@@ -150,7 +155,7 @@ async function interactAtCurrentTile(ctx) {
     }
 
     if (canPlantWheatAt(world, tx, ty, tz) && inventoryCount(npc, Obj.WHEAT_SEED) > 0) {
-        plantWheatSeedAction(npc, tx, ty, gameTime, tz).apply(world);
+        runEntityAction(npc, plantWheatSeedAction(npc, tx, ty, gameTime, tz), world);
     }
 }
 
@@ -170,7 +175,7 @@ function tryCookBreadAtAdjacentStove(ctx) {
             if (dx === 0 && dy === 0) continue;
             const tile = world.getTile(px + dx, py + dy, z);
             if (!tile || !isStoveObject(tile.obj)) continue;
-            if (cookBreadAtStoveAction(npc, px + dx, py + dy).apply(world)) return true;
+            if (runEntityAction(npc, cookBreadAtStoveAction(npc, px + dx, py + dy), world)) return true;
         }
     }
     return false;

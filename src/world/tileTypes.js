@@ -65,7 +65,7 @@ const PICKABLE_OBJ = new Set([
     Obj.WHEAT, Obj.WHEAT_SEED, Obj.BREAD,
 ]);
 
-/** Furniture / storage that can hold `contents` stacks on the tile. */
+/** Furniture / storage whose stacks live in World3D's private container store. */
 const CONTAINER_OBJ = new Set([Obj.TABLE, Obj.BED, Obj.CHAIR, Obj.CHEST]);
 
 export function isContainerObject(objType) {

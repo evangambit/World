@@ -29,6 +29,7 @@ import {
     lookInsideContainerAction,
     plantWheatSeedAction,
     pickUpAction,
+    runEntityAction,
     satisfiesInventoryPrereq,
     stashToContainerAction,
     takeFromContainerAction,
@@ -177,13 +178,21 @@ class Game {
                     return;
                 }
                 if (tile && isWheatCropObject(tile.obj)) {
-                    const ok = harvestWheatAction(this.player, tx, ty, this.gameTime).apply(this.world);
+                    const ok = runEntityAction(
+                        this.player,
+                        harvestWheatAction(this.player, tx, ty, this.gameTime),
+                        this.world,
+                    );
                     this._showGameMessage(ok ? 'Harvested wheat and seeds' : 'Wheat is not ready yet');
                     if (ok) this._syncInventoryUI();
                     return;
                 }
                 if (tile && !tile.obj) {
-                    const ok = plantWheatSeedAction(this.player, tx, ty, this.gameTime).apply(this.world);
+                    const ok = runEntityAction(
+                        this.player,
+                        plantWheatSeedAction(this.player, tx, ty, this.gameTime),
+                        this.world,
+                    );
                     if (ok) {
                         this._showGameMessage('Planted wheat');
                         this._syncInventoryUI();
@@ -192,10 +201,16 @@ class Game {
                 }
                 if (tile && isStoveObject(tile.obj)) {
                     const steak = cookSteakAtStoveAction(this.player, tx, ty);
-                    if (steak.apply(this.world)) {
+                    if (runEntityAction(this.player, steak, this.world)) {
                         this._showGameMessage('Cooked a steak.');
                         this._syncInventoryUI();
-                    } else if (cookBreadAtStoveAction(this.player, tx, ty).apply(this.world)) {
+                    } else if (
+                        runEntityAction(
+                            this.player,
+                            cookBreadAtStoveAction(this.player, tx, ty),
+                            this.world,
+                        )
+                    ) {
                         this._showGameMessage('Baked some bread.');
                         this._syncInventoryUI();
                     } else if (
@@ -215,7 +230,7 @@ class Game {
                     return;
                 }
             }
-            if (pickUpAction(this.player, tx, ty, this.player.z).apply(this.world)) {
+            if (runEntityAction(this.player, pickUpAction(this.player, tx, ty, this.player.z), this.world)) {
                 this._syncInventoryUI();
             }
         });
@@ -369,7 +384,7 @@ class Game {
 
     _dropFromInventory(objType, buildingId) {
         const action = dropAction(this.player, objType, buildingId);
-        action.apply(this.world);
+        runEntityAction(this.player, action, this.world);
         this._syncInventoryUI();
         this._showGameMessage(action.lastResult.message);
     }
@@ -377,7 +392,7 @@ class Game {
     _openContainerAt(tx, ty) {
         const z = this.player.z;
         const look = lookInsideContainerAction(this.player, tx, ty, z);
-        if (!look.apply(this.world)) return;
+        if (!runEntityAction(this.player, look, this.world)) return;
         this.openContainer = { x: tx, y: ty, z };
         this._refreshContainerUI();
     }
@@ -436,7 +451,13 @@ class Game {
     _takeFromContainer(objType, buildingId) {
         const open = this.openContainer;
         if (!open) return;
-        if (!takeFromContainerAction(this.player, open.x, open.y, open.z, objType, buildingId).apply(this.world)) {
+        if (
+            !runEntityAction(
+                this.player,
+                takeFromContainerAction(this.player, open.x, open.y, open.z, objType, buildingId),
+                this.world,
+            )
+        ) {
             return;
         }
         this._syncContainerPanel();
@@ -446,7 +467,13 @@ class Game {
     _stashToContainer(objType, buildingId) {
         const open = this.openContainer;
         if (!open || !canStashInContainer(objType)) return;
-        if (!stashToContainerAction(this.player, open.x, open.y, open.z, objType, buildingId).apply(this.world)) {
+        if (
+            !runEntityAction(
+                this.player,
+                stashToContainerAction(this.player, open.x, open.y, open.z, objType, buildingId),
+                this.world,
+            )
+        ) {
             return;
         }
         this._syncContainerPanel();

@@ -25,8 +25,7 @@ src/
   actors/                 # Bodies in the world
     entity.js             # Shared body (movement, inventory, vitality)
     timedActionRunner.js  # Runs timed actions on an entity (blocks movement)
-    npcSimulation.js      # NPC vitality/movement/death (no AI — use in tests)
-    npcLocomotion.js      # Pathfinding + path follow
+    npcSimulation.js      # NPC vitality/travel/death; brains return actions
     npc.js                # Full NPC (sim + task/plan brain)
   npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
     shared/               # Tile memory, object tags, chunk describe, brain runtime
@@ -120,9 +119,9 @@ Do **not** put world-changing logic in `main.js` or `npcPlanRunner.js` except to
 5. **NPC:** add a plan leaf type (and/or `runYourAction` in `npcTaskPrimitives.js`) that calls the **same** function after `travelNpcToTile` if needed.
 6. If NPCs need to refer to a place or thing abstractly, add an object tag and/or a memory ref query; do not reimplement the effect in the plan runner.
 
-### Movement is separate (on purpose)
+### Movement/action execution
 
-Movement uses two paths today: player `tryMove` (continuous input) vs NPC `moveToAction` / `travelNpcToTile`. That is fine—control differs, but **interactions** must not fork. After both stand next to a stove, they both call `cookAtStove`.
+Player and NPC now share the same action execution primitives (`moveDirectionAction`, `tickEntityAction`, `runEntityAction`). Brains still choose *which* action to run, but world effects and action semantics come from the same action layer.
 
 ### Plans vs tasks
 
@@ -144,8 +143,8 @@ Select at runtime with `?brain=task` (default), `?brain=wander`, `?brain=thomas`
 
 Per-frame simulation order (see `tickSimulation.js`):
 
-1. `tickNpcSimulation` — vitality, locomotion, timed actions
-2. `npc.brain?.tick` — perception → task queue (which runs `syncMemoryRefTravelGoal` internally)
+1. NPC vitality update and in-flight travel/timed-action progression
+2. `npc.brain?.tick` to choose next action (when not already resolving one)
 
 Perception runs **before** the task runner so newly seen tiles can influence travel and plans on the same frame. Full brain/memory/plan details: [`src/npc/README.md`](src/npc/README.md).
 
@@ -213,7 +212,7 @@ Allowed direction: `main.js` → `client/` + logic layers; `client/` → logic l
 | `domain/cooking.js` | Inventory-only cooking transform |
 | `domain/crops.js` | Wheat growth and harvest |
 | `domain/vitality.js` | Shared hunger/health |
-| `actors/entity.js`, `actors/npcSimulation.js`, `actors/npc.js`, `client/playerController.js` | Actor state and movement |
+| `actors/entity.js`, `actors/npcSimulation.js`, `actors/npc.js`, `client/playerController.js` | Actor state, action execution, and movement |
 | `actors/timedActionRunner.js` | Runs timed actions on entities |
 | `main.js` | Player input and UI |
 | `npc/brain/` | Pluggable NPC brain interface + implementations |
