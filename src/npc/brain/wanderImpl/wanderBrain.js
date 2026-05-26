@@ -66,9 +66,10 @@ export class WanderBrain {
      * @param {World3D} world
      * @param {number} _dt
      * @param {number} _gameTime
+     * @param {number|null} _actionProgress
      * @returns {EntityAction | null}
      */
-    tick(world, _dt, _gameTime) {
+    tick(world, _dt, _gameTime, _actionProgress) {
         this._world = world;
         const npc = this.npc;
         if (!npc || !npc.isAlive) return null;

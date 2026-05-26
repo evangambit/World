@@ -55,7 +55,6 @@ import {
  * @property {(world: World3D) => boolean} [apply] - one-shot world effect when no tick
  * @property {(entity: Entity, world: World3D, dt: number) => boolean} [tick] - per-frame update (movement, etc.)
  * @property {number} [duration=0] - seconds; 0 = instant apply, >0 starts TimedActionRunner until complete
- * @property {(entity: Entity) => boolean} [isComplete] - when set, currentAction held until this is true
  * @property {'moveDirection'} [type]
  * @property {number} [dx] - normalized movement intent (cardinal/diagonal input)
  * @property {number} [dy]
@@ -67,16 +66,6 @@ import {
  */
 export function actionDuration(action) {
     return action.duration ?? 0;
-}
-
-/**
- * @param {EntityAction} action
- * @param {Entity} entity
- * @returns {boolean}
- */
-export function isEntityActionComplete(action, entity) {
-    if (action.isComplete) return action.isComplete(entity);
-    return actionDuration(action) === 0;
 }
 
 /**
@@ -105,7 +94,6 @@ export function moveDirectionAction(entity, dx, dy) {
             if (dx === 0 && dy === 0) return true;
             return e.tryMove(dx, dy, world, dt);
         },
-        isComplete: () => true,
     };
 }
 

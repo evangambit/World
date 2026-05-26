@@ -22,9 +22,10 @@ export class NoopNpcBrain {
      * @param {World3D} _world
      * @param {number} _dt
      * @param {number} _gameTime
+     * @param {number|null} _actionProgress
      * @returns {null}
      */
-    tick(_world, _dt, _gameTime) {
+    tick(_world, _dt, _gameTime, _actionProgress) {
         return null;
     }
 

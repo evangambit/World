@@ -3,6 +3,7 @@
  */
 import { tickVitality } from '../domain/vitality.js';
 import {
+    actionDuration,
     isAdjacentToTile,
     pickUpAction,
 } from '../domain/entityActions.js';
@@ -159,7 +160,13 @@ export function tickNpc(entity, world, dt, gameTime) {
     /** @type {EntityAction | null} */
     let applied = null;
 
-    const brainAction = entity.brain?.tick(world, dt, gameTime) ?? null;
+    /** @type {number|null} */
+    let actionProgress = null;
+    if (entity.currentAction && actionDuration(entity.currentAction) > 0) {
+        actionProgress = entity.timedAction.getProgress();
+    }
+
+    const brainAction = entity.brain?.tick(world, dt, gameTime, actionProgress) ?? null;
     if (!entity.resolvingAction && brainAction) {
         tickEntityAction(entity, brainAction, world, dt);
         applied = brainAction;

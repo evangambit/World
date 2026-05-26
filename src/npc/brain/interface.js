@@ -10,7 +10,7 @@
 /**
  * @typedef {Object} NpcBrain
  * @property {(npc: NpcEntity) => void} attach
- * @property {(world: World3D, dt: number, gameTime: number) => EntityAction | null | void} tick
+ * @property {(world: World3D, dt: number, gameTime: number, actionProgress: number | null) => EntityAction | null | void} tick
  * @property {() => void} [destroy]
  * @property {(x: number, y: number, z: number, entry: TileMemoryEntry) => void} [observeTile]
  * @property {() => { lines: string[] }} [getStatus]

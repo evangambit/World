@@ -2,7 +2,7 @@
  * Shared action execution for actor controllers (player + NPC simulation).
  * Keep this out of brain modules: brains should return actions, not execute them.
  */
-import { actionDuration, isEntityActionComplete } from '../domain/entityActions.js';
+import { actionDuration } from '../domain/entityActions.js';
 
 /** @typedef {import('./entity.js').Entity} Entity */
 /** @typedef {import('../domain/entityActions.js').EntityAction} EntityAction */
@@ -32,7 +32,7 @@ export function tickEntityAction(entity, action, world, dt) {
         return false;
     }
 
-    if (isEntityActionComplete(action, entity)) {
+    if (actionDuration(action) === 0) {
         entity.currentAction = null;
     } else if (actionDuration(action) > 0 && !entity.timedAction.isBusy()) {
         entity.currentAction = null;
