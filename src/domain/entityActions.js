@@ -50,14 +50,23 @@ import {
  * @property {TileReq} [tile]
  * @property {TileCoord} [adjacentTo] - entity must be adjacent to this tile
  *
- * @typedef {Object} EntityAction
+ * @typedef {Object} BaseEntityAction
  * @property {() => ActionPrereq} prereq
  * @property {(world: World3D) => boolean} [apply] - one-shot world effect when no tick
  * @property {(entity: Entity, world: World3D, dt: number) => boolean} [tick] - per-frame update (movement, etc.)
  * @property {number} [duration=0] - seconds; 0 = instant apply, >0 starts TimedActionRunner until complete
- * @property {'moveDirection'} [type]
- * @property {number} [dx] - normalized movement intent (cardinal/diagonal input)
- * @property {number} [dy]
+ *
+ * @typedef {BaseEntityAction & {
+ *   type: 'moveDirection',
+ *   dx: number,
+ *   dy: number,
+ * }} MoveDirectionAction
+ *
+ * @typedef {BaseEntityAction & {
+ *   type?: undefined,
+ * }} GenericEntityAction
+ *
+ * @typedef {MoveDirectionAction | GenericEntityAction} EntityAction
  */
 
 /**
@@ -70,7 +79,7 @@ export function actionDuration(action) {
 
 /**
  * @param {EntityAction} action
- * @returns {action is EntityAction & { type: 'moveDirection' }}
+ * @returns {action is MoveDirectionAction}
  */
 export function isMoveDirectionAction(action) {
     return action.type === 'moveDirection';
@@ -81,7 +90,7 @@ export function isMoveDirectionAction(action) {
  * @param {Entity} entity
  * @param {number} dx - normalized direction (-1, 0, or 1)
  * @param {number} dy
- * @returns {EntityAction & { type: 'moveDirection', dx: number, dy: number }}
+ * @returns {MoveDirectionAction}
  */
 export function moveDirectionAction(entity, dx, dy) {
     return {
