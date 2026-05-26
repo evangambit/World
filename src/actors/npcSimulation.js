@@ -3,13 +3,19 @@
  */
 import { tickVitality } from '../domain/vitality.js';
 import {
-    actionDuration,
     isAdjacentToTile,
     isEntityActionComplete,
+    moveDirectionAction,
     pickUpAction,
+    tickEntityAction,
 } from '../domain/entityActions.js';
-import { isMoveAction, travelToTileAction } from './npcActions.js';
-import { isAtMoveGoal } from '../npc/locomotion/pathUtils.js';
+import {
+    advancePathIndexAtWaypoint,
+    directionTowardPoint,
+    findApproachTile,
+    isAtMoveGoal,
+    planPathToTile,
+} from '../npc/locomotion/pathUtils.js';
 import { Entity } from './entity.js';
 import { attachNpcBrain } from '../npc/brain/attach.js';
 
@@ -17,6 +23,18 @@ import { attachNpcBrain } from '../npc/brain/attach.js';
 /** @typedef {import('./entity.js').Entity} Entity */
 /** @typedef {import('../world/world.js').World3D} World3D */
 /** @typedef {import('../npc/brain/interface.js').NpcBrain} NpcBrain */
+
+/**
+ * @typedef {Object} NpcTravel
+ * @property {number} tx
+ * @property {number} ty
+ * @property {number} tz
+ * @property {boolean} onto
+ * @property {{ x: number, y: number, z: number }[]} path
+ * @property {number} pathIndex
+ * @property {() => void} resolve
+ * @property {(err: Error) => void} reject
+ */
 
 /** NPC appearance presets (skin, hair, shirt, pants). */
 export const NPC_PRESETS = [
@@ -43,6 +61,7 @@ export const NPC_PRESETS = [
  *   tick: (world: World3D, dt: number, gameTime: number) => EntityAction | null,
  *   scheduleAction: (action: EntityAction) => void,
  *   _pendingAction: EntityAction | null,
+ *   _travel: NpcTravel | null,
  *   resolvingAction: EntityAction | null,
  * }} NpcEntity
  */
@@ -92,6 +111,7 @@ export function initNpcEntity(entity, opts = {}) {
 
     const loco = /** @type {NpcEntity} */ (entity);
     loco._pendingAction = null;
+    loco._travel = null;
     loco.scheduleAction = (action) => scheduleNpcAction(loco, action);
     loco.tick = (world, dt, gameTime) => tickNpc(loco, world, dt, gameTime);
 
@@ -112,6 +132,10 @@ export function initNpcEntity(entity, opts = {}) {
  */
 export function markNpcDead(entity) {
     if (entity._dead) return;
+    if (entity._travel) {
+        entity._travel.reject(new Error('dead'));
+        entity._travel = null;
+    }
     entity._dead = true;
     entity.health = 0;
     entity.currentAction = null;
@@ -138,51 +162,50 @@ function takePendingNpcAction(npc) {
     return action;
 }
 
+/** @param {NpcEntity} npc */
+export function isNpcTraveling(npc) {
+    return npc._travel != null;
+}
+
 /**
  * @param {NpcEntity} npc
- * @param {EntityAction} action
  * @param {World3D} world
- * @returns {boolean}
+ * @param {number} dt
+ * @returns {boolean} true when travel consumed this frame
  */
-export function applyNpcAction(npc, action, world) {
-    if (npc.timedAction.isBusy()) {
-        npc.timedAction.cancel();
-    }
+function tickNpcTravel(npc, world, dt) {
+    const trip = npc._travel;
+    if (!trip) return false;
 
-    if (isMoveAction(action)) {
-        npc.currentAction = action;
-        const ok = npc.brain?.applyAction?.(npc, action, world) ?? false;
-        if (!ok) {
-            npc.currentAction = null;
-            return false;
-        }
-        if (isEntityActionComplete(action, npc)) {
-            npc.currentAction = null;
-        }
+    const goal = { tx: trip.tx, ty: trip.ty, tz: trip.tz, onto: trip.onto };
+    if (isAtMoveGoal(npc, goal)) {
+        npc._travel = null;
+        trip.resolve();
         return true;
     }
 
-    npc.currentAction = action;
-    const ok = action.apply(world);
-    if (!ok) {
-        npc.currentAction = null;
-        return false;
+    trip.pathIndex = advancePathIndexAtWaypoint(npc, trip.path, trip.pathIndex);
+    if (trip.pathIndex >= trip.path.length) {
+        npc._travel = null;
+        trip.reject(new Error('impossible'));
+        return true;
     }
-    if (isEntityActionComplete(action, npc)) {
-        npc.currentAction = null;
-    } else if (actionDuration(action) > 0 && !npc.timedAction.isBusy()) {
-        npc.currentAction = null;
-    }
+
+    const wp = trip.path[trip.pathIndex];
+    const { dx, dy } = directionTowardPoint(npc, wp.x + 0.5, wp.y + 0.5);
+    tickEntityAction(npc, moveDirectionAction(npc, dx, dy), world, dt);
     return true;
 }
 
 /**
  * @param {NpcEntity} npc
+ * @param {EntityAction} action
+ * @param {World3D} world
+ * @param {number} dt
+ * @returns {boolean}
  */
-function finishNpcCurrentAction(npc) {
-    if (!npc.currentAction) return;
-    if (!isEntityActionComplete(npc.currentAction, npc)) return;
-    npc.currentAction = null;
+export function applyNpcAction(npc, action, world, dt) {
+    return tickEntityAction(npc, action, world, dt);
 }
 
 /**
@@ -195,16 +218,40 @@ function finishNpcCurrentAction(npc) {
  * @returns {Promise<void>}
  */
 export function travelNpcToTile(npc, tx, ty, tz, world, opts = {}) {
-    if (!npc.brain?.travelToTile) {
-        return Promise.reject(new Error('NPC has no brain that supports travel'));
-    }
     const onto = opts.onto !== false;
     if (isAtMoveGoal(npc, { tx, ty, tz, onto })) {
         return Promise.resolve();
     }
-    const promise = npc.brain.travelToTile(npc, tx, ty, tz, world, opts);
-    scheduleNpcAction(npc, travelToTileAction(npc, tx, ty, tz, { onto }));
-    return promise;
+
+    if (npc._travel) {
+        npc._travel.reject(new Error('travel superseded'));
+        npc._travel = null;
+    }
+
+    const dest = onto
+        ? { x: tx, y: ty, z: tz }
+        : findApproachTile(world, npc, { x: tx, y: ty, z: tz });
+    if (!dest) {
+        return Promise.reject(new Error('impossible'));
+    }
+
+    const path = planPathToTile(world, npc, dest.x, dest.y, dest.z);
+    if (!path || path.length < 2) {
+        return Promise.reject(new Error('impossible'));
+    }
+
+    return new Promise((resolve, reject) => {
+        npc._travel = {
+            tx,
+            ty,
+            tz,
+            onto,
+            path,
+            pathIndex: 1,
+            resolve,
+            reject,
+        };
+    });
 }
 
 /**
@@ -219,7 +266,7 @@ export async function runPickUpAtTile(npc, world, tileX, tileY, tileZ = npc.z) {
     if (!isAdjacentToTile(npc, tileX, tileY) || npc.z !== tileZ) {
         await travelNpcToTile(npc, tileX, tileY, tileZ, world, { onto: false });
     }
-    if (!applyNpcAction(npc, pickUpAction(npc, tileX, tileY, tileZ), world)) {
+    if (!applyNpcAction(npc, pickUpAction(npc, tileX, tileY, tileZ), world, 0)) {
         throw new Error(`Pick up failed at (${tileX}, ${tileY}, ${tileZ})`);
     }
 }
@@ -232,16 +279,15 @@ export async function runPickUpAtTile(npc, world, tileX, tileY, tileZ = npc.z) {
 export function tickNpcLocomotionFrame(entity, world, dt) {
     if (entity._dead) return;
 
+    if (tickNpcTravel(entity, world, dt)) return;
+
     let pending;
     while ((pending = takePendingNpcAction(entity))) {
-        applyNpcAction(entity, pending, world);
+        applyNpcAction(entity, pending, world, dt);
     }
 
     if (entity.timedAction.isBusy()) {
         entity.timedAction.tick(dt, world);
-    } else {
-        entity.brain?.advanceLocomotion?.(entity, dt);
-        finishNpcCurrentAction(entity);
     }
 }
 
@@ -261,24 +307,25 @@ export function tickNpc(entity, world, dt, gameTime) {
         return null;
     }
 
-    const brainAction = entity.brain?.tick(world, dt, gameTime) ?? null;
+    const traveling = tickNpcTravel(entity, world, dt);
+
     /** @type {EntityAction | null} */
     let applied = null;
-    if (brainAction) {
-        applyNpcAction(entity, brainAction, world);
+
+    const brainAction = entity.brain?.tick(world, dt, gameTime) ?? null;
+    if (!traveling && !entity.resolvingAction && brainAction) {
+        tickEntityAction(entity, brainAction, world, dt);
         applied = brainAction;
     }
+
     let pending;
     while ((pending = takePendingNpcAction(entity))) {
-        applyNpcAction(entity, pending, world);
+        tickEntityAction(entity, pending, world, dt);
         applied = pending;
     }
 
     if (entity.timedAction.isBusy()) {
         entity.timedAction.tick(dt, world);
-    } else {
-        entity.brain?.advanceLocomotion?.(entity, dt);
-        finishNpcCurrentAction(entity);
     }
 
     return applied;

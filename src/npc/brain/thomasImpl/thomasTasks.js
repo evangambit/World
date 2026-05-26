@@ -8,11 +8,9 @@
  * Higher-level combinators (seekKnownDesires) compose primitives and hide ticks.
  */
 import { startTimedWorldAction } from '../../../domain/entityActions.js';
-import { moveToAction } from '../../../actors/npcActions.js';
-import { isHostMoving } from '../../locomotion/brainLocomotionMixin.js';
-import { scheduleNpcAction } from '../../../actors/npcSimulation.js';
+import { isNpcTraveling, travelNpcToTile } from '../../../actors/npcSimulation.js';
 import { forEachNpcObservedTile, markTileUnreachable } from '../../shared/npcMemory.js';
-import { findApproachTile, planPathToTile } from '../../locomotion/pathUtils.js';
+import { findApproachTile } from '../../locomotion/pathUtils.js';
 
 /** @typedef {import('../world/world.js').TileData} TileData */
 /** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
@@ -67,9 +65,7 @@ export class TaskContext {
 // ── Primitives ──────────────────────────────────────────────────────────────
 
 /**
- * Walk toward a tile on the NPC's current floor.
- *
- * Schedules `travelToTileAction` and polls until arrival or failure.
+ * Walk toward a tile on the NPC's current floor via shared travelNpcToTile.
  *
  * @param {TaskContext} ctx
  * @param {number} x   Target tile X
@@ -78,26 +74,47 @@ export class TaskContext {
  * @returns {Promise<string>} A `MoveResult.*` value.
  */
 export async function moveTowardLocation(ctx, x, y, maxTicks) {
-    const { npc } = ctx;
+    const { npc, world } = ctx;
     const startHealth = npc.health;
 
     if (Math.floor(npc.x) === x && Math.floor(npc.y) === y) {
         return MoveResult.ARRIVED;
     }
 
-    for (let tick = 0; tick < maxTicks; tick++) {
-        if (!npc.resolvingAction && !isHostMoving(ctx._brain, npc)) {
-            const path = planPathToTile(ctx.world, npc, x, y, npc.z);
-            if (!path || path.length < 2) return MoveResult.IMPOSSIBLE;
-            const nextStep = path[1];
-            scheduleNpcAction(npc, moveToAction(npc, nextStep.x, nextStep.y, nextStep.z));
-        }
+    let travelPromise;
+    try {
+        travelPromise = travelNpcToTile(npc, x, y, npc.z, world, { onto: true });
+    } catch {
+        return MoveResult.IMPOSSIBLE;
+    }
 
+    for (let tick = 0; tick < maxTicks; tick++) {
         await ctx.nextTick();
 
-        if (npc._dead || npc.health < startHealth) return MoveResult.TOOK_DAMAGE;
-        if (Math.floor(npc.x) === x && Math.floor(npc.y) === y) return MoveResult.ARRIVED;
+        if (npc._dead || npc.health < startHealth) {
+            if (npc._travel) {
+                npc._travel.reject(new Error('dead'));
+                npc._travel = null;
+            }
+            return MoveResult.TOOK_DAMAGE;
+        }
+
+        if (!isNpcTraveling(npc)) {
+            try {
+                await travelPromise;
+            } catch {
+                return MoveResult.IMPOSSIBLE;
+            }
+            if (Math.floor(npc.x) === x && Math.floor(npc.y) === y) return MoveResult.ARRIVED;
+            return MoveResult.IMPOSSIBLE;
+        }
     }
+
+    if (npc._travel) {
+        npc._travel.reject(new Error('max_ticks'));
+        npc._travel = null;
+    }
+    await travelPromise.catch(() => {});
 
     return MoveResult.MAX_TICKS;
 }

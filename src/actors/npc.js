@@ -12,8 +12,6 @@ import {
     applyNpcAction,
     travelNpcToTile,
 } from './npcSimulation.js';
-import { moveToAction, travelToTileAction } from './npcActions.js';
-
 export {
     createNpcEntity,
     initNpcEntity,
@@ -22,10 +20,15 @@ export {
     scheduleNpcAction,
     applyNpcAction,
     travelNpcToTile,
+    isNpcTraveling,
     runPickUpAtTile,
     NPC_PRESETS,
 } from './npcSimulation.js';
-export { moveToAction, travelToTileAction } from './npcActions.js';
+export {
+    moveDirectionAction,
+    tickEntityAction,
+    isMoveDirectionAction,
+} from '../domain/entityActions.js';
 export {
     attachNpcBrain,
     NoopNpcBrain,

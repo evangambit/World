@@ -51,11 +51,13 @@ import {
  *
  * @typedef {Object} EntityAction
  * @property {() => ActionPrereq} prereq
- * @property {(world: World3D) => boolean} apply
+ * @property {(world: World3D) => boolean} [apply] - one-shot world effect when no tick
+ * @property {(entity: Entity, world: World3D, dt: number) => boolean} [tick] - per-frame update (movement, etc.)
  * @property {number} [duration=0] - seconds; 0 = instant apply, >0 starts TimedActionRunner until complete
  * @property {(entity: Entity) => boolean} [isComplete] - when set, currentAction held until this is true
- * @property {'move'} [type] - immutable move intent; path state lives on the brain
- * @property {import('../npc/locomotion/pathUtils.js').MoveGoal} [goal]
+ * @property {'moveDirection'} [type]
+ * @property {number} [dx] - normalized movement intent (cardinal/diagonal input)
+ * @property {number} [dy]
  */
 
 /**
@@ -74,6 +76,69 @@ export function actionDuration(action) {
 export function isEntityActionComplete(action, entity) {
     if (action.isComplete) return action.isComplete(entity);
     return actionDuration(action) === 0;
+}
+
+/**
+ * @param {EntityAction} action
+ * @returns {action is EntityAction & { type: 'moveDirection' }}
+ */
+export function isMoveDirectionAction(action) {
+    return action.type === 'moveDirection';
+}
+
+/**
+ * Same movement primitive as player keyboard input — one simulation step via tryMove.
+ * @param {Entity} entity
+ * @param {number} dx - normalized direction (-1, 0, or 1)
+ * @param {number} dy
+ * @returns {EntityAction & { type: 'moveDirection', dx: number, dy: number }}
+ */
+export function moveDirectionAction(entity, dx, dy) {
+    return {
+        type: 'moveDirection',
+        dx,
+        dy,
+        duration: 0,
+        prereq: () => ({}),
+        tick: (e, world, dt) => {
+            if (dx === 0 && dy === 0) return true;
+            return e.tryMove(dx, dy, world, dt);
+        },
+        isComplete: () => true,
+    };
+}
+
+/**
+ * Run one entity action for a single simulation frame (player and NPC).
+ * @param {Entity} entity
+ * @param {EntityAction} action
+ * @param {World3D} world
+ * @param {number} dt
+ * @returns {boolean}
+ */
+export function tickEntityAction(entity, action, world, dt) {
+    if (entity.timedAction.isBusy()) {
+        entity.timedAction.cancel();
+    }
+
+    entity.currentAction = action;
+    const ok =
+        typeof action.tick === 'function'
+            ? action.tick(entity, world, dt)
+            : (action.apply?.(world) ?? false);
+
+    if (!ok) {
+        entity.currentAction = null;
+        return false;
+    }
+
+    if (isEntityActionComplete(action, entity)) {
+        entity.currentAction = null;
+    } else if (actionDuration(action) > 0 && !entity.timedAction.isBusy()) {
+        entity.currentAction = null;
+    }
+
+    return true;
 }
 
 /**

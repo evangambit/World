@@ -2,6 +2,7 @@
  * Apply keyboard input to the player entity (movement, timed-action cancel).
  */
 import { tickVitality } from '../domain/vitality.js';
+import { moveDirectionAction, tickEntityAction } from '../domain/entityActions.js';
 import { hasMovementInput } from './input.js';
 
 /** @typedef {import('../actors/entity.js').Entity} Entity */
@@ -22,7 +23,7 @@ export function updatePlayerFromInput(entity, input, world, dt) {
             const { dx, dy } = input.getMovement();
             entity.timedAction.cancel();
             if (dx !== 0 || dy !== 0) {
-                entity.tryMove(dx, dy, world, dt);
+                tickEntityAction(entity, moveDirectionAction(entity, dx, dy), world, dt);
             }
             return;
         }
@@ -32,6 +33,6 @@ export function updatePlayerFromInput(entity, input, world, dt) {
 
     const { dx, dy } = input.getMovement();
     if (dx !== 0 || dy !== 0) {
-        entity.tryMove(dx, dy, world, dt);
+        tickEntityAction(entity, moveDirectionAction(entity, dx, dy), world, dt);
     }
 }

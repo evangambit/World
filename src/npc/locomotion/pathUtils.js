@@ -99,3 +99,31 @@ export function resolveMoveDestination(world, npc, goal) {
     }
     return findApproachTile(world, npc, { x: goal.tx, y: goal.ty, z: goal.tz });
 }
+
+/** @param {Entity} entity @param {number} wx @param {number} wy */
+export function directionTowardPoint(entity, wx, wy) {
+    const ddx = wx - entity.x;
+    const ddy = wy - entity.y;
+    const dist = Math.hypot(ddx, ddy);
+    if (dist < 1e-6) return { dx: 0, dy: 0 };
+    return { dx: ddx / dist, dy: ddy / dist };
+}
+
+/**
+ * Advance path index when entity is close to current waypoint center.
+ * @param {Entity} entity
+ * @param {{ x: number, y: number, z: number }[]} path
+ * @param {number} pathIndex
+ * @param {number} [snapDist=0.15]
+ * @returns {number}
+ */
+export function advancePathIndexAtWaypoint(entity, path, pathIndex, snapDist = 0.15) {
+    if (pathIndex >= path.length) return pathIndex;
+    const wp = path[pathIndex];
+    const wx = wp.x + 0.5;
+    const wy = wp.y + 0.5;
+    if (Math.hypot(wx - entity.x, wy - entity.y) < snapDist) {
+        return pathIndex + 1;
+    }
+    return pathIndex;
+}

@@ -2,7 +2,13 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { World3D } from '../world/world.js';
 import { T } from '../world/tileTypes.js';
-import { satisfiesInventoryPrereq, satisfiesTilePrereq } from './entityActions.js';
+import {
+    moveDirectionAction,
+    satisfiesInventoryPrereq,
+    satisfiesTilePrereq,
+    tickEntityAction,
+} from './entityActions.js';
+import { Entity } from '../actors/entity.js';
 
 describe('satisfiesTilePrereq', () => {
     it('requires walkable when walkable: true', () => {
@@ -19,6 +25,21 @@ describe('satisfiesTilePrereq', () => {
         world.setTile(0, 0, 0, { terrain: T.WATER, obj: 0 });
 
         assert.equal(satisfiesTilePrereq(world, { x: 0, y: 0, z: 0 }), true);
+    });
+});
+
+describe('moveDirectionAction', () => {
+    it('moves entity via tryMove on tick', () => {
+        const world = new World3D();
+        for (let x = 0; x <= 3; x++) {
+            for (let y = 0; y <= 3; y++) {
+                world.setTile(x, y, 0, { terrain: T.DIRT, obj: 0 });
+            }
+        }
+        const entity = new Entity(1.5, 1.5, 0);
+        const startX = entity.x;
+        tickEntityAction(entity, moveDirectionAction(entity, 1, 0), world, 0.5);
+        assert.ok(entity.x > startX);
     });
 });
 
