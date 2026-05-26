@@ -3,7 +3,6 @@
  */
 
 import { moveDirectionAction } from '../../../domain/entityActions.js';
-import { isNpcTraveling } from '../../../actors/npcSimulation.js';
 import {
     advancePathIndexAtWaypoint,
     directionTowardPoint,
@@ -73,7 +72,7 @@ export class WanderBrain {
         this._world = world;
         const npc = this.npc;
         if (!npc || !npc.isAlive) return null;
-        if (npc.resolvingAction || isNpcTraveling(npc)) return null;
+        if (npc.resolvingAction) return null;
 
         if (!this._path || this._pathIndex >= this._path.length) {
             if (!this._pickNewPath(npc)) return null;

@@ -1,5 +1,5 @@
 /**
- * Legacy locomotion helpers — travel now uses npc._travel + moveDirectionAction.
+ * Legacy locomotion helpers — brains now drive movement via per-tick actions.
  */
 import { isNpcTraveling } from '../../actors/npcSimulation.js';
 
