@@ -1,13 +1,12 @@
 /**
  * NPC — Entity + village sim + pluggable brain.
- * For tests without AI, use createNpcEntity / tickNpcSimulation from npcSimulation.js.
+ * For tests without AI, use createNpcEntity / tickNpc from npcSimulation.js.
  */
 import { Entity } from './entity.js';
 import { attachNpcBrain, WanderBrain } from '../npc/brain/index.js';
 import {
     initNpcEntity,
     tickNpc,
-    tickNpcSimulation,
     scheduleNpcAction,
     applyNpcAction,
     travelNpcToTile,
@@ -16,7 +15,6 @@ export {
     createNpcEntity,
     initNpcEntity,
     tickNpc,
-    tickNpcSimulation,
     scheduleNpcAction,
     applyNpcAction,
     travelNpcToTile,

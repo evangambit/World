@@ -311,23 +311,3 @@ export function tickNpc(entity, world, dt, gameTime) {
     return applied;
 }
 
-/**
- * Vitality and timed actions only — no brain locomotion.
- * @param {NpcEntity} entity
- * @param {World3D} world
- * @param {number} dt
- */
-export function tickNpcSimulation(entity, world, dt) {
-    if (entity._dead) return;
-
-    tickVitality(entity, dt);
-
-    if (entity.health <= 0) {
-        markNpcDead(entity);
-        return;
-    }
-
-    if (entity.timedAction.isBusy()) {
-        entity.timedAction.tick(dt, world);
-    }
-}
