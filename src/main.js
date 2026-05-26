@@ -213,7 +213,7 @@ class Game {
                         this._syncInventoryUI();
                     } else if (
                         !satisfiesInventoryPrereq(this.player, {
-                            inventoryOneOf: [
+                            inventoryAnyOf: [
                                 [{ objType: Obj.UNCOOKED_STEAK }],
                                 [{ objType: Obj.WHEAT }],
                             ],

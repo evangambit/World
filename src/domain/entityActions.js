@@ -44,8 +44,7 @@ import {
  * @property {number} [buildingId]
  *
  * @typedef {Object} ActionPrereq
- * @property {InventoryReq[]} [inventory] - all listed stacks required (AND)
- * @property {InventoryReq[][]} [inventoryOneOf] - at least one group fully satisfied (OR)
+ * @property {InventoryReq[][]} [inventoryAnyOf] - OR-of-AND groups for inventory requirements
  * @property {ContainerItemReq} [containerItem] - stack required inside target container
  * @property {TileReq} [tile]
  * @property {TileCoord} [adjacentTo] - entity must be adjacent to this tile
@@ -96,15 +95,9 @@ export function inventoryHasReq(entity, req) {
  * @param {ActionPrereq} prereq
  */
 export function satisfiesInventoryPrereq(entity, prereq) {
-    for (const req of prereq.inventory ?? []) {
-        if (!inventoryHasReq(entity, req)) return false;
-    }
-    const groups = prereq.inventoryOneOf ?? [];
-    if (groups.length > 0) {
-        const any = groups.some((group) => group.every((req) => inventoryHasReq(entity, req)));
-        if (!any) return false;
-    }
-    return true;
+    const groups = prereq.inventoryAnyOf ?? [];
+    if (groups.length === 0) return true;
+    return groups.some((group) => group.every((req) => inventoryHasReq(entity, req)));
 }
 
 /**
@@ -179,7 +172,7 @@ export function pickUpAction(entity, tileX, tileY, tileZ = entity.z) {
 export function cookSteakAtStoveAction(entity, tileX, tileY) {
     return {
         prereq: () => ({
-            inventory: [{ objType: Obj.UNCOOKED_STEAK }],
+            inventoryAnyOf: [[{ objType: Obj.UNCOOKED_STEAK }]],
             adjacentTo: { x: tileX, y: tileY, z: entity.z },
             tile: { x: tileX, y: tileY, z: entity.z, object: Obj.STOVE },
         }),
@@ -196,7 +189,7 @@ export function cookSteakAtStoveAction(entity, tileX, tileY) {
 export function cookBreadAtStoveAction(entity, tileX, tileY) {
     return {
         prereq: () => ({
-            inventory: [{ objType: Obj.WHEAT }],
+            inventoryAnyOf: [[{ objType: Obj.WHEAT }]],
             adjacentTo: { x: tileX, y: tileY, z: entity.z },
             tile: { x: tileX, y: tileY, z: entity.z, object: Obj.STOVE },
         }),
@@ -231,7 +224,7 @@ export function dropAction(entity, objType, buildingId, count) {
         get lastResult() {
             return lastResult;
         },
-        prereq: () => ({ inventory: [inventoryReq] }),
+        prereq: () => ({ inventoryAnyOf: [[inventoryReq]] }),
         apply: (world) => {
             lastResult = applyDropFromInventory(entity, world, objType, buildingId, count);
             return lastResult.placed > 0;
@@ -276,7 +269,7 @@ export function stashToContainerAction(entity, cx, cy, cz, objType, buildingId) 
     if (objType === Obj.KEY && buildingId != null) inventoryReq.buildingId = buildingId;
     return {
         prereq: () => ({
-            inventory: [inventoryReq],
+            inventoryAnyOf: [[inventoryReq]],
             adjacentTo: { x: cx, y: cy, z: cz },
             tile: { x: cx, y: cy, z: cz, container: true },
         }),
