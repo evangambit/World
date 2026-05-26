@@ -110,51 +110,6 @@ export function moveDirectionAction(entity, dx, dy) {
 }
 
 /**
- * Run one entity action for a single simulation frame (player and NPC).
- * @param {Entity} entity
- * @param {EntityAction} action
- * @param {World3D} world
- * @param {number} dt
- * @returns {boolean}
- */
-export function tickEntityAction(entity, action, world, dt) {
-    if (entity.timedAction.isBusy()) {
-        entity.timedAction.cancel();
-    }
-
-    entity.currentAction = action;
-    const ok =
-        typeof action.tick === 'function'
-            ? action.tick(entity, world, dt)
-            : (action.apply?.(world) ?? false);
-
-    if (!ok) {
-        entity.currentAction = null;
-        return false;
-    }
-
-    if (isEntityActionComplete(action, entity)) {
-        entity.currentAction = null;
-    } else if (actionDuration(action) > 0 && !entity.timedAction.isBusy()) {
-        entity.currentAction = null;
-    }
-
-    return true;
-}
-
-/**
- * Execute a one-shot action through the shared executor path.
- * Use this instead of calling `action.apply(world)` directly.
- * @param {Entity} entity
- * @param {EntityAction} action
- * @param {World3D} world
- * @returns {boolean}
- */
-export function runEntityAction(entity, action, world) {
-    return tickEntityAction(entity, action, world, 0);
-}
-
-/**
  * @param {Entity} entity
  * @param {InventoryReq} req
  */
@@ -696,7 +651,7 @@ export function lookInsideContainerAction(entity, cx, cy, cz) {
  */
 function applyTakeFromContainer(entity, world, cx, cy, cz, objType, buildingId) {
     const look = lookInsideContainerAction(entity, cx, cy, cz);
-    if (!runEntityAction(entity, look, world)) return false;
+    if (!look.apply?.(world)) return false;
 
     const contents = world.ensureTileContents(cx, cy, cz);
     if (!contents) return false;
@@ -724,7 +679,7 @@ function applyTakeFromContainer(entity, world, cx, cy, cz, objType, buildingId) 
 function applyStashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
     if (!canStashInContainer(objType)) return false;
     const look = lookInsideContainerAction(entity, cx, cy, cz);
-    if (!runEntityAction(entity, look, world)) return false;
+    if (!look.apply?.(world)) return false;
 
     const inv = entity.inventory ?? [];
     const i = inv.findIndex(
@@ -774,7 +729,7 @@ export function findContainerStack(world, cx, cy, cz, inventoryTypes) {
  * @returns {boolean}
  */
 export function pickUpAtTile(entity, world, tileX, tileY, tileZ = entity.z) {
-    return runEntityAction(entity, pickUpAction(entity, tileX, tileY, tileZ), world);
+    return pickUpAction(entity, tileX, tileY, tileZ).apply(world);
 }
 
 /**
@@ -785,8 +740,8 @@ export function pickUpAtTile(entity, world, tileX, tileY, tileZ = entity.z) {
  * @returns {false | 'steak' | 'bread'}
  */
 export function cookAtStove(entity, world, tileX, tileY) {
-    if (runEntityAction(entity, cookSteakAtStoveAction(entity, tileX, tileY), world)) return 'steak';
-    if (runEntityAction(entity, cookBreadAtStoveAction(entity, tileX, tileY), world)) return 'bread';
+    if (cookSteakAtStoveAction(entity, tileX, tileY).apply(world)) return 'steak';
+    if (cookBreadAtStoveAction(entity, tileX, tileY).apply(world)) return 'bread';
     return false;
 }
 
@@ -800,7 +755,7 @@ export function cookAtStove(entity, world, tileX, tileY) {
  */
 export function dropFromInventory(entity, world, objType, buildingId, count) {
     const action = dropAction(entity, objType, buildingId, count);
-    runEntityAction(entity, action, world);
+    action.apply(world);
     return action.lastResult;
 }
 
@@ -815,7 +770,7 @@ export function dropFromInventory(entity, world, objType, buildingId, count) {
  * @returns {boolean}
  */
 export function takeFromContainer(entity, world, cx, cy, cz, objType, buildingId) {
-    return runEntityAction(entity, takeFromContainerAction(entity, cx, cy, cz, objType, buildingId), world);
+    return takeFromContainerAction(entity, cx, cy, cz, objType, buildingId).apply(world);
 }
 
 /**
@@ -829,7 +784,7 @@ export function takeFromContainer(entity, world, cx, cy, cz, objType, buildingId
  * @returns {boolean}
  */
 export function stashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
-    return runEntityAction(entity, stashToContainerAction(entity, cx, cy, cz, objType, buildingId), world);
+    return stashToContainerAction(entity, cx, cy, cz, objType, buildingId).apply(world);
 }
 
 /**

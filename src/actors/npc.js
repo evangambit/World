@@ -26,9 +26,9 @@ export {
 } from './npcSimulation.js';
 export {
     moveDirectionAction,
-    tickEntityAction,
     isMoveDirectionAction,
 } from '../domain/entityActions.js';
+export { tickEntityAction } from './actionExecutor.js';
 export {
     attachNpcBrain,
     NoopNpcBrain,

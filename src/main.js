@@ -29,12 +29,12 @@ import {
     lookInsideContainerAction,
     plantWheatSeedAction,
     pickUpAction,
-    runEntityAction,
     satisfiesInventoryPrereq,
     stashToContainerAction,
     takeFromContainerAction,
     toggleDoorLock,
 } from './domain/entityActions.js';
+import { runEntityAction } from './actors/actionExecutor.js';
 import { consumeFoodFromInventory, isEdible, VITALITY } from './domain/vitality.js';
 
 const GAME_SPEED_FAST = 5;

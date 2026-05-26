@@ -4,11 +4,11 @@
 import { tickVitality } from '../domain/vitality.js';
 import {
     isAdjacentToTile,
-    isEntityActionComplete,
     moveDirectionAction,
     pickUpAction,
-    tickEntityAction,
+    isEntityActionComplete,
 } from '../domain/entityActions.js';
+import { tickEntityAction } from './actionExecutor.js';
 import {
     advancePathIndexAtWaypoint,
     directionTowardPoint,

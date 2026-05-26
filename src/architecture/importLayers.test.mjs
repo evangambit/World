@@ -12,6 +12,8 @@ const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const SRC = join(ROOT, 'src');
 const CLIENT = join(SRC, 'client');
 const MAIN = join(SRC, 'main.js');
+const BRAIN_DIR = join(SRC, 'npc', 'brain');
+const ACTION_EXECUTOR = join(SRC, 'actors', 'actionExecutor.js');
 
 /** Top-level src dirs treated as business logic (not presentation). */
 const LOGIC_DIRS = ['world', 'domain', 'actors', 'simulation', 'npc', 'content'];
@@ -181,6 +183,28 @@ describe('presentation must not import the browser entry', () => {
             violations.length,
             0,
             violations.map((v) => `${v.file} imports main via "${v.specifier}"`).join('\n'),
+        );
+    });
+});
+
+describe('brains must not execute actions directly', () => {
+    it('npc/brain modules do not import actors/actionExecutor.js', async () => {
+        const violations = [];
+
+        for await (const file of walkJsFiles(BRAIN_DIR)) {
+            const source = await readFile(file, 'utf8');
+            for (const spec of extractImportSpecifiers(source)) {
+                const resolved = resolveRelativeImport(file, spec);
+                if (resolved && resolved === ACTION_EXECUTOR) {
+                    violations.push({ file: relative(ROOT, file), specifier: spec });
+                }
+            }
+        }
+
+        assert.equal(
+            violations.length,
+            0,
+            violations.map((v) => `${v.file} imports action executor via "${v.specifier}"`).join('\n'),
         );
     });
 });

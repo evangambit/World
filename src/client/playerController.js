@@ -2,7 +2,8 @@
  * Apply keyboard input to the player entity (movement, timed-action cancel).
  */
 import { tickVitality } from '../domain/vitality.js';
-import { moveDirectionAction, tickEntityAction } from '../domain/entityActions.js';
+import { moveDirectionAction } from '../domain/entityActions.js';
+import { tickEntityAction } from '../actors/actionExecutor.js';
 import { hasMovementInput } from './input.js';
 
 /** @typedef {import('../actors/entity.js').Entity} Entity */

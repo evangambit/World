@@ -4,5 +4,5 @@
 export {
     isMoveDirectionAction,
     moveDirectionAction,
-    tickEntityAction,
 } from '../domain/entityActions.js';
+export { tickEntityAction } from './actionExecutor.js';

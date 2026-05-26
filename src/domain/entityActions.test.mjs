@@ -8,11 +8,10 @@ import {
     lookInsideContainerAction,
     moveDirectionAction,
     plantWheatSeedAction,
-    runEntityAction,
     satisfiesInventoryPrereq,
     satisfiesTilePrereq,
-    tickEntityAction,
 } from './entityActions.js';
+import { runEntityAction, tickEntityAction } from '../actors/actionExecutor.js';
 import { Entity } from '../actors/entity.js';
 
 describe('satisfiesTilePrereq', () => {
