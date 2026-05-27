@@ -2,16 +2,12 @@
  * Wander brain — random walk near home, no memory or plans.
  */
 
-import { moveDirectionAction } from '../../../domain/entityActions.js';
-import {
-    advancePathIndexAtWaypoint,
-    directionTowardPoint,
-    planPathToTile,
-} from '../../locomotion/pathUtils.js';
+import { walkToLocation } from '../shared/walkToLocation.js';
 
 /** @typedef {import('../interface.js').NpcEntity} NpcEntity */
 /** @typedef {import('../interface.js').World3D} World3D */
 /** @typedef {import('../../../domain/entityActions.js').EntityAction} EntityAction */
+/** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
 
 /**
  * Simple wander brain — no memory, no plans, no task queue.
@@ -22,12 +18,10 @@ export class WanderBrain {
     constructor() {
         /** @type {NpcEntity | null} */
         this.npc = null;
-        /** @type {World3D | null} */
-        this._world = null;
-        /** @type {{ x: number, y: number, z: number }[] | null} */
-        this._path = null;
-        /** @type {number} */
-        this._pathIndex = 0;
+        /** @type {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null> | null} */
+        this._walker = null;
+        /** @type {ActionExecutionResult | null} */
+        this._walkerInput = null;
     }
 
     /** @param {NpcEntity} npc */
@@ -37,28 +31,31 @@ export class WanderBrain {
 
     /**
      * @param {NpcEntity} npc
-     * @returns {boolean}
+     * @param {number} attempts
      */
-    _pickNewPath(npc) {
-        const world = this._world;
-        if (!world) return false;
-
+    *_tileCandidates(npc, attempts) {
         const radius = npc.wanderRadius ?? 10;
-        for (let attempt = 0; attempt < 10; attempt++) {
+        for (let i = 0; i < attempts; i++) {
             const gx = npc.homeX + Math.floor(Math.random() * radius * 2 - radius);
             const gy = npc.homeY + Math.floor(Math.random() * radius * 2 - radius);
-            if (!world.isWalkable(gx, gy, npc.homeZ)) continue;
+            yield { x: gx, y: gy, z: npc.homeZ };
+        }
+    }
 
-            const path = planPathToTile(world, npc, gx, gy, npc.homeZ);
-            if (!path || path.length < 2) continue;
-
-            this._path = path;
-            this._pathIndex = 1;
+    /**
+     * @param {NpcEntity} npc
+     * @param {World3D} world
+     * @returns {boolean}
+     */
+    _startWalk(npc, world) {
+        for (const candidate of this._tileCandidates(npc, 10)) {
+            if (!world.isWalkable(candidate.x, candidate.y, candidate.z)) continue;
+            this._walker = walkToLocation(npc, world, candidate);
+            this._walkerInput = null;
             return true;
         }
-
-        this._path = null;
-        this._pathIndex = 0;
+        this._walker = null;
+        this._walkerInput = null;
         return false;
     }
 
@@ -68,34 +65,34 @@ export class WanderBrain {
      * @param {number} _gameTime
      * @param {number|null} _actionProgress
      * @param {import('../../shared/npcMemory.js').VisibleTile[]} _visibleTiles
+     * @param {ActionExecutionResult|null} [lastActionResult]
      * @returns {EntityAction | null}
      */
-    tick(world, _dt, _gameTime, _actionProgress, _visibleTiles) {
-        this._world = world;
+    tick(world, _dt, _gameTime, _actionProgress, _visibleTiles, lastActionResult = null) {
         const npc = this.npc;
         if (!npc || !npc.isAlive) return null;
         if (npc.resolvingAction) return null;
 
-        if (!this._path || this._pathIndex >= this._path.length) {
-            if (!this._pickNewPath(npc)) return null;
+        if (lastActionResult) {
+            this._walkerInput = lastActionResult;
         }
 
-        this._pathIndex = advancePathIndexAtWaypoint(npc, this._path, this._pathIndex);
-        if (this._pathIndex >= this._path.length) {
-            this._path = null;
-            this._pathIndex = 0;
-            return null;
+        while (true) {
+            if (!this._walker && !this._startWalk(npc, world)) return null;
+            if (!this._walker) return null;
+            const step = this._walker.next(this._walkerInput);
+            this._walkerInput = null;
+            if (step.done) {
+                this._walker = null;
+                continue;
+            }
+            return step.value;
         }
-
-        const wp = this._path[this._pathIndex];
-        const { dx, dy } = directionTowardPoint(npc, wp.x + 0.5, wp.y + 0.5);
-        return moveDirectionAction(npc, dx, dy);
     }
 
     destroy() {
-        this._path = null;
-        this._pathIndex = 0;
+        this._walker = null;
+        this._walkerInput = null;
         this.npc = null;
-        this._world = null;
     }
 }

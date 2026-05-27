@@ -7,7 +7,7 @@ import {
     isAdjacentToTile,
     pickUpAction,
 } from '../domain/entityActions.js';
-import { tickEntityAction } from './actionExecutor.js';
+import { tickEntityAction, tickEntityActionResult } from './actionExecutor.js';
 import { Entity } from './entity.js';
 import { attachNpcBrain } from '../npc/brain/attach.js';
 import { tickNpcPerception } from '../npc/shared/npcMemory.js';
@@ -16,6 +16,7 @@ import { tickNpcPerception } from '../npc/shared/npcMemory.js';
 /** @typedef {import('./entity.js').Entity} Entity */
 /** @typedef {import('../world/world.js').World3D} World3D */
 /** @typedef {import('../npc/brain/interface.js').NpcBrain} NpcBrain */
+/** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
 
 /** NPC appearance presets (skin, hair, shirt, pants). */
 export const NPC_PRESETS = [
@@ -86,6 +87,8 @@ export function initNpcEntity(entity, opts = {}) {
     entity.homeY = Math.floor(entity.y);
     entity.homeZ = entity.z;
     entity.wanderRadius = 10;
+    /** @type {ActionExecutionResult | null} */
+    entity._lastBrainActionResult = null;
 
     const loco = /** @type {NpcEntity} */ (entity);
     loco.tick = (world, dt, gameTime) => tickNpc(loco, world, dt, gameTime);
@@ -168,9 +171,12 @@ export function tickNpc(entity, world, dt, gameTime) {
     }
 
     const visibleTiles = tickNpcPerception(entity, world, gameTime);
-    const brainAction = entity.brain?.tick(world, dt, gameTime, actionProgress, visibleTiles) ?? null;
+    const lastActionResult = entity._lastBrainActionResult ?? null;
+    entity._lastBrainActionResult = null;
+    const brainAction =
+        entity.brain?.tick(world, dt, gameTime, actionProgress, visibleTiles, lastActionResult) ?? null;
     if (!entity.resolvingAction && brainAction) {
-        tickEntityAction(entity, brainAction, world, dt);
+        entity._lastBrainActionResult = tickEntityActionResult(entity, brainAction, world, dt);
         applied = brainAction;
     }
 

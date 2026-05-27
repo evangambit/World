@@ -24,9 +24,10 @@ export class NoopNpcBrain {
      * @param {number} _gameTime
      * @param {number|null} _actionProgress
      * @param {import('../../shared/npcMemory.js').VisibleTile[]} _visibleTiles
+     * @param {{ ok: boolean, message?: string }|null} [_lastActionResult]
      * @returns {null}
      */
-    tick(_world, _dt, _gameTime, _actionProgress, _visibleTiles) {
+    tick(_world, _dt, _gameTime, _actionProgress, _visibleTiles, _lastActionResult) {
         return null;
     }
 
