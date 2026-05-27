@@ -1,5 +1,7 @@
 # NPC AI System Specification
 
+> **Note on Engine Refactor:** The game engine is currently being refactored by Morgan. The high-level ideas in this document should remain mostly valid, and the required tweaks shouldn't require significant changes to the proposed AI architecture. However, this specification must be revisited once the engine refactor is done.
+
 ## Overview
 
 This document specifies an AI system for grid-based, tick-driven game NPCs. The system is built around three principles:
@@ -12,7 +14,7 @@ This document specifies an AI system for grid-based, tick-driven game NPCs. The 
 
 ### Atomic Actions
 
-The game engine consumes one `AtomicAction` per tick from an NPC. Examples: `move(direction)`, `reload()`, `harvest()`, `openDoor(direction)`.
+The game engine consumes one `AtomicAction` per tick from an NPC. Examples: `move(direction)`, `reload()`, `harvest()`, `openDoor(direction)`. *(Note: There will be many more actions in the full system, such as managing inventory, interacting with containers and stoves, multi-floor traversal, and executing timed actions like cooking.)*
 
 ```js
 // Shape: { type: string, ...params }
@@ -43,6 +45,10 @@ class WorldModelRead {
   tiles() { /* -> Iterable<RememberedTile> */ }
   npcPosition() { /* -> {x, y} */ }
   currentTick() { /* -> number */ }
+  npcHp() { /* -> number */ }
+  npcMaxHp() { /* -> number */ }
+  npcAmmo() { /* -> number */ }
+  npcMaxAmmo() { /* -> number */ }
 }
 
 // The NPC's persistent memory (lives on the GameNPC).
@@ -52,6 +58,8 @@ class WorldModel extends WorldModelRead {
   updateTile(x, y, lastSeenTick, value) { /* single tile update */ }
   setNpcPosition({ x, y }) { /* called by engine on real moves */ }
   setCurrentTick(t) { /* called by engine each tick */ }
+  setNpcHp(hp) { /* called by engine on damage/healing */ }
+  setNpcAmmo(ammo) { /* called by engine on fire/reload */ }
 }
 ```
 
@@ -90,17 +98,19 @@ class RealContext extends Context {
   get worldModel() { return this._npc.memory; }
   hypothetical() { return new HypotheticalContext(this); }
 
-  // Each real primitive yields one or more Actions. The scheduler consumes
-  // these and feeds them to the engine, one per tick.
+  // Each real primitive yields one value per tick. Single-tick actions yield
+  // one Action. Multi-tick actions yield the initiating Action on the first
+  // tick, then null for each subsequent tick until the action completes.
+  // The engine interprets null as "NPC busy, no new action this tick".
   *move(direction) {
     yield Action.move(direction);
     return true; // engine will have updated worldModel.npcPosition by next resume
   }
   *reload() {
-    // Reload takes multiple ticks; the engine handles that by not advancing
-    // the NPC's action queue until reload completes. We yield once and the
-    // scheduler resumes us after the reload duration.
     yield Action.reload();
+    for (let i = 1; i < RELOAD_TICKS; i++) {
+      yield null; // hold the generator until reload is done
+    }
     return true;
   }
   // ...
@@ -133,7 +143,7 @@ class HypotheticalContext extends Context {
   }
   *reload() {
     this._overlay.setCurrentTick(this._overlay.currentTick() + RELOAD_TICKS);
-    // Update overlay's NPC state to reflect "weapon reloaded"
+    this._overlay.setNpcAmmo(this._overlay.npcMaxAmmo());
     return true;
   }
   // ...
@@ -152,6 +162,8 @@ class WorldModelOverlay extends WorldModelRead {
     this._tileOverrides = new Map(); // key: "x,y" -> RememberedTile
     this._npcPosition = null;        // null = fall through
     this._currentTick = null;        // null = fall through
+    this._npcHp = null;              // null = fall through
+    this._npcAmmo = null;            // null = fall through
   }
 
   get(x, y) {
@@ -184,6 +196,20 @@ class WorldModelOverlay extends WorldModelRead {
   updateTile(x, y, lastSeenTick, value) {
     this._tileOverrides.set(`${x},${y}`, new RememberedTile({ x, y, value, lastSeenTick }));
   }
+  npcHp() {
+    return this._npcHp ?? this._parent.npcHp();
+  }
+  npcMaxHp() {
+    return this._parent.npcMaxHp(); // max HP doesn't change in hypothetical mode
+  }
+  npcAmmo() {
+    return this._npcAmmo ?? this._parent.npcAmmo();
+  }
+  npcMaxAmmo() {
+    return this._parent.npcMaxAmmo(); // max ammo doesn't change in hypothetical mode
+  }
+  setNpcHp(hp) { this._npcHp = hp; }
+  setNpcAmmo(ammo) { this._npcAmmo = ammo; }
 }
 ```
 
@@ -224,45 +250,40 @@ function* moveTo(ctx, goal) {
 ```js
 function* pathfind(ctx, goal, maxTicks) {
   const startTick = ctx.worldModel.currentTick();
-  const path = aStar({
-    start: ctx.worldModel.npcPosition(),
-    goal,
-    world: ctx.worldModel,
-    unknownTileCost: 1.5,
-  });
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const now = ctx.worldModel.currentTick();
 
-  if (!path.found) {
-    return { success: false, reason: 'no_path' };
-  }
-  if (path.estimatedCost > maxTicks) {
-    return { success: false, reason: 'over_budget', estimatedCost: path.estimatedCost };
-  }
+    const path = aStar({
+      start: ctx.worldModel.npcPosition(),
+      goal,
+      world: ctx.worldModel,
+      unknownTileCost: 1.5,
+    });
 
-  for (const waypoint of path.waypoints) {
-    const elapsed = ctx.worldModel.currentTick() - startTick;
-    if (elapsed > maxTicks) {
-      return { success: false, reason: 'timeout' };
+    if (!path.found) {
+      return { success: false, reason: 'no_path' };
     }
-    const r = yield* moveTo(ctx, waypoint);
-    if (!r.success) {
-      // Path was invalidated mid-execution. Try to replan once.
-      const newPath = aStar({
-        start: ctx.worldModel.npcPosition(),
-        goal,
-        world: ctx.worldModel,
-        unknownTileCost: 1.5,
-      });
-      if (!newPath.found) return { success: false, reason: 'no_path_replan' };
-      const remaining = maxTicks - (ctx.worldModel.currentTick() - startTick);
-      if (newPath.estimatedCost > remaining) {
-        return { success: false, reason: 'over_budget_replan', estimatedCost: newPath.estimatedCost };
+    if (now + path.estimatedCost > startTick + maxTicks) {
+      return { success: false, reason: 'over_budget', estimatedCost: path.estimatedCost };
+    }
+
+    let success = true;
+    for (const waypoint of path.waypoints) {
+      if (ctx.worldModel.currentTick() - startTick > maxTicks) {
+        return { success: false, reason: 'timeout' };
       }
-      path.waypoints = newPath.waypoints;
-      continue;
+      const r = yield* moveTo(ctx, waypoint);
+      if (!r.success) {
+        // Path was invalidated mid-execution. Break to outer loop to replan.
+        success = false;
+        break;
+      }
+    }
+    if (success) {
+      return { success: true, ticksTaken: ctx.worldModel.currentTick() - startTick };
     }
   }
-
-  return { success: true, ticksTaken: ctx.worldModel.currentTick() - startTick };
+  return { success: false, reason: 'replan_limit' };
 }
 ```
 
@@ -307,35 +328,47 @@ function* explore(ctx, maxTicks) {
 
 ## The Scheduler
 
-The scheduler drives a task generator in real mode, consuming yielded `Action`s and feeding them to the engine one per tick.
+The scheduler drives a task generator in real mode, advancing it one step per tick and returning whatever the generator yields — an `Action`, or `null` if the NPC is busy mid-way through a multi-tick primitive. When a task completes, the scheduler immediately consults the brain for a new task within the same tick, so no time is wasted idle between tasks. This loop is bounded to prevent infinite loops from instantly-completing tasks. The scheduler is otherwise stateless: it holds only the current generator and delegates all multi-tick timing to the primitives themselves.
 
 ```js
 class Scheduler {
   constructor(npc) {
     this._npc = npc;
     this._currentGen = null;
-    this._pendingAction = null;
+  }
+
+  hasTask() {
+    return this._currentGen !== null;
+  }
+
+  // Discard the current task. The brain will choose a new one on the next tick.
+  reset() {
+    if (this._currentGen) {
+      this._currentGen.return(undefined); // Resume the generator with an implicit return to trigger `finally` blocks
+    }
+    this._currentGen = null;
   }
 
   // Called by GameNPC.tick(). Returns the next Action to execute, or null if
-  // the NPC has nothing to do this tick (e.g., still completing a multi-tick action).
+  // the NPC is idle or mid-way through a multi-tick action.
   tick() {
-    if (this._pendingAction) {
-      const a = this._pendingAction;
-      this._pendingAction = null;
-      return a;
+    // Loop so that when a task completes, we immediately consult the brain
+    // for a new task rather than wasting a tick idle. Bounded to prevent
+    // infinite loops from tasks that complete instantly.
+    for (let attempts = 0; attempts < 3; attempts++) {
+      if (!this._currentGen) {
+        this._currentGen = this._npc.brain.chooseTask(new RealContext(this._npc));
+      }
+      const { value, done } = this._currentGen.next();
+      if (done) {
+        this._currentGen = null;
+        continue; // task finished — immediately choose a new one
+      }
+      // value is an Action, or null if a multi-tick primitive is still running.
+      return value;
     }
-    if (!this._currentGen) {
-      this._currentGen = this._npc.brain.chooseTask(new RealContext(this._npc));
-    }
-    const { value, done } = this._currentGen.next();
-    if (done) {
-      this._currentGen = null;
-      // Brain will be asked for a new task on the next tick.
-      return null;
-    }
-    // `value` should be an Action object.
-    return value;
+    // All attempts produced instantly-completing tasks; idle this tick.
+    return null;
   }
 }
 ```
@@ -403,65 +436,63 @@ The brain holds no persistent state about which task is currently running. On ev
 
 ### Re-Plan Frequency
 
-The brain is _called_ only when the scheduler runs out of tasks (current task completed or aborted). It does not re-plan every tick by default. For ancestor-level reactivity to mid-execution events (e.g., taking damage interrupts foraging), see "Preemption" below.
+The brain is _called_ when the scheduler runs out of tasks (current task completed or aborted) or every N ticks (for some reasonably large N). It does not re-plan every tick. For mid-execution reactivity, see "Preemption" below.
 
 ## Preemption
 
-Tasks may need to abort early in response to events: taking damage, a path becoming invalid, time running out, or an ancestor task deciding the strategy is no longer viable.
+Tasks may need to abort early in response to events: taking damage, a path becoming invalid, time running out, or the aforementioned N ticks passing. Two mechanisms handle this, one at the NPC level and one at the task level.
 
-### Mechanism: Guards
+### Mechanism 1: Brain-Level Preemption Hook
 
-A task can register a guard at any point. The scheduler checks all active guards before each `yield`. If a guard fires, the scheduler throws a `Preempted` exception into the generator, which propagates up the `yield*` chain (each level can `try`/`finally` for cleanup).
+For global interrupts that should abort *any* currently running task (e.g., taking heavy damage, entering combat), `GameNPC.tick()` calls `shouldPreempt()` before advancing the scheduler. If it returns true, the scheduler's current generator is discarded and the brain is asked for a new task on the next tick.
+
+```js
+// In GameNPC:
+tick(tilesICanSee) {
+  this.memory.update(tilesICanSee);
+  if (this._scheduler.hasTask() && this.brain.shouldPreempt(this.memory)) {
+    this._scheduler.reset();
+  }
+  return this._scheduler.tick();
+}
+```
+
+```js
+// In GameNPCBrain:
+shouldPreempt(worldModel) {
+  // Example: abort everything if HP drops below 20%
+  return worldModel.npcHp() < worldModel.npcMaxHp() * 0.2;
+}
+```
+
+When the scheduler is reset mid-task, it calls `return(undefined)` on the current generator before discarding it. This causes the generator to resume as if a `return` statement executed at the current yield point, ensuring any active `try`/`finally` blocks execute on the way out. Tasks that acquire resources they need to release (e.g., reserving a tile, or pushing to the `taskStack`) can safely rely on `finally` blocks for guaranteed cleanup during brain-level preemption.
+
+### Mechanism 2: Explicit Yield-Point Checks
+
+For task-specific conditions (e.g., a forage task aborting if the NPC takes significant damage mid-path), the task checks the condition at natural yield points and returns early:
 
 ```js
 function* forage(ctx, maxTicks) {
   const startHp = ctx.worldModel.npcHp();
-  ctx.guard(() => ctx.worldModel.npcHp() < startHp * 0.5, 'took_damage');
 
-  try {
-    const r = yield* goToWheatField(ctx, maxTicks);
-    return r;
-  } catch (e) {
-    if (e instanceof Preempted) {
-      return { success: false, reason: e.reason };
-    }
-    throw e;
-  } finally {
-    ctx.unguard('took_damage');
+  const r = yield* goToWheatField(ctx, maxTicks);
+  if (!r.success) return r;
+
+  if (ctx.worldModel.npcHp() < startHp * 0.5) {
+    return { success: false, reason: 'took_damage' };
   }
+
+  return yield* harvest(ctx);
 }
 ```
 
-Context provides:
-
-```js
-ctx.guard(predicate, reason)   // register a guard
-ctx.unguard(reason)            // remove a guard
-```
-
-In hypothetical mode, guards are still registered but **not checked** by default. This is because hypothetical execution is fast-forwarded — it doesn't pass through the tick-level events that would trigger guards. Tasks that want to model their own self-interruption during planning must do so explicitly.
-
-### Guard Ordering
-
-Guards are checked in registration order. The first to fire wins. Higher-level tasks register their guards first (because they start running first), so their guards take precedence over inner task guards — which matches the intuition that ancestor concerns dominate.
+For finer granularity, subtasks like `goToWheatField` can themselves check the condition at each waypoint and return early. This puts interrupt logic in the task that owns the concern, makes control flow explicit, and requires no scheduler machinery beyond normal generator returns.
 
 ## Introspection
 
 For debugging, tasks can push frames onto a logical task stack maintained on the context. This is purely optional bookkeeping.
 
 ```js
-function withFrame(name) {
-  return function*(ctx, ...args) {
-    ctx.taskStack.push({ name, args, startedAt: ctx.worldModel.currentTick() });
-    try {
-      return yield* this(ctx, ...args);
-    } finally {
-      ctx.taskStack.pop();
-    }
-  };
-}
-
-// Or explicitly:
 function* pathfind(ctx, goal, maxTicks) {
   ctx.taskStack.push({ name: 'pathfind', goal, maxTicks });
   try {
@@ -492,6 +523,10 @@ class GameNPC {
   // Called by the engine, many times per second.
   tick(tilesICanSee) {
     this.memory.update(tilesICanSee);
+    // Brain-level preemption: discard current task if a global interrupt fires.
+    if (this._scheduler.hasTask() && this.brain.shouldPreempt(this.memory)) {
+      this._scheduler.reset();
+    }
     return this._scheduler.tick(); // returns AtomicAction or null
   }
 
@@ -515,7 +550,7 @@ class GameNPC {
 
 These are the load-bearing properties of the design. Violating any of them produces subtle bugs.
 
-1. **Leaf primitives must be semantically equivalent across real and hypothetical contexts.** `ctx.move(dir)` in real mode should produce the same end-state as `ctx.move(dir)` in hypothetical mode (modulo information the NPC couldn't have known). This is the foundation of unified task code.
+1. **Leaf primitives must produce equivalent world-state transitions given the same world knowledge.** `ctx.move(dir)` in real mode and hypothetical mode should update position identically. However, hypothetical mode does not simulate perception: real execution causes the engine to reveal new tiles on the next tick, while hypothetical execution leaves the world model unchanged beyond the explicit overlay update. Tasks that depend on discovering new information mid-execution will therefore behave differently in hypothetical mode than in real mode. This is an accepted limitation — simulating vision in hypothetical mode is not worth the cost — but it means the brain's evaluation of such tasks is inherently optimistic about unknown territory.
     
 2. **Hypothetical execution must not yield `Action`s.** All hypothetical context primitives must complete synchronously (within the generator) without yielding. The brain's drain-to-completion loop asserts this.
     
@@ -527,19 +562,163 @@ These are the load-bearing properties of the design. Violating any of them produ
     
 6. **Utility functions must produce meaningful gaps.** Two top-level options that represent genuinely different strategies should differ by more than floating-point noise in any given state. If they don't, the NPC may oscillate.
     
+## Utility Function
 
-## Open Design Decisions
+### Exploration
 
-These are intentionally underspecified and need to be settled during implementation:
+You clearly value knowledge about tiles around your home more than tiles farther away, so we must add some penalty.
 
-- **A* unknown-tile cost.** Currently a constant (`1.5`). May need to vary by NPC personality (cautious vs. bold) or by what's known about adjacent tiles.
-- **Re-plan frequency at the brain level.** Currently re-plans only when the scheduler is empty. May need to add periodic re-plans (every N ticks) or event-triggered re-plans for ancestor-level reactivity beyond what guards provide.
-- **Overlay merge semantics for multi-level hypotheticals.** Currently each overlay is a flat layer over its parent. Deeply nested hypotheticals could be slow due to lookup chain length. May need to flatten overlays past some depth.
-- **Utility function shape.** Currently each top-level option supplies its own utility function. May want a unified utility framework so options are directly comparable.
-- **Cancellation cleanup.** Tasks that allocate resources (subscriptions, world-model deltas they want to commit) need `try`/`finally` discipline. Worth lint-enforcing.
+Suppose the penalty were exponential. Then, as your explored area grew 100x, you'd become basically obsessed with keeping it perfectly circular.
+
+What utility function makes your degree of circle-obsession constant?
+
+1 / distance\_from\_home^alpha
+
+This gives us a nice utility function for exploration:
+
+```js
+let seen_tiles = context.tiles.keys()  
+let centroid = compute_centroid(seen_tiles)  
+// NB: we'd probably prefer something like average location the NPC has been using some kind of time discounting. Or their literal home. TBD  
+let u = 0  
+for (tile in seen_tiles) {  
+    // Cap to avoid infinities.
+    u += min(1 / distance(tile, centroid) ** alpha, 1)
+}
+```
+
+### Hunger
+
+Consider the portion of the utility function involving satiety (100 \- hunger) and bread.
+
+u(satiety, bread)
+
+Suppose a loaf of bread improves satiety by k up to a max of 100\.
+
+To prevent starvation, it must be the case that
+
+```
+∀ B    u(k, B - 1) > u(0, B)
+```
+
+To prevent useless waste, it must also be the case that
+
+```
+∀ B, 0 ≤ h < k    u(100, B - 1) > u(100 - h, B)
+```
+
+This is kind of a silly way to state it, because only x = k - ε really matters, so we really have
+
+```
+∀ B    u(100, B - 1) > u(100 - k + ε, B)
+```
+
+This mostly just implies that the bread-and-hunger utility component should be a function of `s + k * B`
+
+Finally, to prevent becoming a pure bread-maximizer (there are other things one can do in life / this game), it must be the case that u is concave down relative to bread. Indeed, it must actually approach 0
+
+So far so obvious.
+
+Here's what's not: What bread really gives you (above satiety directly) is option value for "batching".
+
+For instance, if the bakery is a mile from the library and you want to maximize time reading, baking 100 loaves and then reading - repeat forever - gets you more utility per year than baking 1 loaf and then reading - repeat forever.
+
+I'm too tired to do this math right now, but Claude [says](https://claude.ai/chat/3d715fea-50ad-41d9-ad1c-d5fcc5a4d0b7) this suggests
+
+```
+U = - exp[- c * (s + k * B)]
+```
+
+### Discounting Time Cost
+
+This is challenging.
+
+Define
+- `∆U = Uf - Ui = U(final_state) - U(initial_state)`
+- `∆T = Tf - Ti = final_state.time - initial_state.time`
+
+Some options
+
+- `∆U / ∆T` - rate optimizing
+- `∆U - k * ∆T` - linear discounting
+- `∆U * k^∆T` - exponential discounting
+- `∆U / (1 + k * ∆T` - hyperbolic discounting
+- Always look forward a fixed amount of time/ticks
+
+Naively, one might think time-inconsistent discounting is a deal-breaker. Not so. As long as you discount *at least as much as exponential*, NPCs will tend to do the tasks they set out to do. For example, hyperbolic discounting will cause even *less* oscllating than exponential.
+
+Currently, I'm leaning toward either
+
+1. `∆U / ∆T`
+2. Requiring all high level tasks to simulate precisely X ticks ahead to provide apples-to-apples comparisons.
+
+You might think I'm an idiot for not using the "correct" exponential approach. I'm not. Consider this scenario:
+
+>Suppose $\gamma = 0.99$ Suppose one task (e.g. pick berry) takes 1 second and yields 1 util. I can do it whenever I want. The other task yields 2000 utils after 1000 seconds.
+>
+>`1 * 0.99^1 = 0.99`
+>`2000*0.99^1000 = 0.086`
+>
+>I will always do the short task, even though, after 1000 seconds, I would have more utility doing the latter.
+
+What's absolutely crucial is that each component of the utility function (e.g. bread/food, exploration, etc) must have derivatives that tend toward zero. This will ensure some kind of diversity of behavior, even if the discounting is off.
 
 ## Summary
 
 The design is built on three load-bearing ideas. Generator-based tasks give you "await-like" sequential code that runs fast in hypothetical mode and tick-by-tick in real mode, with the mode difference confined to leaf primitives. Copy-on-write world-model overlays make hypothetical contexts cheap to fork and discard, enabling planners that evaluate many candidates per decision. And a stateless brain that re-derives task choice from the world model on demand gives you free save/load coherence and reactive replanning without explicit hysteresis machinery — provided utility functions are designed to avoid near-ties.
 
 The cost of this elegance is concentrated in two places: the discipline of keeping real and hypothetical primitive implementations semantically equivalent, and the discipline of designing utility functions with meaningful gaps. Both are tractable but neither is free, and both should be tested explicitly.
+
+## Open Problems
+
+- **Discounting Time Cost** - see above
+
+- **Randomness.** - We want "randomness" to be deterministic. How deterministic? I'm currently leaning towards requiring all task functions that need randomness to create a generator with a constant (or per-npc-id) seed at the top of themselves.
+
+- **Choose Bread & Hunger Utility Function** - See the "Hunger" section above and the "Bread & Hunger Math" section below.
+
+## Bread & Hunger Math
+
+Suppose
+
+1. A bakery and a library are N seconds apart.
+2. When, I'm at the bakery, I can bake 1 bread per second.
+3. When, I'm at the library, I can read 1 book per second.
+4. I eat `x` bread per second. If I run out, I die.
+5. To avoid nonsense, assume `x < 1`
+6. My utility from each library visity is `f(books_read)`, where `f > 0`, `f' > 0`, and `f'' < 0`
+7. I start at the bakery.
+
+
+- Suppose, when I visit the bakery, I always bake `y` bread.
+- This leaves me `y * (1 - x)` bread when I leave.
+- This leaves me `y * (1 - x) - 10 * x` when I get to the library
+- This leaves me `y * (1 - x) - 20 * x` bread to eat at the library
+- So, I can stay at the library for `y * (1 - x) / x - 20` seconds
+- So, I can read `y * (1 - x) / x - 20` books per cycle
+- The cycle length is `y * (1 - x) / x + y = y / x`
+- Utility per second is `f(y * (1 - x) / x - 20) * x / y`
+
+Note the form with respect to `y` up to linear transformation:
+
+```
+UPS = f(a * y - b) / y
+```
+
+If we allow `f(z) = z`, we get (up to linear transformation)
+
+```
+UPS = -1 / y
+```
+
+Alternatively, if we let `f(z) = z^0.001`, we get
+
+```
+UPS = (a * y - b)^0.001 / y ≈ -1 / y
+```
+
+This really suggests our utility function for bread and hunger should be something like
+
+```
+-1 / (s + k * B)
+```
