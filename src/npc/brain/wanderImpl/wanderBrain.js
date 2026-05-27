@@ -3,9 +3,12 @@
  */
 
 import { walkToLocation } from '../shared/walkToLocation.js';
+import { createHypotheticalFromMemory } from '../../shared/hypotheticalWorld.js';
+import { getNpcTileMemoryStore } from '../../shared/npcMemory.js';
 
 /** @typedef {import('../interface.js').NpcEntity} NpcEntity */
 /** @typedef {import('../interface.js').World3D} World3D */
+/** @typedef {import('../../shared/hypotheticalWorld.js').HypotheticalWorld} HypotheticalWorld */
 /** @typedef {import('../../../domain/entityActions.js').EntityAction} EntityAction */
 /** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
 
@@ -44,13 +47,27 @@ export class WanderBrain {
 
     /**
      * @param {NpcEntity} npc
-     * @param {World3D} world
+     * @returns {HypotheticalWorld | null}
+     */
+    _hypotheticalWorld(npc) {
+        const memory = getNpcTileMemoryStore(npc);
+        if (!memory || memory.size === 0) return null;
+        return createHypotheticalFromMemory(memory);
+    }
+
+    /**
+     * @param {NpcEntity} npc
      * @returns {boolean}
      */
-    _startWalk(npc, world) {
+    _startWalk(npc) {
+        const hypo = this._hypotheticalWorld(npc);
+        if (!hypo) return false;
+
         for (const candidate of this._tileCandidates(npc, 10)) {
-            if (!world.isWalkable(candidate.x, candidate.y, candidate.z)) continue;
-            this._walker = walkToLocation(npc, world, candidate);
+            if (!hypo.isWalkable(candidate.x, candidate.y, candidate.z)) continue;
+            this._walker = walkToLocation(npc, hypo, candidate, {
+                getWorld: () => this._hypotheticalWorld(npc) ?? hypo,
+            });
             this._walkerInput = null;
             return true;
         }
@@ -78,7 +95,7 @@ export class WanderBrain {
         }
 
         while (true) {
-            if (!this._walker && !this._startWalk(npc, world)) return null;
+            if (!this._walker && !this._startWalk(npc)) return null;
             if (!this._walker) return null;
             const step = this._walker.next(this._walkerInput);
             this._walkerInput = null;
