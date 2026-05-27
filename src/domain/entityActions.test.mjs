@@ -7,6 +7,7 @@ import {
     harvestWheatAction,
     lookInsideContainerAction,
     moveDirectionAction,
+    moveToTileAction,
     pickUpAction,
     plantWheatSeedAction,
     satisfiesInventoryPrereq,
@@ -45,6 +46,52 @@ describe('moveDirectionAction', () => {
         const startX = entity.x;
         tickEntityAction(entity, moveDirectionAction(entity, 1, 0), world, 0.5);
         assert.ok(entity.x > startX);
+    });
+});
+
+describe('moveToTileAction', () => {
+    it('moves to target tile center after duration', () => {
+        const world = new World3D();
+        for (let x = 0; x <= 3; x++) {
+            for (let y = 0; y <= 3; y++) {
+                world.setTile(x, y, 0, { terrain: T.DIRT, obj: 0 });
+            }
+        }
+        const entity = new Entity(1.5, 1.5, 0);
+        const action = moveToTileAction(entity, 2, 1, 0);
+
+        const started = runEntityAction(entity, action, world);
+        assert.equal(started, true);
+        assert.equal(entity.x, 1.5);
+        assert.equal(entity.y, 1.5);
+        assert.equal(entity.timedAction.isBusy(), true);
+
+        entity.timedAction.tick(0.15, world);
+        assert.equal(entity.x, 1.5);
+        assert.equal(entity.y, 1.5);
+        assert.equal(entity.timedAction.isBusy(), true);
+
+        entity.timedAction.tick(0.15, world);
+        assert.equal(entity.timedAction.isBusy(), false);
+        assert.equal(entity.x, 2.5);
+        assert.equal(entity.y, 1.5);
+    });
+
+    it('fails when target tile is not adjacent', () => {
+        const world = new World3D();
+        for (let x = 0; x <= 5; x++) {
+            for (let y = 0; y <= 5; y++) {
+                world.setTile(x, y, 0, { terrain: T.DIRT, obj: 0 });
+            }
+        }
+        const entity = new Entity(1.5, 1.5, 0);
+        const action = moveToTileAction(entity, 3, 1, 0);
+
+        const started = runEntityAction(entity, action, world);
+        assert.equal(started, false);
+        assert.equal(entity.timedAction.isBusy(), false);
+        assert.equal(entity.x, 1.5);
+        assert.equal(entity.y, 1.5);
     });
 });
 

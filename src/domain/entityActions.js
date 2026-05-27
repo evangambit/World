@@ -64,10 +64,17 @@ import {
  * }} MoveDirectionAction
  *
  * @typedef {BaseEntityAction & {
+ *   type: 'moveToTile',
+ *   tileX: number,
+ *   tileY: number,
+ *   tileZ: number,
+ * }} MoveToTileAction
+ *
+ * @typedef {BaseEntityAction & {
  *   type?: undefined,
  * }} GenericEntityAction
  *
- * @typedef {MoveDirectionAction | GenericEntityAction} EntityAction
+ * @typedef {MoveDirectionAction | MoveToTileAction | GenericEntityAction} EntityAction
  */
 
 /**
@@ -84,6 +91,14 @@ export function actionDuration(action) {
  */
 export function isMoveDirectionAction(action) {
     return action.type === 'moveDirection';
+}
+
+/**
+ * @param {EntityAction} action
+ * @returns {action is MoveToTileAction}
+ */
+export function isMoveToTileAction(action) {
+    return action.type === 'moveToTile';
 }
 
 /**
@@ -104,6 +119,32 @@ export function moveDirectionAction(entity, dx, dy) {
             if (dx === 0 && dy === 0) return true;
             return e.tryMove(dx, dy, world, dt);
         },
+    };
+}
+
+/**
+ * Primitive movement action to an adjacent tile center.
+ * Uses the timed-action runner when available (real entities),
+ * with immediate fallback for planning snapshots.
+ *
+ * @param {Entity} entity
+ * @param {number} tileX
+ * @param {number} tileY
+ * @param {number} [tileZ]
+ * @returns {MoveToTileAction}
+ */
+export function moveToTileAction(entity, tileX, tileY, tileZ = entity.z) {
+    const duration = getTimedAction('move_to_tile')?.duration ?? 0;
+    return {
+        type: 'moveToTile',
+        tileX,
+        tileY,
+        tileZ,
+        duration,
+        prereq: () => ({
+            tile: { x: tileX, y: tileY, z: tileZ, walkable: true },
+        }),
+        apply: (world) => applyMoveToTile(entity, world, tileX, tileY, tileZ),
     };
 }
 
@@ -225,6 +266,18 @@ export function isAdjacentToTile(entity, tileX, tileY) {
     const px = Math.floor(entity.x);
     const py = Math.floor(entity.y);
     return Math.max(Math.abs(px - tileX), Math.abs(py - tileY)) <= 1;
+}
+
+/**
+ * True only for a one-step neighboring tile (Chebyshev distance exactly 1).
+ * @param {Entity} entity
+ * @param {number} tileX
+ * @param {number} tileY
+ */
+export function isAdjacentStepToTile(entity, tileX, tileY) {
+    const px = Math.floor(entity.x);
+    const py = Math.floor(entity.y);
+    return Math.max(Math.abs(px - tileX), Math.abs(py - tileY)) === 1;
 }
 
 /**
@@ -760,6 +813,29 @@ function applyStashToContainer(entity, world, cx, cy, cz, objType, buildingId) {
         return false;
     }
     mergeStackInto(contents, stack.objType, stack.count, stack.buildingId);
+    return true;
+}
+
+/**
+ * @param {Entity} entity
+ * @param {World3D} world
+ * @param {number} tileX
+ * @param {number} tileY
+ * @param {number} tileZ
+ * @returns {boolean}
+ */
+function applyMoveToTile(entity, world, tileX, tileY, tileZ) {
+    if (tileZ !== entity.z) return false;
+    if (!isAdjacentStepToTile(entity, tileX, tileY)) return false;
+    if (!world.isWalkable(tileX, tileY, tileZ)) return false;
+
+    const starter = entity.timedAction?.start;
+    if (typeof starter === 'function') {
+        return entity.timedAction.start('move_to_tile', world, tileX, tileY, tileZ).ok;
+    }
+
+    entity.x = tileX + 0.5;
+    entity.y = tileY + 0.5;
     return true;
 }
 

@@ -2,7 +2,7 @@
  * Timed world actions — registry and per-action rules.
  * Player and NPC runners call these; add new actions here.
  */
-import { isAdjacentToTile, mergeStackInto } from './entityActions.js';
+import { isAdjacentStepToTile, isAdjacentToTile, mergeStackInto } from './entityActions.js';
 import { T, Obj, isClearableGrassTerrain } from '../world/tileTypes.js';
 
 /** @typedef {import('../actors/entity.js').Entity} Entity */
@@ -19,6 +19,24 @@ import { T, Obj, isClearableGrassTerrain } from '../world/tileTypes.js';
 
 /** @type {Record<string, TimedActionDef>} */
 export const TIMED_ACTIONS = {
+    move_to_tile: {
+        duration: 0.3,
+        label: 'Moving',
+        canStart(entity, world, tx, ty, tz) {
+            if (tz !== entity.z) return { ok: false, message: 'Wrong floor' };
+            if (!isAdjacentStepToTile(entity, tx, ty)) {
+                return { ok: false, message: 'Tile must be adjacent' };
+            }
+            if (!world.isWalkable(tx, ty, tz)) {
+                return { ok: false, message: 'Tile is not walkable' };
+            }
+            return { ok: true };
+        },
+        complete(entity, _world, tx, ty, _tz) {
+            entity.x = tx + 0.5;
+            entity.y = ty + 0.5;
+        },
+    },
     clear_grass: {
         duration: 5,
         label: 'Clearing grass',
