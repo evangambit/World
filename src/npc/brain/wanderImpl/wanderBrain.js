@@ -67,9 +67,10 @@ export class WanderBrain {
      * @param {number} _dt
      * @param {number} _gameTime
      * @param {number|null} _actionProgress
+     * @param {import('../../shared/npcMemory.js').VisibleTile[]} _visibleTiles
      * @returns {EntityAction | null}
      */
-    tick(world, _dt, _gameTime, _actionProgress) {
+    tick(world, _dt, _gameTime, _actionProgress, _visibleTiles) {
         this._world = world;
         const npc = this.npc;
         if (!npc || !npc.isAlive) return null;

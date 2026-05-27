@@ -39,14 +39,15 @@ Swap implementations via constructor:
 new NPC(x, y, z, preset, name, inv, { brain: myCustomBrain });
 ```
 
-`npc.tasks` is available when the brain exposes it (task brain). The brain records observations via `observeTile`; reads use `npcMemory` helpers (`getNpcTileMemory`, `forEachNpcObservedTile`, etc.).
+`npc.tasks` is available when the brain exposes it (task brain). Each `npc.brain.tick(...)` receives `visibleTiles` for this frame; long-lived reads still use `npcMemory` helpers (`getNpcTileMemory`, `forEachNpcObservedTile`, etc.).
 
 ## Simulation order (per NPC, each frame)
 
 `tickSimulation` runs:
 
 1. Vitality update + in-flight travel/timed-action progression  
-2. `npc.brain.tick` — for task brain: perception → task queue (which runs `syncMemoryRefTravelGoal` internally)
+2. Perception snapshot (`tickNpcPerception`) updates memory + returns current `visibleTiles`  
+3. `npc.brain.tick` receives `visibleTiles` and can run tasks/plans (e.g. `syncMemoryRefTravelGoal`)
 
 Perception runs **before** the task runner so newly seen tiles can influence travel and plans on the same frame.
 

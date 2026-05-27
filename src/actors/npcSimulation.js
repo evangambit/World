@@ -10,6 +10,7 @@ import {
 import { tickEntityAction } from './actionExecutor.js';
 import { Entity } from './entity.js';
 import { attachNpcBrain } from '../npc/brain/attach.js';
+import { tickNpcPerception } from '../npc/shared/npcMemory.js';
 
 /** @typedef {import('../domain/entityActions.js').EntityAction} EntityAction */
 /** @typedef {import('./entity.js').Entity} Entity */
@@ -166,7 +167,8 @@ export function tickNpc(entity, world, dt, gameTime) {
         actionProgress = entity.timedAction.getProgress();
     }
 
-    const brainAction = entity.brain?.tick(world, dt, gameTime, actionProgress) ?? null;
+    const visibleTiles = tickNpcPerception(entity, world, gameTime);
+    const brainAction = entity.brain?.tick(world, dt, gameTime, actionProgress, visibleTiles) ?? null;
     if (!entity.resolvingAction && brainAction) {
         tickEntityAction(entity, brainAction, world, dt);
         applied = brainAction;

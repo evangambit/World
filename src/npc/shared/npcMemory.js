@@ -23,6 +23,14 @@ const NPC_TILE_MEMORY = new WeakMap();
  */
 
 /**
+ * @typedef {Object} VisibleTile
+ * @property {number} x
+ * @property {number} y
+ * @property {number} z
+ * @property {TileMemoryEntry} entry
+ */
+
+/**
  * @param {NpcEntity} npc
  * @returns {Map<string, TileMemoryEntry>|undefined}
  */
@@ -157,15 +165,17 @@ export function markTileReachable(npc, x, y, z) {
  * @param {NpcEntity} npc
  * @param {World3D} world
  * @param {number} gameTime
+ * @returns {VisibleTile[]}
  */
 export function tickNpcPerception(npc, world, gameTime) {
-    const brain = npc.brain;
-    if (!npc.isAlive) return;
+    if (!npc.isAlive) return [];
 
     const cx = Math.floor(npc.x);
     const cy = Math.floor(npc.y);
     const cz = npc.z;
     const r = NPC_PERCEPTION_RADIUS;
+    /** @type {VisibleTile[]} */
+    const visibleTiles = [];
 
     for (let dx = -r; dx <= r; dx++) {
         for (let dy = -r; dy <= r; dy++) {
@@ -188,7 +198,8 @@ export function tickNpcPerception(npc, world, gameTime) {
                 reachable,
             };
             setNpcTileMemory(npc, tx, ty, cz, entry);
-            brain?.observeTile?.(tx, ty, cz, entry);
+            visibleTiles.push({ x: tx, y: ty, z: cz, entry });
         }
     }
+    return visibleTiles;
 }
