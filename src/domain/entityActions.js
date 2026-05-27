@@ -20,6 +20,7 @@ import {
 /** @typedef {{ objType: number, count: number, buildingId?: number }} ItemStack */
 /** @typedef {import('../actors/entity.js').Entity} Entity */
 /** @typedef {import('../world/world.js').World3D} World3D */
+/** @typedef {{ ok: boolean, message?: string }} ActionResult */
 
 /**
  * Static requirements for an entity action (inventory + target tile semantics).
@@ -52,8 +53,8 @@ import {
  *
  * @typedef {Object} BaseEntityAction
  * @property {() => ActionPrereq} prereq
- * @property {(world: World3D) => boolean} [apply] - one-shot world effect when no tick
- * @property {(entity: Entity, world: World3D, dt: number) => boolean} [tick] - per-frame update (movement, etc.)
+ * @property {(world: World3D) => boolean | ActionResult} [apply] - one-shot world effect when no tick
+ * @property {(entity: Entity, world: World3D, dt: number) => boolean | ActionResult} [tick] - per-frame update (movement, etc.)
  * @property {number} [duration=0] - seconds; 0 = instant apply, >0 starts TimedActionRunner until complete
  *
  * @typedef {BaseEntityAction & {
@@ -131,6 +132,16 @@ export function satisfiesInventoryPrereq(entity, prereq) {
 }
 
 /**
+ * @param {Entity} entity
+ * @param {ActionPrereq} prereq
+ * @returns {ActionResult}
+ */
+export function explainInventoryPrereq(entity, prereq) {
+    if (satisfiesInventoryPrereq(entity, prereq)) return { ok: true };
+    return { ok: false, message: 'Missing required items' };
+}
+
+/**
  * @param {World3D} world
  * @param {TileReq} req
  * @returns {boolean}
@@ -145,6 +156,64 @@ export function satisfiesTilePrereq(world, req) {
     if (req.terrain != null && tile.terrain !== req.terrain) return false;
     if (req.walkable === true && !world.isWalkable(req.x, req.y, z)) return false;
     return true;
+}
+
+/**
+ * @param {World3D} world
+ * @param {TileReq} req
+ * @returns {ActionResult}
+ */
+export function explainTilePrereq(world, req) {
+    const z = req.z ?? 0;
+    const tile = world.getTile(req.x, req.y, z);
+    if (!tile) return { ok: false, message: 'Target tile does not exist' };
+    if (req.object != null && tile.obj !== req.object) return { ok: false, message: 'Wrong object on tile' };
+    if (req.pickable === true && !isPickableObject(tile.obj)) return { ok: false, message: 'Nothing pickable there' };
+    if (req.container === true && !isContainerObject(tile.obj)) return { ok: false, message: 'Target is not a container' };
+    if (req.terrain != null && tile.terrain !== req.terrain) return { ok: false, message: 'Wrong terrain' };
+    if (req.walkable === true && !world.isWalkable(req.x, req.y, z)) {
+        return { ok: false, message: 'Tile is not walkable' };
+    }
+    return { ok: true };
+}
+
+/**
+ * Evaluate static action prereqs against current entity/world state with reasons.
+ * @param {Entity} entity
+ * @param {World3D} world
+ * @param {ActionPrereq} prereq
+ * @returns {ActionResult}
+ */
+export function explainActionPrereq(entity, world, prereq) {
+    const inv = explainInventoryPrereq(entity, prereq);
+    if (!inv.ok) return inv;
+
+    if (prereq.adjacentTo) {
+        const t = prereq.adjacentTo;
+        if (t.z !== entity.z) return { ok: false, message: 'Wrong floor' };
+        if (!isAdjacentToTile(entity, t.x, t.y)) return { ok: false, message: 'Too far away' };
+    }
+
+    if (prereq.tile) {
+        const tile = explainTilePrereq(world, prereq.tile);
+        if (!tile.ok) return tile;
+    }
+
+    if (prereq.containerItem) {
+        const t = prereq.tile;
+        if (!t) return { ok: false, message: 'Container target missing' };
+        const stacks = world.getTileContents(t.x, t.y, t.z ?? 0);
+        const hit = stacks.some(
+            (s) =>
+                s.objType === prereq.containerItem.objType &&
+                (prereq.containerItem.buildingId == null ||
+                    s.buildingId === prereq.containerItem.buildingId) &&
+                s.count > 0,
+        );
+        if (!hit) return { ok: false, message: 'Required item not in container' };
+    }
+
+    return { ok: true };
 }
 
 /**

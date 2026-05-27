@@ -7,11 +7,12 @@ import {
     harvestWheatAction,
     lookInsideContainerAction,
     moveDirectionAction,
+    pickUpAction,
     plantWheatSeedAction,
     satisfiesInventoryPrereq,
     satisfiesTilePrereq,
 } from './entityActions.js';
-import { runEntityAction, tickEntityAction } from '../actors/actionExecutor.js';
+import { runEntityAction, runEntityActionResult, tickEntityAction } from '../actors/actionExecutor.js';
 import { Entity } from '../actors/entity.js';
 
 describe('satisfiesTilePrereq', () => {
@@ -123,5 +124,17 @@ describe('lookInsideContainerAction', () => {
         assert.equal(action.lastResult.ok, true);
         assert.equal(action.lastResult.contents.length, 1);
         assert.equal(action.lastResult.contents[0].objType, Obj.WHEAT);
+    });
+});
+
+describe('runEntityActionResult', () => {
+    it('returns prereq failure reasons', () => {
+        const world = new World3D();
+        world.setTile(3, 3, 0, { terrain: T.DIRT, obj: Obj.FLOWER });
+        const entity = new Entity(0.5, 0.5, 0);
+
+        const result = runEntityActionResult(entity, pickUpAction(entity, 3, 3, 0), world);
+        assert.equal(result.ok, false);
+        assert.match(result.message, /far/i);
     });
 });

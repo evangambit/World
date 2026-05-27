@@ -64,6 +64,19 @@ export class HypotheticalWorld {
         this._containerContents = new Map();
     }
 
+    // TODO: tasks should return a meaningful reason they failed (or maybe even succeeded) so the LLM
+    // has something to go off of
+
+    // TODO: a primitive tile-based movement action is very convenient for reducing the number of 
+    // actions in planning by 30x. Both HypotheticalWorld and the real world sim will have to do
+    // some physics-based enforcment to achieve this.
+
+    // TODO: tick should provide everything that the NPC has learned in the last tick:
+    // tiles it can see
+    // actions of other NPCs it can see
+    // communication from other NPCs
+    // Note: this means we remove 'observe' calls from the brain
+
     /** @returns {HypotheticalWorld} */
     branch() {
         return new HypotheticalWorld({ parent: this });
