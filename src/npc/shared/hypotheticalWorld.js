@@ -62,14 +62,19 @@ export class HypotheticalWorld {
         this._tiles = new Map();
         /** @type {Map<string, { objType: number, count: number, buildingId?: number }[]>} */
         this._containerContents = new Map();
+        /**
+         * Set of tile keys hypothetically seen so far.
+         * Root: seeded from memory keys (already-known tiles don't count as new).
+         * Branches: copied from parent so sequential simulations don't double-count.
+         * @type {Set<string>}
+         */
+        this._seenTileKeys = opts.parent
+            ? new Set(opts.parent._seenTileKeys)
+            : new Set(opts.memory?.keys() ?? []);
     }
 
     // TODO: tasks should return a meaningful reason they failed (or maybe even succeeded) so the LLM
     // has something to go off of
-
-    // TODO: a primitive tile-based movement action is very convenient for reducing the number of 
-    // actions in planning by 30x. Both HypotheticalWorld and the real world sim will have to do
-    // some physics-based enforcment to achieve this.
 
     // TODO: tick should provide everything that the NPC has learned in the last tick:
     // tiles it can see
@@ -241,6 +246,34 @@ export class HypotheticalWorld {
             );
         }
         return this._containerContents.get(key) ?? null;
+    }
+
+    /**
+     * Simulate NPC perception at a position: mark all tile keys within a
+     * Chebyshev radius as seen. Returns the count of tiles that were not
+     * previously seen (genuinely new exploration value).
+     *
+     * Operates on this instance's _seenTileKeys in place. Call on a branch()
+     * to avoid mutating a shared ancestor.
+     *
+     * @param {number} cx
+     * @param {number} cy
+     * @param {number} cz
+     * @param {number} radius - Chebyshev radius
+     * @returns {number} count of newly seen tiles
+     */
+    simulatePerception(cx, cy, cz, radius) {
+        let newCount = 0;
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                const key = World3D.key(cx + dx, cy + dy, cz);
+                if (!this._seenTileKeys.has(key)) {
+                    this._seenTileKeys.add(key);
+                    newCount++;
+                }
+            }
+        }
+        return newCount;
     }
 
     /**

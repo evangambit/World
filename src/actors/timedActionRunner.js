@@ -87,6 +87,21 @@ export class TimedActionRunner {
     tick(dt, world) {
         if (!this.active) return;
 
+        // move_to_tile: interpolate position smoothly so walk animation fires.
+        // Skip re-validation — the move was already approved at start().
+        if (this.active.id === 'move_to_tile') {
+            this.active.elapsed += dt;
+            const t = Math.min(1, this.active.elapsed / this.active.duration);
+            this.entity.x = this.active.startPx + 0.5 + (this.active.tx - this.active.startPx) * t;
+            this.entity.y = this.active.startPy + 0.5 + (this.active.ty - this.active.startPy) * t;
+            if (this.active.elapsed >= this.active.duration) {
+                this.entity.x = this.active.tx + 0.5;
+                this.entity.y = this.active.ty + 0.5;
+                this._finish(true);
+            }
+            return;
+        }
+
         const px = Math.floor(this.entity.x);
         const py = Math.floor(this.entity.y);
         if (px !== this.active.startPx || py !== this.active.startPy) {
