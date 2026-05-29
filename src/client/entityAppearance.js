@@ -2,6 +2,7 @@
  * Entity sprite sheets and walk/work animation (client only).
  */
 import { buildSpriteSheet } from './entitySprites.js';
+import { getTimedAction, timedActionUsesWorkAppearance } from '../domain/timedActions.js';
 
 /** @typedef {import('../actors/entity.js').EntityAppearance} EntityAppearance */
 
@@ -51,7 +52,10 @@ export function tickEntityAppearance(entity, dt) {
     if (!entity.appearance) return;
 
     const state = getAnim(entity);
-    const working = entity.timedAction?.isBusy?.() ?? false;
+    const busy = entity.timedAction?.isBusy?.() ?? false;
+    const actionId = entity.timedAction?.getActiveActionId?.() ?? null;
+    const working = busy && timedActionUsesWorkAppearance(actionId);
+    const stepping = busy && getTimedAction(actionId)?.appearance === 'walk';
 
     if (working) {
         state.animTimer += dt;
@@ -65,9 +69,10 @@ export function tickEntityAppearance(entity, dt) {
     }
 
     const moved =
-        state.lastX != null &&
-        state.lastY != null &&
-        (Math.hypot(entity.x - state.lastX, entity.y - state.lastY) > 0.001);
+        stepping ||
+        (state.lastX != null &&
+            state.lastY != null &&
+            (Math.hypot(entity.x - state.lastX, entity.y - state.lastY) > 0.001));
     state.lastX = entity.x;
     state.lastY = entity.y;
 
@@ -95,7 +100,9 @@ export function getEntitySprite(entity) {
     const sheet = getSheet(colors);
     const dir = entity.dir;
     const state = getAnim(entity);
-    const working = entity.timedAction?.isBusy?.() ?? false;
+    const working =
+        (entity.timedAction?.isBusy?.() ?? false) &&
+        timedActionUsesWorkAppearance(entity.timedAction?.getActiveActionId?.());
 
     if (working && sheet.workSprites?.[dir]) {
         return sheet.workSprites[dir][state.animFrame] ?? null;

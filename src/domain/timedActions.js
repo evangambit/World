@@ -13,6 +13,7 @@ import { T, Obj, isClearableGrassTerrain } from '../world/tileTypes.js';
  * @typedef {Object} TimedActionDef
  * @property {number} duration - seconds
  * @property {string} label - UI label while in progress
+ * @property {'walk'|'work'} [appearance='work'] - client sprite while active
  * @property {(entity: Entity, world: World3D, tx: number, ty: number, tz: number) => ActionCheck} canStart
  * @property {(entity: Entity, world: World3D, tx: number, ty: number, tz: number) => void} complete
  */
@@ -22,6 +23,7 @@ export const TIMED_ACTIONS = {
     move_to_tile: {
         duration: 0.3,
         label: 'Moving',
+        appearance: 'walk',
         canStart(entity, world, tx, ty, tz) {
             if (tz !== entity.z) return { ok: false, message: 'Wrong floor' };
             if (!isAdjacentStepToTile(entity, tx, ty)) {
@@ -71,4 +73,14 @@ export const TIMED_ACTIONS = {
  */
 export function getTimedAction(actionId) {
     return TIMED_ACTIONS[actionId] ?? null;
+}
+
+/**
+ * @param {string | null | undefined} actionId
+ * @returns {boolean}
+ */
+export function timedActionUsesWorkAppearance(actionId) {
+    if (!actionId) return false;
+    const def = getTimedAction(actionId);
+    return (def?.appearance ?? 'work') === 'work';
 }

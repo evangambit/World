@@ -28,6 +28,11 @@ export class TimedActionRunner {
         return this.active != null;
     }
 
+    /** @returns {string | null} */
+    getActiveActionId() {
+        return this.active?.id ?? null;
+    }
+
     /** @returns {number} 0–1 */
     getProgress() {
         if (!this.active) return 0;
