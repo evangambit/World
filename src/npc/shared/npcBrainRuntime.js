@@ -5,12 +5,12 @@
  *
  * Defaults to "wander".
  */
-import { WanderBrain, NoopNpcBrain } from '../brain/index.js';
+import { WanderBrain, NoopNpcBrain, DanBrain } from '../brain/index.js';
 
 /** @typedef {import('../brain/interface.js').NpcBrain} NpcBrain */
-/** @typedef {'wander' | 'noop'} BrainType */
+/** @typedef {'wander' | 'noop' | 'dan'} BrainType */
 
-const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['wander', 'noop']);
+const VALID_BRAIN_TYPES = /** @type {BrainType[]} */ (['wander', 'noop', 'dan']);
 
 /**
  * @returns {BrainType}
@@ -36,5 +36,6 @@ export function resolveBrainType() {
  */
 export function createBrainForType(brainType) {
     if (brainType === 'noop') return new NoopNpcBrain();
+    if (brainType === 'dan') return new DanBrain();
     return new WanderBrain();
 }

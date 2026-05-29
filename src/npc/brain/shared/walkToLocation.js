@@ -110,7 +110,7 @@ function getWalkableNeighbors(world, x, y, z) {
  * @param {number} [maxNodes]
  * @returns {TileCoord[] | null}
  */
-function findPath(world, sx, sy, sz, gx, gy, gz, maxNodes = 2000) {
+export function findPath(world, sx, sy, sz, gx, gy, gz, maxNodes = 2000) {
     const key = (x, y, z) => `${x},${y},${z}`;
     const startKey = key(sx, sy, sz);
     const goalKey = key(gx, gy, gz);
