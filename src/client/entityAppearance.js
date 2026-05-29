@@ -51,7 +51,9 @@ export function tickEntityAppearance(entity, dt) {
     if (!entity.appearance) return;
 
     const state = getAnim(entity);
-    const working = entity.timedAction?.isBusy?.() ?? false;
+    // move_to_tile is locomotion, not work — position interpolation drives the walk animation.
+    const activeId = entity.timedAction?.active?.id;
+    const working = (entity.timedAction?.isBusy?.() ?? false) && activeId !== 'move_to_tile';
 
     if (working) {
         state.animTimer += dt;

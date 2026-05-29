@@ -385,7 +385,7 @@ export class Renderer {
                     }
                 }
                 if (isContainerObject(tile.obj)) {
-                    const n = world.getTileContents(x, y, z).reduce((s, e) => s + e.count, 0);
+                    const n = world.getTileContents(ht.x, ht.y, ht.z).reduce((s, e) => s + e.count, 0);
                     lines.push(`Stored: ${n} item(s)`);
                 }
                 if (tile.ceiling) lines.push('Indoor');
