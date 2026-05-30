@@ -714,7 +714,15 @@ UPS = -1 / y
 Alternatively, if we let `f(z) = z^0.001`, we get
 
 ```
-UPS = (a * y - b)^0.001 / y ≈ -1 / y
+UPS = (a * y - b)^0.001 / y ≈ 1 / y
+```
+
+NB: the sign flip.
+
+Finally; consider
+
+```
+UPS = (a * y - b)^c / y = (a / y^(1/c-1) - b / y^(1/c))^c
 ```
 
 This really suggests our utility function for bread and hunger should be something like
