@@ -4,6 +4,7 @@
  */
 import { cookUncookedSteakInInventory, cookWheatIntoBread } from './cooking.js';
 import { harvestWheatAtTile, plantWheatSeedAtTile } from './crops.js';
+import { consumeFoodFromInventory } from './vitality.js';
 import { getTimedAction } from './timedActions.js';
 import {
     Obj,
@@ -463,6 +464,18 @@ export function harvestWheatAction(entity, tileX, tileY, gameTime, tileZ = entit
             tile: { x: tileX, y: tileY, z: tileZ, object: Obj.WHEAT_CROP },
         }),
         apply: (world) => harvestWheatAtTile(entity, world, tileX, tileY, gameTime, tileZ).ok,
+    };
+}
+
+/**
+ * @param {Entity} entity
+ * @param {number} objType
+ * @returns {EntityAction}
+ */
+export function eatAction(entity, objType) {
+    return {
+        prereq: () => ({ inventoryAnyOf: [[{ objType }]] }),
+        apply: () => consumeFoodFromInventory(entity, objType),
     };
 }
 
