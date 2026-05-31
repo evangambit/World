@@ -1,6 +1,6 @@
 # NPC AI System Specification (Theory)
 
-> **Theory doc.** This describes the intended decision-making model — utility functions, hypothetical planning, and task coroutines — largely independent of engine details. For how Dan is wired into the current codebase, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+> **Theory doc.** This describes the intended decision-making model — utility functions, hypothetical planning, and task coroutines — largely independent of engine details. For how Dan is wired into the current codebase, see [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 > **Note on Engine Refactor:** The game engine is currently being refactored by Morgan. The high-level ideas in this document should remain mostly valid, and the required tweaks shouldn't require significant changes to the proposed AI architecture. However, this specification must be revisited once the engine refactor is done.
 
@@ -568,58 +568,18 @@ These are the load-bearing properties of the design. Violating any of them produ
 
 ### Exploration
 
-You clearly value knowledge about tiles around your home more than tiles farther away, so we must add some penalty.
+→ [utility_functions/power_law_exploration.md](utility_functions/power_law_exploration.md)
 
-Suppose the penalty were exponential. Then, as your explored area grew 100x, you'd become basically obsessed with keeping it perfectly circular.
-
-What utility function makes your degree of circle-obsession constant?
-
-1 / distance\_from\_home^alpha
-
-This gives us a nice utility function for exploration:
-
-```js
-let seen_tiles = context.tiles.keys()  
-let centroid = compute_centroid(seen_tiles)  
-// NB: we'd probably prefer something like average location the NPC has been using some kind of time discounting. Or their literal home. TBD  
-let u = 0  
-for (tile in seen_tiles) {  
-    // Cap to avoid infinities.
-    u += min(1 / distance(tile, centroid) ** alpha, 1)
-}
-```
+Scale-invariance forces `1/dist^α` per tile. Exponential distance-penalty would make
+circularity-obsession grow with scale; the power law keeps it constant.
 
 ### Hunger
 
-Consider the portion of the utility function involving satiety (100 \- hunger) and bread.
+→ [utility_functions/crra_death_floor.md](utility_functions/crra_death_floor.md)
 
-u(satiety, bread)
-
-Suppose a loaf of bread improves satiety by k up to a max of 100\.
-
-The two key conditions are really one statement: the marginal rate of substitution between bread and satiety is exactly k : 1, forcing u to depend only on the combination `s + kB`. The strict inequalities are tie-breakers at the boundary, not independent preferences.
-
-**Anti-starvation:** eating a loaf when nearly dead must be worth it:
-
-```
-∀ B    u(k, B - 1) > u(0, B)
-```
-
-**Anti-waste:** keeping a loaf (slightly hungry, more bread) beats eating it when doing so wastes the portion above the satiety cap:
-
-```
-∀ B, 0 ≤ h < k    u(100 - h, B) > u(100, B - 1)
-```
-
-The binding case is h = k − ε — "almost full, one loaf to spare." Under exact `s + kB` dependence both boundary cases are equalities (e.g. the anti-starvation boundary has both arguments equal to `kB`); the `>` signs encode only the survival and anti-waste tie-breakers. Any u depending solely on `s + kB` satisfies both conditions automatically; the conditions exist to force that dependence.
-
-This mostly just implies that the bread-and-hunger utility component should be a function of `s + k * B`
-
-Finally, to prevent becoming a pure bread-maximizer (there are other things one can do in life / this game), it must be the case that u is concave down relative to bread. Indeed, it must actually approach 0.
-
-So far so obvious.
-
-Here's what's not: what bread really gives you (above satiety directly) is option value for "batching." See the **Bread & Hunger Math** section below for the full derivation of the right functional form.
+The binding constraints (anti-starvation, anti-waste) force `u` to depend only on `s + kB`.
+The right functional form on that composite — including why it must be CRRA and not CARA —
+is derived in the entry above and the batch math below.
 
 ### Discounting Time Cost
 
@@ -667,60 +627,14 @@ The cost of this elegance is concentrated in two places: the discipline of keepi
 
 - **Randomness.** - We want "randomness" to be deterministic. How deterministic? I'm currently leaning towards requiring all task functions that need randomness to create a generator with a constant (or per-npc-id) seed at the top of themselves.
 
-- **Choose Bread & Hunger Utility Function** - See the "Hunger" section above and the "Bread & Hunger Math" section below.
+- **Choose Bread & Hunger Utility Function** - See [utility_functions/crra_death_floor.md](utility_functions/crra_death_floor.md) and the Bread & Hunger Math section below.
 
 ## Bread & Hunger Math
 
-Suppose
+Full derivation: [utility_functions/crra_death_floor.md](utility_functions/crra_death_floor.md)
+and [utility_functions/cara_sequential_discounting.md](utility_functions/cara_sequential_discounting.md).
 
-1. A bakery and a library are N seconds apart.
-2. When, I'm at the bakery, I can bake 1 bread per second.
-3. When, I'm at the library, I can read 1 book per second.
-4. I eat `x` bread per second. If I run out, I die.
-5. To avoid nonsense, assume `x < 1`
-6. My utility from each library visity is `f(books_read)`, where `f > 0`, `f' > 0`, and `f'' < 0`
-7. I start at the bakery.
-
-
-- Suppose, when I visit the bakery, I always bake `y` bread.
-- This leaves me `y * (1 - x)` bread when I leave.
-- This leaves me `y * (1 - x) - 10 * x` when I get to the library
-- This leaves me `y * (1 - x) - 20 * x` bread to eat at the library
-- So, I can stay at the library for `y * (1 - x) / x - 20` seconds
-- So, I can read `y * (1 - x) / x - 20` books per cycle
-- The cycle length is `y * (1 - x) / x + y = y / x`
-- Utility per second is `f(y * (1 - x) / x - 20) * x / y`
-
-Note the form with respect to `y` up to linear transformation:
-
-```
-UPS = f(a * y - b) / y
-```
-
-If we allow `f(z) = z`, we get (up to linear transformation)
-
-```
-UPS = -1 / y
-```
-
-**Why linear f? The growth-rate argument.** Rather than testing individual examples, sort all choices of `f` by growth rate, requiring three properties of `UPS(y) = f(ay − b) / y`: `f(0) = 0`, `UPS` increasing in batch size `y`, and `UPS` bounded above (per-second utility should saturate as batches grow, not blow up).
-
-- **Sublinear / concave** (`f(z)/z → 0`: `zᵖ` with `p < 1`, `log`, `√`, any standard saturating utility): `UPS` is 0 at the minimum batch and `→ 0` again as `y → ∞`, producing a hump. This **fails** the "increasing" requirement. All standard concave utilities are ruled out.
-- **Superlinear / convex** (`f(z)/z → ∞`): `UPS → ∞`. **Fails** boundedness — and convex utility is economically bizarre.
-- **Asymptotically linear** (`f(z)/z → L ∈ (0, ∞)`): `UPS = La − C/y + o(1/y)` — the `−1/y` shape. ✓
-
-The requirements force `f` to be linear in the tail. `f(z) = z` is the clean representative. `−1/y` is an **attractor**: every asymptotically-linear `f` lands on this UPS shape; only the constant `C` changes. `f` need not be exactly linear, only linear asymptotically.
-
-**Caveat:** the hump/non-monotonicity argument lives in *policy space* — `UPS` as a function of batch size `y`. It does not mean inventory has decreasing value; the agent never discards stock. Reading the shape of state-utility off the `UPS(y)` curve is only valid in the linear-`f` regime, which is exactly why `f(z) = z` is the right choice for that inference.
-
-**The timescale argument (the real reason linear is the default).** Real diminishing returns on reading operate over a timescale much longer than a single batch session. Within one batch, `f` is sampled over a short interval, so its curvature barely registers — locally `f` is affine, hence effectively linear. This makes `−1/y` the generic per-batch form. The sublinear regime only matters when a single batch is long enough to exhaust the resource's own diminishing returns.
-
-A consequence: utility is linear *within* a batch but concave *across* many batches (long-run satiation reasserts itself on the long horizon). These are different layers with no obligation to share a functional form. This also predicts when the linear default breaks: for resources consumed slowly relative to how fast they cloy.
-
-**From batch-value to state-utility.** The batching algebra above earns "`−1/y` is the right batch-value shape over policy space." It does not, by itself, justify "`u(s, B) = −1/(s + kB)` is the right state utility." That step rests on independent structural properties of the form `−1/w` where `w = s + kB`:
-
-- **Homothetic / CRRA-2.** `−1/w` is constant-relative-risk-aversion with coefficient 2. Marginal value scales as `u′(λw) = λ⁻² u′(w)`, so optimal inventory *ratios* are preserved as wealth grows ("keep stacks in similar proportions when richer"). This is the standard empirical reason to prefer CRRA over CARA, and it matches human hoarding behavior.
-- **Starvation singularity.** `−1/w → −∞` as `w → 0` gives infinite marginal value at the edge of starvation — the correct panic response. The CARA form `−exp[−c(s + kB)]` lacks this property.
-- **Slow polynomial tail.** Marginal value decays as `1/w²` rather than exponentially, so large stockpiles keep mattering — this is the option value. CARA prices a big larder at near-zero marginal value, destroying exactly the option value the argument is trying to preserve.
-
-The inference from batch-value to state-utility is valid in the linear-`f` regime (where the two coincide), but the right reason to prefer `−1/(s + kB)` is these three structural properties. The conclusion stands; the support is different from what the batching algebra alone would imply.
+The batch algebra (`UPS = f(ay − b) / y`) forces `f` linear in the tail → `UPS ∝ −1/y`.
+The jump from batch-value to state-utility rests on three independent properties of `−1/(s + kB)`:
+homotheticity (CRRA-2), starvation singularity at `w → 0`, and slow polynomial tail preserving
+option value — all of which the utility function entries analyze in detail.

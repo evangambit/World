@@ -2,7 +2,7 @@
 
 Dan is a utility-driven NPC brain that plans by hypothetically running the same task code used at execution time. Enable with `?brain=dan` (see `npcBrainRuntime.js`).
 
-For the underlying theory (utility math, hypothetical overlays, design rationale), see [dan_ai_spec.md](./dan_ai_spec.md).
+For the underlying theory (utility math, hypothetical overlays, design rationale), see [notes/index.md](./notes/index.md).
 
 ## Layout
 
@@ -14,7 +14,7 @@ danImpl/
     eat.js          — consume best available food
     farm.js         — harvest / cook / plant loop
     explore.js      — walk toward map frontier
-  dan_ai_spec.md    — theory
+  notes/            — theory (index.md + utility_functions/)
   ARCHITECTURE.md   — this file
 ```
 
@@ -107,7 +107,7 @@ Hypothetical `walkTo` treats tiles absent from **memory** as unseen for explorat
 
 ## Known gaps / future work
 
-- Full lookahead with **health** in utility would replace the hunger penalty hack (see comments in `danBrain.js` and `dan_ai_spec.md`).
+- Full lookahead with **health** in utility would replace the hunger penalty hack (see comments in `danBrain.js` and `notes/index.md`).
 - `cropUtility` weight and mature-vs-all crop counting need calibration.
 - `eatTask` still has `HUNGER_EAT_THRESHOLD` exported but selection is utility-driven, not threshold-gated.
-- Engine refactor may change action/timed-action shapes; revisit `dan_ai_spec.md` when stable.
+- Engine refactor may change action/timed-action shapes; revisit `notes/index.md` when stable.
