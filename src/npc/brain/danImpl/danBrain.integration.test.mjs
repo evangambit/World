@@ -5,6 +5,7 @@ import { T, Obj } from '../../../world/tileTypes.js';
 import { createNpcEntity } from '../../../actors/npcSimulation.js';
 import { tickSimulation } from '../../../simulation/tickSimulation.js';
 import { DanBrain } from './danBrain.js';
+import { getFoodNutrition } from '../../../domain/vitality.js';
 
 const GRID_SIZE = 7;
 const GRID_ORIGIN = 0;
@@ -61,13 +62,14 @@ describe('DanBrain integration', () => {
 
         const finalBread = npc.inventory.find((s) => s.objType === Obj.BREAD)?.count ?? 0;
         const finalWheat = npc.inventory.find((s) => s.objType === Obj.WHEAT)?.count ?? 0;
+        const finalNutrition = npc.inventory.reduce((sum, s) => sum + (getFoodNutrition(s.objType) ?? 0) * s.count, 0);
         console.log(
             `Bread produced (peak inventory): ${maxBreadSeen}, remaining at end: ${finalBread}; ` +
-            `wheat (peak inventory): ${maxWheatSeen}, remaining at end: ${finalWheat}`,
+            `wheat (peak inventory): ${maxWheatSeen}, remaining at end: ${finalWheat}; ` +
+            `nutrition at end: ${finalNutrition}`,
         );
 
         assert.ok(npc.isAlive, 'NPC should still be alive after 600s');
-        assert.ok(maxBreadSeen >= 1, 'NPC should have produced at least 1 bread');
-        assert.ok(maxWheatSeen >= 1, 'NPC should have produced at least 1 wheat');
+        assert.ok(finalNutrition >= 100, 'NPC should have produced at least 100 nutrition');
     });
 });
