@@ -1,4 +1,6 @@
-# NPC AI System Specification
+# NPC AI System Specification (Theory)
+
+> **Theory doc.** This describes the intended decision-making model — utility functions, hypothetical planning, and task coroutines — largely independent of engine details. For how Dan is wired into the current codebase, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 > **Note on Engine Refactor:** The game engine is currently being refactored by Morgan. The high-level ideas in this document should remain mostly valid, and the required tweaks shouldn't require significant changes to the proposed AI architecture. However, this specification must be revisited once the engine refactor is done.
 
