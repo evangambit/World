@@ -96,7 +96,6 @@ export function chooseBestFarmTarget(entity, hypoWorld, gameTime) {
     const pz = entity.z;
 
     const wheatCount = inventoryCount(entity, Obj.WHEAT);
-    const breadCount = inventoryCount(entity, Obj.BREAD);
     const seedCount = inventoryCount(entity, Obj.WHEAT_SEED);
 
     /** @type {FarmTarget | null} */
