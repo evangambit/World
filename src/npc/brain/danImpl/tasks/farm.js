@@ -11,12 +11,10 @@ import {
     plantWheatSeedAction,
 } from '../../../../domain/entityActions.js';
 import { isWheatMature } from '../../../../domain/crops.js';
-import { walkToLocation } from '../../shared/walkToLocation.js';
-import { forEachNpcObservedTile } from '../../../shared/npcMemory.js';
 import { Obj, T, isStoveObject, isWheatCropObject } from '../../../../world/tileTypes.js';
 
+/** @typedef {import('../danContext.js').DanContext} DanContext */
 /** @typedef {import('../../../shared/hypotheticalWorld.js').HypotheticalWorld} HypotheticalWorld */
-/** @typedef {import('../../../../actors/npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../../../../domain/entityActions.js').EntityAction} EntityAction */
 /** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
@@ -33,6 +31,9 @@ export const MAX_BREAD_STOCK = 5;
  * @property {FarmActionType} actionType
  */
 
+/** Cap loop iterations to prevent runaway hypo simulation. */
+const MAX_FARM_STEPS = 20;
+
 const CARDINAL_OFFSETS = [
     [1, 0],
     [-1, 0],
@@ -41,29 +42,29 @@ const CARDINAL_OFFSETS = [
 ];
 
 /**
- * @param {NpcEntity} npc
+ * @param {{ inventory?: { objType: number, count: number }[] }} entity
  * @param {number} objType
  * @returns {number}
  */
-function inventoryCount(npc, objType) {
+function inventoryCount(entity, objType) {
     let count = 0;
-    for (const stack of npc.inventory ?? []) {
+    for (const stack of entity.inventory ?? []) {
         if (stack.objType === objType) count += stack.count;
     }
     return count;
 }
 
 /**
- * @param {NpcEntity} npc
+ * @param {{ x: number, y: number, z: number }} entity
  * @param {number} tx
  * @param {number} ty
  * @param {number} tz
  * @returns {number}
  */
-function chebyshevDistFromNpc(npc, tx, ty, tz) {
-    if (tz !== npc.z) return Infinity;
-    const px = Math.floor(npc.x);
-    const py = Math.floor(npc.y);
+function chebyshevDistFromNpc(entity, tx, ty, tz) {
+    if (tz !== entity.z) return Infinity;
+    const px = Math.floor(entity.x);
+    const py = Math.floor(entity.y);
     return Math.max(Math.abs(px - tx), Math.abs(py - ty));
 }
 
@@ -86,19 +87,20 @@ function findWalkableNeighbor(hypoWorld, tx, ty, tz) {
 }
 
 /**
- * Scan tile memory and return the highest-scoring farming opportunity, or null.
+ * Scan the hypothetical world and return the highest-scoring farming
+ * opportunity, or null.
  *
- * @param {NpcEntity} npc
+ * @param {{ x: number, y: number, z: number, inventory?: { objType: number, count: number }[] }} entity
  * @param {HypotheticalWorld} hypoWorld
  * @param {number} gameTime
  * @returns {FarmTarget | null}
  */
-export function chooseBestFarmTarget(npc, hypoWorld, gameTime) {
-    const pz = npc.z;
+export function chooseBestFarmTarget(entity, hypoWorld, gameTime) {
+    const pz = entity.z;
 
-    const wheatCount = inventoryCount(npc, Obj.WHEAT);
-    const breadCount = inventoryCount(npc, Obj.BREAD);
-    const seedCount = inventoryCount(npc, Obj.WHEAT_SEED);
+    const wheatCount = inventoryCount(entity, Obj.WHEAT);
+    const breadCount = inventoryCount(entity, Obj.BREAD);
+    const seedCount = inventoryCount(entity, Obj.WHEAT_SEED);
 
     /** @type {FarmTarget | null} */
     let best = null;
@@ -113,7 +115,7 @@ export function chooseBestFarmTarget(npc, hypoWorld, gameTime) {
      * @param {TileCoord} walkTarget
      */
     function consider(tx, ty, tz, weight, actionType, walkTarget) {
-        const dist = chebyshevDistFromNpc(npc, walkTarget.x, walkTarget.y, walkTarget.z);
+        const dist = chebyshevDistFromNpc(entity, walkTarget.x, walkTarget.y, walkTarget.z);
         if (!Number.isFinite(dist)) return;
 
         const score = weight / Math.max(dist, 1);
@@ -127,29 +129,28 @@ export function chooseBestFarmTarget(npc, hypoWorld, gameTime) {
         };
     }
 
-    forEachNpcObservedTile(npc, (key, entry) => {
+    hypoWorld.forEachTile((key, tile, reachable) => {
+        if (reachable === false) return;
+
         const parts = key.split(',');
         const tx = Number(parts[0]);
         const ty = Number(parts[1]);
         const tz = Number(parts[2]);
         if (tz !== pz) return;
-        if (entry.reachable === false) return;
 
-        const state = entry.state;
-
-        if (isWheatCropObject(state.obj) && isWheatMature(state, gameTime)) {
+        if (isWheatCropObject(tile.obj) && isWheatMature(tile, gameTime)) {
             const neighbor = findWalkableNeighbor(hypoWorld, tx, ty, tz);
             if (neighbor) consider(tx, ty, tz, 3, 'harvest', neighbor);
             return;
         }
 
-        if (isStoveObject(state.obj) && wheatCount > 0 && breadCount < MAX_BREAD_STOCK) {
+        if (isStoveObject(tile.obj) && wheatCount > 0 && breadCount < MAX_BREAD_STOCK) {
             const neighbor = findWalkableNeighbor(hypoWorld, tx, ty, tz);
             if (neighbor) consider(tx, ty, tz, 2, 'cook', neighbor);
             return;
         }
 
-        if (seedCount > 0 && !state.obj && state.terrain === T.DIRT && hypoWorld.isWalkable(tx, ty, tz)) {
+        if (seedCount > 0 && !tile.obj && tile.terrain === T.DIRT && hypoWorld.isWalkable(tx, ty, tz)) {
             consider(tx, ty, tz, 1, 'plant', { x: tx, y: ty, z: tz });
         }
     });
@@ -158,42 +159,42 @@ export function chooseBestFarmTarget(npc, hypoWorld, gameTime) {
 }
 
 /**
- * @param {NpcEntity} npc
+ * @param {{ x: number, y: number, z: number }} entity
  * @param {FarmTarget} target
  * @param {number} gameTime
  * @returns {EntityAction}
  */
-function actionForTarget(npc, target, gameTime) {
+function actionForTarget(entity, target, gameTime) {
     const { x, y, z } = target.tileCoord;
     switch (target.actionType) {
         case 'harvest':
-            return harvestWheatAction(npc, x, y, gameTime, z);
+            return harvestWheatAction(entity, x, y, gameTime, z);
         case 'cook':
-            return cookBreadAtStoveAction(npc, x, y);
+            return cookBreadAtStoveAction(entity, x, y);
         case 'plant':
-            return plantWheatSeedAction(npc, x, y, gameTime, z);
+            return plantWheatSeedAction(entity, x, y, gameTime, z);
     }
 }
 
 /**
- * @param {NpcEntity} npc
- * @param {() => HypotheticalWorld} getWorld
- * @param {() => number} getGameTime
+ * @param {DanContext} ctx
  * @returns {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null>}
  */
-export function* farmTask(npc, getWorld, getGameTime) {
-    while (true) {
-        const target = chooseBestFarmTarget(npc, getWorld(), getGameTime());
+export function* farmTask(ctx) {
+    for (let step = 0; step < MAX_FARM_STEPS; step++) {
+        const target = chooseBestFarmTarget(ctx.entity, ctx.world, ctx.gameTime);
         if (!target) {
             return { ok: true };
         }
 
-        const walkResult = yield* walkToLocation(npc, getWorld(), target.walkTarget, {
-            getWorld,
-        });
+        const walkResult = yield* ctx.walkTo(target.walkTarget);
         if (!walkResult.ok) return walkResult;
 
-        const actionResult = yield actionForTarget(npc, target, getGameTime());
-        if (actionResult && !actionResult.ok) return actionResult;
+        const actionResult = yield* ctx.applyAction(
+            actionForTarget(ctx.entity, target, ctx.gameTime),
+        );
+        if (!actionResult.ok) return actionResult;
     }
+
+    return { ok: true };
 }

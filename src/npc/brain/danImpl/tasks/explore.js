@@ -14,6 +14,9 @@ import { getNpcTileMemoryStore } from '../../../shared/npcMemory.js';
 /** @typedef {import('../../../shared/hypotheticalWorld.js').HypotheticalWorld} HypotheticalWorld */
 /** @typedef {import('../../../../actors/npcSimulation.js').NpcEntity} NpcEntity */
 /** @typedef {import('../../../shared/npcMemory.js').TileMemoryEntry} TileMemoryEntry */
+/** @typedef {import('../danContext.js').DanContext} DanContext */
+/** @typedef {import('../../../../domain/entityActions.js').EntityAction} EntityAction */
+/** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 
 const EIGHT_DIRECTIONS = [
@@ -39,7 +42,7 @@ const FRONTIER_SEARCH_CAP = 200;
  * @param {number} z
  * @returns {{ x: number, y: number }}
  */
-function computeCentroid(memory, z) {
+export function computeCentroid(memory, z) {
     let sx = 0;
     let sy = 0;
     let count = 0;
@@ -69,7 +72,7 @@ function computeCentroid(memory, z) {
  * @param {{ x: number, y: number }} centroid
  * @returns {number}
  */
-function weightedNewTilesScore(hypoWorld, gx, gy, gz, radius, centroid) {
+export function weightedNewTilesScore(hypoWorld, gx, gy, gz, radius, centroid) {
     let score = 0;
     for (let dx = -radius; dx <= radius; dx++) {
         for (let dy = -radius; dy <= radius; dy++) {
@@ -127,15 +130,14 @@ function findFrontierGoal(hypoWorld, px, py, pz, dx, dy) {
 }
 
 /**
- * Evaluate all 8 directional frontiers and return the tile coordinate that
- * maximises new tiles seen per step of path cost. Returns null if no
- * reachable frontier with exploration value exists.
+ * Evaluate all 8 directional frontiers and return the best goal with its
+ * utility score (weighted new tiles / path length), or null.
  *
  * @param {NpcEntity} npc
  * @param {HypotheticalWorld} hypoWorld
- * @returns {TileCoord | null}
+ * @returns {{ goal: TileCoord, score: number } | null}
  */
-export function chooseBestExplorationGoal(npc, hypoWorld) {
+export function getBestExploreResult(npc, hypoWorld) {
     const px = Math.floor(npc.x);
     const py = Math.floor(npc.y);
     const pz = npc.z;
@@ -169,5 +171,29 @@ export function chooseBestExplorationGoal(npc, hypoWorld) {
         }
     }
 
-    return bestGoal;
+    if (!bestGoal) return null;
+    return { goal: bestGoal, score: bestScore };
+}
+
+/**
+ * @param {NpcEntity} npc
+ * @param {HypotheticalWorld} hypoWorld
+ * @returns {TileCoord | null}
+ */
+export function chooseBestExplorationGoal(npc, hypoWorld) {
+    return getBestExploreResult(npc, hypoWorld)?.goal ?? null;
+}
+
+/**
+ * Walk toward the best exploration frontier goal.
+ *
+ * @param {DanContext} ctx
+ * @returns {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null>}
+ */
+export function* exploreTask(ctx) {
+    const result = getBestExploreResult(ctx.entity, ctx.world);
+    if (!result) {
+        return { ok: false, message: 'No frontier found' };
+    }
+    return yield* ctx.walkTo(result.goal);
 }

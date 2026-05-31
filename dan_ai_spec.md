@@ -595,39 +595,29 @@ u(satiety, bread)
 
 Suppose a loaf of bread improves satiety by k up to a max of 100\.
 
-To prevent starvation, it must be the case that
+The two key conditions are really one statement: the marginal rate of substitution between bread and satiety is exactly k : 1, forcing u to depend only on the combination `s + kB`. The strict inequalities are tie-breakers at the boundary, not independent preferences.
+
+**Anti-starvation:** eating a loaf when nearly dead must be worth it:
 
 ```
 ∀ B    u(k, B - 1) > u(0, B)
 ```
 
-To prevent useless waste, it must also be the case that
+**Anti-waste:** keeping a loaf (slightly hungry, more bread) beats eating it when doing so wastes the portion above the satiety cap:
 
 ```
-∀ B, 0 ≤ h < k    u(100, B - 1) > u(100 - h, B)
+∀ B, 0 ≤ h < k    u(100 - h, B) > u(100, B - 1)
 ```
 
-This is kind of a silly way to state it, because only x = k - ε really matters, so we really have
-
-```
-∀ B    u(100, B - 1) > u(100 - k + ε, B)
-```
+The binding case is h = k − ε — "almost full, one loaf to spare." Under exact `s + kB` dependence both boundary cases are equalities (e.g. the anti-starvation boundary has both arguments equal to `kB`); the `>` signs encode only the survival and anti-waste tie-breakers. Any u depending solely on `s + kB` satisfies both conditions automatically; the conditions exist to force that dependence.
 
 This mostly just implies that the bread-and-hunger utility component should be a function of `s + k * B`
 
-Finally, to prevent becoming a pure bread-maximizer (there are other things one can do in life / this game), it must be the case that u is concave down relative to bread. Indeed, it must actually approach 0
+Finally, to prevent becoming a pure bread-maximizer (there are other things one can do in life / this game), it must be the case that u is concave down relative to bread. Indeed, it must actually approach 0.
 
 So far so obvious.
 
-Here's what's not: What bread really gives you (above satiety directly) is option value for "batching".
-
-For instance, if the bakery is a mile from the library and you want to maximize time reading, baking 100 loaves and then reading - repeat forever - gets you more utility per year than baking 1 loaf and then reading - repeat forever.
-
-I'm too tired to do this math right now, but Claude [says](https://claude.ai/chat/3d715fea-50ad-41d9-ad1c-d5fcc5a4d0b7) this suggests
-
-```
-U = - exp[- c * (s + k * B)]
-```
+Here's what's not: what bread really gives you (above satiety directly) is option value for "batching." See the **Bread & Hunger Math** section below for the full derivation of the right functional form.
 
 ### Discounting Time Cost
 
@@ -711,13 +701,29 @@ If we allow `f(z) = z`, we get (up to linear transformation)
 UPS = -1 / y
 ```
 
-Alternatively, if we let `f(z) = z^0.001`, we get
+**Why linear f? The growth-rate argument.** Rather than testing individual examples, sort all choices of `f` by growth rate, requiring three properties of `UPS(y) = f(ay − b) / y`: `f(0) = 0`, `UPS` increasing in batch size `y`, and `UPS` bounded above (per-second utility should saturate as batches grow, not blow up).
 
-```
-UPS = (a * y - b)^0.001 / y ≈ -1 / y
-```
+- **Sublinear / concave** (`f(z)/z → 0`: `zᵖ` with `p < 1`, `log`, `√`, any standard saturating utility): `UPS` is 0 at the minimum batch and `→ 0` again as `y → ∞`, producing a hump. This **fails** the "increasing" requirement. All standard concave utilities are ruled out.
+- **Superlinear / convex** (`f(z)/z → ∞`): `UPS → ∞`. **Fails** boundedness — and convex utility is economically bizarre.
+- **Asymptotically linear** (`f(z)/z → L ∈ (0, ∞)`): `UPS = La − C/y + o(1/y)` — the `−1/y` shape. ✓
 
-This really suggests our utility function for bread and hunger should be something like
+The requirements force `f` to be linear in the tail. `f(z) = z` is the clean representative. `−1/y` is an **attractor**: every asymptotically-linear `f` lands on this UPS shape; only the constant `C` changes. `f` need not be exactly linear, only linear asymptotically.
+
+**Caveat:** the hump/non-monotonicity argument lives in *policy space* — `UPS` as a function of batch size `y`. It does not mean inventory has decreasing value; the agent never discards stock. Reading the shape of state-utility off the `UPS(y)` curve is only valid in the linear-`f` regime, which is exactly why `f(z) = z` is the right choice for that inference.
+
+**The timescale argument (the real reason linear is the default).** Real diminishing returns on reading operate over a timescale much longer than a single batch session. Within one batch, `f` is sampled over a short interval, so its curvature barely registers — locally `f` is affine, hence effectively linear. This makes `−1/y` the generic per-batch form. The sublinear regime only matters when a single batch is long enough to exhaust the resource's own diminishing returns.
+
+A consequence: utility is linear *within* a batch but concave *across* many batches (long-run satiation reasserts itself on the long horizon). These are different layers with no obligation to share a functional form. This also predicts when the linear default breaks: for resources consumed slowly relative to how fast they cloy.
+
+**From batch-value to state-utility.** The batching algebra above earns "`−1/y` is the right batch-value shape over policy space." It does not, by itself, justify "`u(s, B) = −1/(s + kB)` is the right state utility." That step rests on independent structural properties of the form `−1/w` where `w = s + kB`:
+
+- **Homothetic / CRRA-2.** `−1/w` is constant-relative-risk-aversion with coefficient 2. Marginal value scales as `u′(λw) = λ⁻² u′(w)`, so optimal inventory *ratios* are preserved as wealth grows ("keep stacks in similar proportions when richer"). This is the standard empirical reason to prefer CRRA over CARA, and it matches human hoarding behavior.
+- **Starvation singularity.** `−1/w → −∞` as `w → 0` gives infinite marginal value at the edge of starvation — the correct panic response. The CARA form `−exp[−c(s + kB)]` lacks this property.
+- **Slow polynomial tail.** Marginal value decays as `1/w²` rather than exponentially, so large stockpiles keep mattering — this is the option value. CARA prices a big larder at near-zero marginal value, destroying exactly the option value the argument is trying to preserve.
+
+The inference from batch-value to state-utility is valid in the linear-`f` regime (where the two coincide), but the right reason to prefer `−1/(s + kB)` is these three structural properties. The conclusion stands; the support is different from what the batching algebra alone would imply.
+
+This suggests our utility function for bread and hunger should be
 
 ```
 -1 / (s + k * B)

@@ -110,7 +110,7 @@ function getWalkableNeighbors(world, x, y, z) {
  * @param {number} [maxNodes]
  * @returns {TileCoord[] | null}
  */
-function findPath(world, sx, sy, sz, gx, gy, gz, maxNodes = 2000) {
+export function findPath(world, sx, sy, sz, gx, gy, gz, maxNodes = 2000) {
     const key = (x, y, z) => `${x},${y},${z}`;
     const startKey = key(sx, sy, sz);
     const goalKey = key(gx, gy, gz);
@@ -215,9 +215,10 @@ export function* walkToLocation(entity, world, target, options = {}) {
     const maxReplans = options.maxReplans ?? DEFAULT_MAX_REPLANS;
 
     let path = planPathFromEntity(entity, getWorld(), target);
-    if (!path || path.length < 2) {
+    if (!path) {
         return { ok: false, message: 'No path to target tile' };
     }
+    // path.length === 1 means already at destination — not an error.
 
     let pathIndex = 1;
     let replans = 0;

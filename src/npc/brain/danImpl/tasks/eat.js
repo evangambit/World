@@ -5,7 +5,7 @@ import { eatAction } from '../../../../domain/entityActions.js';
 import { isEdible } from '../../../../domain/vitality.js';
 import { Obj } from '../../../../world/tileTypes.js';
 
-/** @typedef {import('../../../../actors/npcSimulation.js').NpcEntity} NpcEntity */
+/** @typedef {import('../danContext.js').DanContext} DanContext */
 /** @typedef {import('../../../../domain/entityActions.js').EntityAction} EntityAction */
 /** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
 
@@ -16,48 +16,40 @@ export const HUNGER_EAT_THRESHOLD = 60;
 const EAT_FOOD_PRIORITY = [Obj.BREAD, Obj.STEAK, Obj.WHEAT];
 
 /**
- * @param {NpcEntity} npc
+ * @param {{ inventory?: { objType: number, count: number }[] }} entity
  * @param {number} objType
  * @returns {number}
  */
-function inventoryCount(npc, objType) {
+function inventoryCount(entity, objType) {
     let count = 0;
-    for (const stack of npc.inventory ?? []) {
+    for (const stack of entity.inventory ?? []) {
         if (stack.objType === objType) count += stack.count;
     }
     return count;
 }
 
 /**
- * @param {NpcEntity} npc
+ * @param {{ inventory?: { objType: number, count: number }[] }} entity
  * @returns {number | null}
  */
-export function pickEdibleFood(npc) {
+export function pickEdibleFood(entity) {
     for (const objType of EAT_FOOD_PRIORITY) {
-        if (inventoryCount(npc, objType) > 0 && isEdible(objType)) return objType;
+        if (inventoryCount(entity, objType) > 0 && isEdible(objType)) return objType;
     }
     return null;
 }
 
 /**
- * @param {NpcEntity} npc
- * @returns {boolean}
- */
-export function shouldEat(npc) {
-    return npc.hunger >= HUNGER_EAT_THRESHOLD && pickEdibleFood(npc) !== null;
-}
-
-/**
- * @param {NpcEntity} npc
+ * @param {DanContext} ctx
  * @returns {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null>}
  */
-export function* eatTask(npc) {
-    const food = pickEdibleFood(npc);
+export function* eatTask(ctx) {
+    const food = pickEdibleFood(ctx.entity);
     if (!food) {
         return { ok: false, message: 'No food to eat' };
     }
 
-    const result = yield eatAction(npc, food);
-    if (result && !result.ok) return result;
+    const result = yield* ctx.applyAction(eatAction(ctx.entity, food));
+    if (!result.ok) return result;
     return { ok: true };
 }
