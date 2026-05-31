@@ -40,15 +40,23 @@ different problems wearing the same notation.
 5. **Horizon** — *single batch* (curvature sampled too locally to register → effectively
    affine) vs *many rounds / long horizon* (satiation or compounding reasserts). Predicts
    when a linear-in-the-bulk default breaks.
+6. **Transit cost** — when a cycle carries a fixed per-trip overhead (travel, setup), is it
+   paid in *time* or in the *resource*? *Time*: dead wall-clock that lengthens the cycle and
+   is discounted — it rescales the value *amplitude* and shifts optimal batch size but leaves
+   curvature untouched, and only bites when discounting > 0. *Resource*: the consumable is
+   burned during transit — it does not lengthen the cycle, costs foregone utility directly,
+   and drives the operating point toward or away from the floor singularity. Routes the *same*
+   distance primitive to "amplitude" in one problem and "how often you touch the floor" in
+   another.
 
 ## Lookup
 
-| # | Problem | Dynamics | Discount | Floor | Uncertainty | Horizon | Implied `u'(x)` |
-|---|---------|----------|----------|-------|-------------|---------|-----------------|
-| 1 | Bread w/ discounting | additive | **yes** | none | det. | cyclic | `∝ e^(−(r/b)x)`, finite at 0 |
-| 2 | Bread w/ death | additive | no | **terminal** | det. | single-batch | claimed `∝ 1/x²`; truer: ~flat bulk + spike at 0 |
-| 3 | Kelly betting | **multiplicative** | no | **terminal** (ruin) | **stochastic** | many rounds | `∝ 1/x` |
-| 4 | Exploration (tile coverage) | additive (sum) | no | none | det. | many rounds | `∝ 1/d^(α+1)` per tile, power-law in distance |
+| # | Problem | Dynamics | Discount | Floor | Uncertainty | Horizon | Implied `u'(x)` | Transit cost |
+|---|---------|----------|----------|-------|-------------|---------|-----------------|--------------|
+| 1 | Bread w/ discounting | additive | **yes** | none | det. | cyclic | `∝ e^(−(r/b)x)`, finite at 0 | time |
+| 2 | Bread w/ death | additive | no | **terminal** | det. | single-batch | claimed `∝ 1/x²`; truer: ~flat bulk + spike at 0 | resource |
+| 3 | Kelly betting | **multiplicative** | no | **terminal** (ruin) | **stochastic** | many rounds | `∝ 1/x` | — |
+| 4 | Exploration (tile coverage) | additive (sum) | no | none | det. | many rounds | `∝ 1/d^(α+1)` per tile, power-law in distance | — |
 
 > **Cross-entry note.** Entries 2 and 3 are *both* "CRRA with a terminal floor," but γ=2 vs
 > γ=1 — and that contrast is the whole argument for indexing by structure. The curvature γ is
@@ -59,6 +67,13 @@ different problems wearing the same notation.
 > **Entry 4** is CRRA-*in-distance* per tile rather than CRRA-in-wealth, forced by the same
 > scale-invariance argument — but the aggregate utility is a sum over items, not a function
 > of a single scalar state.
+>
+> **Distance, Entries 1 vs 2.** Same primitive — a round-trip overhead (`2τ` / `2N`), the EOQ
+> fixed cost that makes batching worthwhile, so in both, more distance → bigger batches. The
+> flags route it oppositely: Entry 1 (discounting, no floor) pays in discounted *time* →
+> rescales amplitude, curvature untouched; Entry 2 (terminal floor, no discounting,
+> consume-in-transit) pays in the *consumable* → drives the operating point into or out of the
+> starvation singularity. The latent axis: do you consume during transit?
 
 ---
 

@@ -4,7 +4,7 @@
 preference over the *shape* of the explored region to stay constant as the region scales.
 
 **Flags.** separable-sum over tiles (Dynamics axis N/A — see schema note) · discounting
-absent · floor none · deterministic · many rounds.
+absent · floor none · deterministic · many rounds · transit cost: n/a.
 
 **Implied utility.** `U(S) = Σ_{t∈S} v(dist(t, home))`, with `v` in the scale-invariant
 family below. The draft representative `v(d) = min(1/d^α, 1)` is *one* member, not the

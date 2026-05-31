@@ -261,6 +261,8 @@ export class DanBrain {
 
         for (const taskFn of TASKS) {
             const hypo = ctx.hypothetical(memory);
+            // TODO: Consider passing a utility function lambda (using our computed `centroid`) into each `taskFn`.
+            // It might be useful for these tasks to best select sub-tasks.
             drainHypo(taskFn(hypo));
             const deltaU = utility(hypo, centroid) - initialU;
             if (deltaU > bestDeltaU) {

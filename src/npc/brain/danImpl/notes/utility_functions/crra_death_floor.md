@@ -5,7 +5,7 @@ out = death. Utility `f(books_read)` per library visit, `f' > 0`, `f'' < 0`. Und
 long-run average. Proposed state utility `u(s,B) = −1/(s + kB)` (CRRA, γ=2).
 
 **Flags.** additive · discounting absent · floor **terminal** · deterministic · single-batch
-(the `−1/y` shape is read in the linear-`f` regime).
+(the `−1/y` shape is read in the linear-`f` regime) · transit cost: resource.
 
 **Marginal value.** *Claimed* `∝ 1/w²` (blows up at 0). *Honest* version: roughly **constant
 in the bulk** with a **hard spike at the floor**.
@@ -31,6 +31,20 @@ in the bulk** with a **hard spike at the floor**.
 **Derived vs imported.** Singularity-given-death: **derived**. Everything else
 (`−1/y → −1/w` mapping, the specific γ=2, the polynomial tail, homotheticity-as-justification)
 is **imported** by analogy or contradicts the linear-`f` premise.
+
+**Distance.** Enters as a *resource cost* — transit cost = resource. You eat `x`/sec
+*including while walking*, so distance burns the consumable itself. Accounting:
+`UPS = (1−x) − 2Nx/y`; distance enters only via the amortized `2Nx/y`. The cycle length `y/x`
+is **independent of `N`** — the `2N` seconds walking are exactly offset by `2N` fewer reading
+seconds, because the bread fueling the walk is bread stolen from reading. Cost of distance =
+`2N` books foregone per cycle, in utils, undiscounted. Because the consumable *is* the travel
+fuel, distance sets proximity to the death floor: a long trip forces a large survival buffer
+(`y ≥ 2Nx/(1−x)` just to survive transit) and a thin arrival margin near `B → 0` where the
+`1/x` blow-up lives; a short trip keeps you in the flat, ≈linear bulk where the singularity is
+irrelevant. **Distance selects which part of the utility function is operationally live — bulk
+vs singularity.** This *sharpens* the entry's critique: the `1/w²` tail still does no work, but
+distance is exactly what decides whether the floor — the one solid feature — governs behavior
+at all.
 
 **Transfers / breaks.** The floor-singularity intuition transfers to any genuine ruin
 problem. The `−1/y` batch shape transfers nowhere (EOQ artifact). γ=2 transfers nowhere.

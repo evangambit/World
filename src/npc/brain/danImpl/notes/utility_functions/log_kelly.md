@@ -5,7 +5,7 @@ round; maximize long-run growth. Wealth `Wₜ₊₁ = Wₜ · Rₜ(bet)`. Stocha
 
 **Flags.** **multiplicative** · discounting absent (long-run growth-rate criterion) · floor
 **terminal** (ruin is absorbing) · **stochastic** (first entry where uncertainty is
-load-bearing) · many rounds (the asymptotics *are* the objective).
+load-bearing) · many rounds (the asymptotics *are* the objective) · transit cost: n/a.
 
 **Implied utility.** `u(W) = log W`. **Marginal value `u'(W) = 1/W`** (CRRA, γ=1). Blow-up at
 0 — never bet the whole bankroll; no-ruin is enforced by the singularity, not bolted on.

@@ -4,7 +4,7 @@
 `h`, walk, bake it into bread at rate `b`, discount each loaf at rate `r`. Deterministic.
 
 **Flags.** additive · discounting present · floor none · deterministic · cyclic (bulk is
-single-batch-local).
+single-batch-local) · transit cost: time.
 
 **Implied utility** (value of wheat in the kitchen, about to be baked):
 `V_K(w) = b/r − C·e^(−(r/b)w)`, with `C = b/r − e^(−rτ)·V₀ > 0`. CARA, rate `a = r/b`.
@@ -20,6 +20,15 @@ not a risk preference.** In a deterministic problem there is no risk for curvatu
 
 **Derived vs imported.** Fully derived — the exponential *and* the rate `a = r/b` fall out of
 the algebra. Nothing imported.
+
+**Distance.** Enters as a *discounted time cost* — transit cost = time. The CARA rate
+`a = r/b` contains no `τ`: distance never touches curvature. `τ` moves only the amplitude
+`C = b/r − e^(−rτ)·V₀` (so `V_K(0) = e^(−rτ)·V₀ → 0` as `τ` grows) and the batch
+`Q* ≈ 2h·√(τb / (r(h+b))) ∝ √τ`. Walking is dead wall-clock lengthening
+`T_c = Q/h + Q/b + 2τ`, then discounted; it bites *only* because `r > 0`. As `r → 0`,
+`Q* → ∞`, the walk amortizes to nothing, and throughput → `hb/(h+b)` regardless of `τ`. So
+distance rescales the value function and slides the kink at `Q*`, but leaves the family and
+its rate invariant.
 
 **Transfers / breaks.** Transfers to any sequential-delivery-under-discounting problem.
 Breaks if you add a terminal floor (CARA has no singularity at 0 — wrong) or remove

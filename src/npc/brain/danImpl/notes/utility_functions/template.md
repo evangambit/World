@@ -4,7 +4,7 @@
 ## Entry N — <one-line mechanism> → <implied form>
 
 Setup.            <the problem in 1–2 sentences>
-Flags.            dynamics · discounting · floor · uncertainty · horizon
+Flags.            dynamics · discounting · floor · uncertainty · horizon · transit cost
 Implied utility.  u(x) = …
 Marginal value.   u'(x) = …   ← the real signature; note behavior at 0 and in the tail
 Mechanism.        why this structure forces this form (the transferable asset)
