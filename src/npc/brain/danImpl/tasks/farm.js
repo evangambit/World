@@ -19,9 +19,6 @@ import { Obj, T, isStoveObject, isWheatCropObject } from '../../../../world/tile
 /** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
 /** @typedef {{ x: number, y: number, z: number }} TileCoord */
 
-/** Stop baking when bread stock reaches this count. */
-export const MAX_BREAD_STOCK = 5;
-
 /** @typedef {'harvest' | 'cook' | 'plant'} FarmActionType */
 
 /**
@@ -144,7 +141,7 @@ export function chooseBestFarmTarget(entity, hypoWorld, gameTime) {
             return;
         }
 
-        if (isStoveObject(tile.obj) && wheatCount > 0 && breadCount < MAX_BREAD_STOCK) {
+        if (isStoveObject(tile.obj) && wheatCount > 0) {
             const neighbor = findWalkableNeighbor(hypoWorld, tx, ty, tz);
             if (neighbor) consider(tx, ty, tz, 2, 'cook', neighbor);
             return;
