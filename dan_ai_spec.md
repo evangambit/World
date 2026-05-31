@@ -722,9 +722,3 @@ A consequence: utility is linear *within* a batch but concave *across* many batc
 - **Slow polynomial tail.** Marginal value decays as `1/w²` rather than exponentially, so large stockpiles keep mattering — this is the option value. CARA prices a big larder at near-zero marginal value, destroying exactly the option value the argument is trying to preserve.
 
 The inference from batch-value to state-utility is valid in the linear-`f` regime (where the two coincide), but the right reason to prefer `−1/(s + kB)` is these three structural properties. The conclusion stands; the support is different from what the batching algebra alone would imply.
-
-This suggests our utility function for bread and hunger should be
-
-```
--1 / (s + k * B)
-```
