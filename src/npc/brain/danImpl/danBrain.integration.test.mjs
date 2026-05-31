@@ -46,15 +46,28 @@ describe('DanBrain integration', () => {
         const DURATION = 600;
 
         let maxBreadSeen = 0;
+        let maxWheatSeen = 0;
         for (let t = 0; t < DURATION; t += DT) {
             ({ gameTime } = tickSimulation({ world, gameTime, dt: DT, npcs: [npc] }));
-            const stack = npc.inventory.find((s) => s.objType === Obj.BREAD);
-            if (stack && stack.count > maxBreadSeen) {
-                maxBreadSeen = stack.count;
+            const breadStack = npc.inventory.find((s) => s.objType === Obj.BREAD);
+            if (breadStack && breadStack.count > maxBreadSeen) {
+                maxBreadSeen = breadStack.count;
+            }
+            const wheatStack = npc.inventory.find((s) => s.objType === Obj.WHEAT);
+            if (wheatStack && wheatStack.count > maxWheatSeen) {
+                maxWheatSeen = wheatStack.count;
             }
         }
 
+        const finalBread = npc.inventory.find((s) => s.objType === Obj.BREAD)?.count ?? 0;
+        const finalWheat = npc.inventory.find((s) => s.objType === Obj.WHEAT)?.count ?? 0;
+        console.log(
+            `Bread produced (peak inventory): ${maxBreadSeen}, remaining at end: ${finalBread}; ` +
+            `wheat (peak inventory): ${maxWheatSeen}, remaining at end: ${finalWheat}`,
+        );
+
         assert.ok(npc.isAlive, 'NPC should still be alive after 600s');
         assert.ok(maxBreadSeen >= 1, 'NPC should have produced at least 1 bread');
+        assert.ok(maxWheatSeen >= 1, 'NPC should have produced at least 1 wheat');
     });
 });
