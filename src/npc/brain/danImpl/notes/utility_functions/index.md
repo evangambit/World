@@ -48,12 +48,17 @@ different problems wearing the same notation.
 | 1 | Bread w/ discounting | additive | **yes** | none | det. | cyclic | `∝ e^(−(r/b)x)`, finite at 0 |
 | 2 | Bread w/ death | additive | no | **terminal** | det. | single-batch | claimed `∝ 1/x²`; truer: ~flat bulk + spike at 0 |
 | 3 | Kelly betting | **multiplicative** | no | **terminal** (ruin) | **stochastic** | many rounds | `∝ 1/x` |
+| 4 | Exploration (tile coverage) | additive (sum) | no | none | det. | many rounds | `∝ 1/d^(α+1)` per tile, power-law in distance |
 
 > **Cross-entry note.** Entries 2 and 3 are *both* "CRRA with a terminal floor," but γ=2 vs
 > γ=1 — and that contrast is the whole argument for indexing by structure. The curvature γ is
 > *set by the dynamics*, not chosen: multiplicative compounding forces γ=1 (derived, solid);
 > Entry 2's γ=2 is imported by analogy (soft). Same family, same floor, different reason,
 > different confidence.
+>
+> **Entry 4** is CRRA-*in-distance* per tile rather than CRRA-in-wealth, forced by the same
+> scale-invariance argument — but the aggregate utility is a sum over items, not a function
+> of a single scalar state.
 
 ---
 
@@ -62,6 +67,7 @@ different problems wearing the same notation.
 - [Entry 1 — Sequential production under discounting → CARA](cara_sequential_discounting.md)
 - [Entry 2 — Batched consumption with a death floor → ~affine bulk + singularity](crra_death_floor.md)
 - [Entry 3 — Multiplicative reinvestment under uncertainty → log (Kelly)](log_kelly.md)
+- [Entry 4 — Scale-invariant exploration value → power law (CRRA in distance)](power_law_exploration.md)
 
 ---
 
