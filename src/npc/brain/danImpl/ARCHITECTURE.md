@@ -93,7 +93,7 @@ Internal loop (up to `MAX_FARM_STEPS` in hypo mode):
 2. Scores each as `weight / Chebyshev distance` to the NPC.
 3. Walks to the walk target, performs one action, repeats until nothing remains.
 
-Cooking stops at `MAX_BREAD_STOCK` bread. Planting requires seeds, bare dirt, and walkable tile.
+Planting requires seeds, bare dirt, and walkable tile.
 
 ### `exploreTask`
 
