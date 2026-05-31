@@ -2,6 +2,7 @@
  * NPC tile memory — records tiles perceived within range (latest snapshot + seenAt).
  */
 import { World3D } from '../../world/world.js';
+import { T } from '../../world/tileTypes.js';
 import { tileStatesEqual } from './tileChunkDescribe.js';
 
 import { NPC_PERCEPTION_RADIUS } from './npcConstants.js';
@@ -14,6 +15,22 @@ export { NPC_PERCEPTION_RADIUS };
 
 /** @type {WeakMap<NpcEntity, Map<string, TileMemoryEntry>>} */
 const NPC_TILE_MEMORY = new WeakMap();
+
+/**
+ * Synthetic tile state recorded for coordinates that exist within perception
+ * range but have no tile in the world (off-map void). Marked as WALL_STONE so
+ * pathfinding treats them as impassable and exploration doesn't target them.
+ *
+ * @type {import('../../world/world.js').TileData}
+ */
+const VOID_TILE_STATE = Object.freeze({
+    terrain: T.WALL_STONE,
+    obj: 0,
+    transition: null,
+    ceiling: false,
+    buildingId: null,
+    interior: false,
+});
 
 /**
  * @typedef {Object} TileMemoryEntry
@@ -182,7 +199,19 @@ export function tickNpcPerception(npc, world, gameTime) {
             const tx = cx + dx;
             const ty = cy + dy;
             const tile = world.getTile(tx, ty, cz);
-            if (!tile) continue;
+            if (!tile) {
+                // Tile doesn't exist — record as impassable void on first sighting so
+                // the NPC learns the map boundary through perception rather than
+                // treating off-map coordinates as unknown explorable territory forever.
+                if (!getNpcTileMemory(npc, tx, ty, cz)) {
+                    setNpcTileMemory(npc, tx, ty, cz, {
+                        seenAt: gameTime,
+                        state: VOID_TILE_STATE,
+                        reachable: false,
+                    });
+                }
+                continue;
+            }
 
             const state = snapshotTileState(tile);
             const prev = getNpcTileMemory(npc, tx, ty, cz);

@@ -1,0 +1,321 @@
+/**
+ * Dan brain — utility-based NPC AI with hypothetical planning.
+ *
+ * Each time a task completes, _chooseTask() evaluates every candidate task
+ * hypothetically via ctx.hypothetical(), drains the same task generators,
+ * and starts the one that yields the greatest utility gain.
+ */
+import { getNpcTileMemoryStore } from '../../shared/npcMemory.js';
+import { NPC_PERCEPTION_RADIUS } from '../../shared/npcConstants.js';
+import { RealContext, drainHypo } from './danContext.js';
+import { computeCentroid, weightedNewTilesScore } from './tasks/explore.js';
+import { eatTask } from './tasks/eat.js';
+import { farmTask } from './tasks/farm.js';
+import { exploreTask } from './tasks/explore.js';
+import { createHypotheticalFromMemory } from '../../shared/hypotheticalWorld.js';
+import { Obj, isWheatCropObject } from '../../../world/tileTypes.js';
+import { VITALITY } from '../../../domain/vitality.js';
+
+/** @typedef {import('../interface.js').NpcBrain} NpcBrain */
+/** @typedef {import('../interface.js').NpcEntity} NpcEntity */
+/** @typedef {import('../interface.js').EntityAction} EntityAction */
+/** @typedef {import('../../shared/hypotheticalWorld.js').HypotheticalWorld} HypotheticalWorld */
+/** @typedef {import('./danContext.js').DanContext} DanContext */
+/** @typedef {import('./danContext.js').HypotheticalContext} HypotheticalContext */
+/** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
+
+/** Maximum task restarts per tick to avoid busy-looping on instant completions. */
+const MAX_TASK_RESTARTS_PER_TICK = 3;
+
+/** Scale exploration score to sit alongside food utility. */
+const EXPLORE_WEIGHT = 0.0005;
+
+/** Nutrition lookup matching vitality.js FOOD_NUTRITION for fast inventory scoring. */
+const FOOD_NUTRITION = {
+    [Obj.STEAK]: 40,
+    [Obj.WHEAT]: 15,
+    [Obj.BREAD]: 30,
+};
+
+/** @typedef {(ctx: DanContext) => Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null>} DanTaskFn */
+
+/** @type {DanTaskFn[]} */
+const TASKS = [eatTask, farmTask, exploreTask];
+
+/**
+ * Food component of Dan's utility function: -1 / (satiety + stockpile value).
+ *
+ * @param {{ hunger: number, inventory?: { objType: number, count: number }[] }} entity
+ * @returns {number}
+ */
+function foodUtility(entity) {
+    const satiety = Math.max(0, VITALITY.MAX_HUNGER - entity.hunger);
+    let score = satiety;
+    for (const stack of entity.inventory ?? []) {
+        score += (FOOD_NUTRITION[stack.objType] ?? 0) * stack.count;
+    }
+    return -1 / Math.max(1, score);
+}
+
+/**
+ * Hunger urgency penalty: quadratic, kicking in past HUNGER_PENALTY_THRESHOLD.
+ *
+ * This is a pragmatic approximation of health consequences. The spec's food utility
+ * -1/(satiety + kB) treats satiety and inventory food as perfect substitutes, so
+ * ΔU(eat) = 0 exactly — the NPC is indifferent to eating and will starve. The
+ * principled fix requires health in the utility function (hunger → health loss →
+ * death → −∞ utility), integrated over future time. This penalty approximates that:
+ * being hungry is penalized directly and independently of inventory, so eating
+ * reduces the penalty and has genuine positive ΔU.
+ *
+ * Calibrated so that Dan prefers eating over exploration at around hunger ≈ 65.
+ * At hunger=70 ΔU(eat) ≈ +0.25, which comfortably beats a typical exploration step.
+ * At hunger=55 ΔU(eat) ≈ +0.028, so Dan will explore if mildly hungry but not
+ * critically so.
+ *
+ * @param {{ hunger: number }} entity
+ * @returns {number}
+ */
+const HUNGER_PENALTY_THRESHOLD = 40;
+
+function hungerPenalty(entity) {
+    const excess = Math.max(0, entity.hunger - HUNGER_PENALTY_THRESHOLD);
+    const scale = VITALITY.MAX_HUNGER - HUNGER_PENALTY_THRESHOLD;
+    return -((excess / scale) ** 2);
+}
+
+/**
+ * Exploration value earned by a task — the set of tiles that would be newly
+ * seen along all walkTo paths, weighted by proximity to the centroid.
+ *
+ * Each unseen tile contributes min(1/distance, 1) so tiles near the centroid
+ * of known territory (gap-filling) score higher than distant tentacles. Using
+ * the accumulated set rather than the final position avoids the pathological
+ * case where farming (or any task that moves through known territory) scores 0
+ * while doing nothing scores positively from the NPC's current-position view.
+ *
+ * @param {Set<string>} newTilesSeen - populated by HypotheticalContext.walkTo
+ * @param {{ x: number, y: number }} centroid - fixed at _chooseTask time
+ * @returns {number}
+ */
+function explorationUtility(newTilesSeen, centroid) {
+    let score = 0;
+    for (const key of newTilesSeen) {
+        const parts = key.split(',');
+        const tx = Number(parts[0]);
+        const ty = Number(parts[1]);
+        const dist = Math.sqrt((tx - centroid.x) ** 2 + (ty - centroid.y) ** 2);
+        score += dist > 0 ? Math.min(1 / dist, 1) : 1;
+    }
+    return EXPLORE_WEIGHT * score;
+}
+
+/**
+ * Farming component of Dan's utility function.
+ *
+ * A planted-crop term gives Dan some intrinsic motivation to maintain crops
+ * even when his food stockpile is adequate. The form -0.2 / N is concave and
+ * approaches 0 as N grows, so Dan is eager to plant the first few crops but
+ * not obsessively so.
+ *
+ * TODO: This term needs more thought. Key open questions:
+ *   - Should it only count *mature* crops (immediate harvest value) vs all
+ *     crops (future pipeline value)? Immature crops have time-discounted value
+ *     that this static term can't express.
+ *   - The weight 0.2 is not derived from anything principled — it should be
+ *     calibrated so that planting is preferred to exploration when Dan is
+ *     moderately hungry but has seeds, and vice versa when he's sated.
+ *   - Planted crops visible in hypo mode are crops Dan already knows about;
+ *     they don't capture crops he might discover by exploring.
+ *
+ * @param {HypotheticalWorld} world
+ * @param {number} z
+ * @returns {number}
+ */
+function cropUtility(world, entity) {
+    let count = 0;
+    world.forEachTile((key, tile) => {
+        if (isWheatCropObject(tile.obj)) count++;
+    });
+    const foodTotalSatiety = -1/foodUtility(entity)
+    return -0.2 / Math.max(1, foodTotalSatiety + count);
+}
+
+/**
+ * @param {DanContext} ctx
+ * @param {{ x: number, y: number }} centroid - fixed at _chooseTask time, not recomputed per task
+ * @returns {number}
+ */
+function utility(ctx, centroid) {
+    const foodU = foodUtility(ctx.entity);
+    const hungerP = hungerPenalty(ctx.entity);
+    const explorationU = explorationUtility(ctx.newTilesSeen, centroid);
+    const cropU = cropUtility(ctx.world, ctx.entity);
+    return foodU + hungerP + explorationU + cropU;
+}
+
+/** @typedef {'eat' | 'farm' | 'explore' | null} DanTaskKind */
+
+/** @implements {NpcBrain} */
+export class DanBrain {
+    constructor() {
+        /** @type {NpcEntity | null} */
+        this._npc = null;
+        /** @type {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null> | null} */
+        this._taskGen = null;
+        /** @type {ActionExecutionResult | null} */
+        this._pendingResult = null;
+        /** @type {number} */
+        this._gameTime = 0;
+        /** @type {DanTaskKind} */
+        this._currentTaskKind = null;
+        /** @type {{ x: number, y: number, z: number } | null} */
+        this._currentGoal = null;
+    }
+
+    /** @param {NpcEntity} npc */
+    attach(npc) {
+        this._npc = npc;
+    }
+
+    /**
+     * @param {import('../../world/world.js').World3D} _world
+     * @param {number} _dt
+     * @param {number} gameTime
+     * @param {number|null} _actionProgress
+     * @param {import('../../shared/npcMemory.js').VisibleTile[]} _visibleTiles
+     * @param {ActionExecutionResult|null} [lastActionResult]
+     * @returns {EntityAction | null}
+     */
+    tick(_world, _dt, gameTime, _actionProgress, _visibleTiles, lastActionResult = null) {
+        const npc = this._npc;
+        if (!npc || !npc.isAlive) return null;
+        if (npc.resolvingAction) return null;
+
+        this._gameTime = gameTime;
+
+        if (lastActionResult) {
+            this._pendingResult = lastActionResult;
+        }
+
+        for (let i = 0; i < MAX_TASK_RESTARTS_PER_TICK; i++) {
+            if (!this._taskGen) {
+                const memory = getNpcTileMemoryStore(npc);
+                if (!memory || memory.size === 0) return null;
+
+                const ctx = new RealContext(npc, this._makeGetWorld(), () => this._gameTime);
+                this._taskGen = this._chooseTask(ctx, memory);
+                if (!this._taskGen) return null;
+            }
+
+            const step = this._taskGen.next(this._pendingResult);
+            this._pendingResult = null;
+
+            if (step.done) {
+                this._taskGen = null;
+                this._currentTaskKind = null;
+                this._currentGoal = null;
+                continue;
+            }
+
+            return step.value;
+        }
+
+        return null;
+    }
+
+    /** @returns {() => HypotheticalWorld} */
+    _makeGetWorld() {
+        const npc = this._npc;
+        return () => {
+            const mem = npc ? getNpcTileMemoryStore(npc) : undefined;
+            return createHypotheticalFromMemory(mem ?? new Map());
+        };
+    }
+
+    /**
+     * @param {DanTaskFn} taskFn
+     * @returns {DanTaskKind}
+     */
+    _taskKind(taskFn) {
+        if (taskFn === eatTask) return 'eat';
+        if (taskFn === farmTask) return 'farm';
+        if (taskFn === exploreTask) return 'explore';
+        return null;
+    }
+
+    /**
+     * @param {RealContext} ctx
+     * @param {Map<string, import('../../shared/npcMemory.js').TileMemoryEntry>} memory
+     * @returns {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null> | null}
+     */
+    _chooseTask(ctx, memory) {
+        const centroid = computeCentroid(memory, ctx.entity.z);
+        const initialU = utility(ctx, centroid);
+
+        let bestDeltaU = 0;
+        /** @type {DanTaskFn | null} */
+        let bestTaskFn = null;
+        /** @type {HypotheticalContext | null} */
+        let bestHypoCtx = null;
+
+        for (const taskFn of TASKS) {
+            const hypo = ctx.hypothetical(memory);
+            drainHypo(taskFn(hypo));
+            const deltaU = utility(hypo, centroid) - initialU;
+            if (deltaU > bestDeltaU) {
+                bestDeltaU = deltaU;
+                bestTaskFn = taskFn;
+                bestHypoCtx = hypo;
+            }
+        }
+
+        if (!bestTaskFn) return null;
+
+        this._currentTaskKind = this._taskKind(bestTaskFn);
+        if (bestHypoCtx) {
+            this._currentGoal = {
+                x: Math.floor(bestHypoCtx.entity.x),
+                y: Math.floor(bestHypoCtx.entity.y),
+                z: bestHypoCtx.entity.z,
+            };
+        } else {
+            this._currentGoal = null;
+        }
+
+        return bestTaskFn(ctx);
+    }
+
+    destroy() {
+        this._taskGen?.return(/** @type {ActionExecutionResult} */ ({ ok: false }));
+        this._taskGen = null;
+        this._currentTaskKind = null;
+        this._currentGoal = null;
+        this._pendingResult = null;
+        this._npc = null;
+    }
+
+    /** @returns {{ lines: string[] }} */
+    getStatus() {
+        if (!this._currentTaskKind) return { lines: ['idle'] };
+
+        switch (this._currentTaskKind) {
+            case 'eat':
+                return { lines: ['eating'] };
+            case 'farm':
+                if (this._currentGoal) {
+                    const { x, y, z } = this._currentGoal;
+                    return { lines: [`farming → (${x}, ${y}, ${z})`] };
+                }
+                return { lines: ['farming'] };
+            case 'explore':
+                if (this._currentGoal) {
+                    const { x, y, z } = this._currentGoal;
+                    return { lines: [`exploring → (${x}, ${y}, ${z})`] };
+                }
+                return { lines: ['exploring'] };
+            default:
+                return { lines: ['idle'] };
+        }
+    }
+}

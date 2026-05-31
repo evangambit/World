@@ -255,6 +255,35 @@ export class HypotheticalWorld {
         if (typeof action.apply !== 'function') return false;
         return action.apply(this);
     }
+
+    /**
+     * Iterate every known tile in this branch, overlay tiles taking precedence
+     * over root memory. Useful for planning loops that need a merged tile view.
+     *
+     * @param {(key: string, tile: TileData, reachable: boolean | undefined) => void} fn
+     */
+    forEachTile(fn) {
+        const seen = new Set();
+        let node = /** @type {HypotheticalWorld|null} */ (this);
+        while (node) {
+            for (const [key, tile] of node._tiles) {
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    fn(key, tile, undefined);
+                }
+            }
+            node = node._parent;
+        }
+        const root = this._root();
+        if (root._memory) {
+            for (const [key, entry] of root._memory) {
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    fn(key, entry.state, entry.reachable);
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -271,11 +300,13 @@ export class HypotheticalEntity {
             this.x = parent.x;
             this.y = parent.y;
             this.z = parent.z;
+            this.hunger = parent.hunger;
             this.inventory = parent.inventory.map((s) => ({ ...s }));
         } else {
             this.x = entity.x;
             this.y = entity.y;
             this.z = entity.z;
+            this.hunger = entity.hunger ?? 0;
             this.inventory = (entity.inventory ?? []).map((s) => ({ ...s }));
         }
         /** @type {HypotheticalEntity|null} */
