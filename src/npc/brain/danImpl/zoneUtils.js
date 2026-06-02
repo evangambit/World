@@ -1,7 +1,7 @@
 /**
  * Farm zone helpers — tile membership, owned-zone filtering, LLM zone summaries.
  */
-import { FARM_ZONES } from '../../../content/builder.js';
+import { FARM_ZONES, FARM_ZONES_BY_NAME, TILE_TO_ZONE } from '../../../content/builder.js';
 import { T, isWheatCropObject } from '../../../world/tileTypes.js';
 import { isWheatMature } from '../../../domain/crops.js';
 
@@ -22,7 +22,7 @@ export function tileKey(x, y, z = 0) {
  * @returns {boolean}
  */
 export function isFarmZoneName(zoneName) {
-    return Object.prototype.hasOwnProperty.call(FARM_ZONES, zoneName);
+    return FARM_ZONES_BY_NAME.has(zoneName);
 }
 
 /**
@@ -32,12 +32,7 @@ export function isFarmZoneName(zoneName) {
  * @returns {string | null}
  */
 export function zoneNameForTile(x, y, z) {
-    for (const [name, zone] of Object.entries(FARM_ZONES)) {
-        for (const [tx, ty] of zone.tiles) {
-            if (tx === x && ty === y && z === 0) return name;
-        }
-    }
-    return null;
+    return TILE_TO_ZONE.get(tileKey(x, y, z)) ?? null;
 }
 
 /**
@@ -60,7 +55,7 @@ export function getOwnedTileSet(zoneOwners, npcName) {
 
     const tiles = new Set();
     for (const zoneName of ownedZones) {
-        const zone = FARM_ZONES[zoneName];
+        const zone = FARM_ZONES_BY_NAME.get(zoneName);
         for (const [tx, ty] of zone.tiles) {
             tiles.add(tileKey(tx, ty, 0));
         }
@@ -80,7 +75,8 @@ export function buildZoneSummary(memory, zoneOwners, gameTime) {
     /** @type {Record<string, object>} */
     const summary = {};
 
-    for (const [zoneName, zone] of Object.entries(FARM_ZONES)) {
+    for (const zone of FARM_ZONES) {
+        const zoneName = zone.name;
         let explored = 0;
         let growing = 0;
         let harvestable = 0;
@@ -102,7 +98,7 @@ export function buildZoneSummary(memory, zoneOwners, gameTime) {
             }
         }
 
-        const ownerKnown = Object.prototype.hasOwnProperty.call(zoneOwners, zoneName);
+        const ownerKnown = Object.hasOwn(zoneOwners, zoneName);
         const owner = ownerKnown ? zoneOwners[zoneName] : 'unknown';
 
         if (explored === 0 && !ownerKnown) continue;

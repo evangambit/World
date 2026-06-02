@@ -431,24 +431,142 @@ export function buildVillage() {
 }
 
 /**
+ * Tile coordinates [x, y] for an axis-aligned rectangle on the ground layer.
+ * All four bounds are inclusive.
+ *
+ * @param {number} left
+ * @param {number} top
+ * @param {number} right
+ * @param {number} bottom
+ * @returns {[number, number][]}
+ */
+export function tilesInSquare(left, top, right, bottom) {
+    /** @type {[number, number][]} */
+    const tiles = [];
+    for (let ty = top; ty <= bottom; ty++) {
+        for (let tx = left; tx <= right; tx++) {
+            tiles.push([tx, ty]);
+        }
+    }
+    return tiles;
+}
+
+/**
  * Map-authored farm zones for NPC coordination (see danImpl/notes/llm-communication.md).
  * Zone names and labels are included in LLM system prompts; tile sets drive farming filters.
  */
-export const FARM_ZONES = {
-    wheat_field_west: {
-        label: 'the left half of the main field, roughly 6 tiles',
-        tiles: [
-            [24, 30], [25, 30], [26, 30], [27, 30],
-            [24, 31], [25, 31],
-        ],
+export const _rawZones = [
+    // Man made structures
+    {
+        name: 'town_square',
+        label: 'the town square (10x8 tiles)',
+        tiles: tilesInSquare(24, 19, 33, 26),
     },
-    wheat_field_east: {
-        label: 'the right half of the main field, roughly 5 tiles',
-        tiles: [
-            [28, 30], [29, 30], [28, 31], [29, 31],
-        ],
+    {
+        name: 'building_northwest_1',
+        label: 'a northwest building (7x6 tiles)',
+        tiles: tilesInSquare(6, 12, 12, 17),
     },
-};
+    {
+        name: 'building_northwest_2',
+        label: 'a northwest building (7x6 tiles)',
+        tiles: tilesInSquare(13, 12, 19, 17),
+    },
+    {
+        name: 'building_southwest',
+        label: 'the southwest building (7x6 tiles)',
+        tiles: tilesInSquare(6, 28, 12, 33),
+    },
+    {
+        name: 'building_northeast_1',
+        label: 'a northeast building (10x8 tiles)',
+        tiles: tilesInSquare(36, 12, 45, 19),
+    },
+    {
+        name: 'building_northeast_2',
+        label: 'a northeast building (8x5 tiles)',
+        tiles: tilesInSquare(46, 17, 53, 21),
+    },
+    {
+        name: 'building_southeast_1',
+        label: 'a southeast building (10x8 tiles)',
+        tiles: tilesInSquare(36, 26, 43, 31),
+    },
+    {
+        name: 'building_southeast_2',
+        label: 'a southeast building (8x5 tiles)',
+        tiles: tilesInSquare(44, 26, 50, 31),
+    },
+    {
+        name: 'building_centereast',
+        label: 'the building just east of the town square (7x6 tiles)',
+        tiles: tilesInSquare(18, 20, 24, 25),
+    },
+    // Partition of the land north of the river
+    {
+        name: 'field_northwest',
+        label: 'the northwest half of the main field (29x23 tiles)',
+        tiles: tilesInSquare(0, 0, 28, 22),
+    },
+    {
+        name: 'field_northeast',
+        label: 'the northeast half of the main field (31x23 tiles)',
+        tiles: tilesInSquare(29, 0, 59, 22),
+    },
+    {
+        name: 'field_southwest',
+        label: 'the southwest half of the main field (29x12 tiles)',
+        tiles: tilesInSquare(0, 23, 28, 34),
+    },
+    {
+        name: 'field_southeast',
+        label: 'the southeast half of the main field (31x12 tiles)',
+        tiles: tilesInSquare(29, 23, 59, 34),
+    },
+    // Partition of the river
+    {
+        name: 'north_coast',
+        label: 'the north coast of the river (60x1 tiles)',
+        tiles: tilesInSquare(0, 35, 59, 35),
+    },
+    {
+        name: 'river',
+        label: 'the river (60x3 tiles)',
+        tiles: tilesInSquare(0, 36, 59, 38),
+    },
+    {
+        name: 'south_coast',
+        label: 'the south coast of the river (60x1 tiles)',
+        tiles: tilesInSquare(0, 39, 59, 39),
+    },
+    // South of the river
+    {
+        name: 'far_south_west_field',
+        label: 'the far southwest field (29x10 tiles)',
+        tiles: tilesInSquare(0, 40, 28, 49),
+    },
+    {
+        name: 'far_south_east_field',
+        label: 'the far southeast field (31x12 tiles)',
+        tiles: tilesInSquare(29, 40, 59, 49),
+    },
+];
+
+/** @type {Map<string, string>} Maps "x,y,z" tile keys to zone names (highest-priority zone wins). */
+export const TILE_TO_ZONE = new Map();
+
+export const FARM_ZONES = _rawZones.map((zone) => {
+    const ownedTiles = zone.tiles.filter(([x, y]) => {
+        const key = `${x},${y},0`;
+        if (TILE_TO_ZONE.has(key)) return false;
+        TILE_TO_ZONE.set(key, zone.name);
+        return true;
+    });
+    return { ...zone, tiles: ownedTiles };
+});
+
+/** @type {Map<string, {name: string, label: string, tiles: [number,number][]}>} */
+export const FARM_ZONES_BY_NAME = new Map(FARM_ZONES.map((z) => [z.name, z]));
 
 /**
  * NPC spawn positions (tile centers). Each matches a home placed in {@link buildVillage}.

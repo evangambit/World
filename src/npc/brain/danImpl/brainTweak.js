@@ -1,9 +1,7 @@
 /**
  * BrainTweak — structured mutations from LLM think/conversation responses.
  */
-import { FARM_ZONES } from '../../../content/builder.js';
-import { VILLAGE_NPC_SPAWNS } from '../../../content/builder.js';
-import { isFarmZoneName } from './zoneUtils.js';
+import { FARM_ZONES_BY_NAME, VILLAGE_NPC_SPAWNS } from '../../../content/builder.js';
 
 /** @typedef {'low' | 'normal' | 'high'} TalkUrgency */
 
@@ -37,7 +35,7 @@ export function sanitizeBrainTweak(tweak, selfName, npcRegistry) {
         /** @type {Record<string, string | null>} */
         const patch = {};
         for (const [zone, owner] of Object.entries(tweak.updateZoneOwnership)) {
-            if (!isFarmZoneName(zone)) continue;
+            if (!FARM_ZONES_BY_NAME.has(zone)) continue;
             if (owner !== null && typeof owner !== 'string') continue;
             if (owner !== null && !KNOWN_NPC_NAMES.has(owner)) continue;
             patch[zone] = owner;

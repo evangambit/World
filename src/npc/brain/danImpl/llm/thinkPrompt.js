@@ -14,13 +14,10 @@ import { buildZoneSummary } from '../zoneUtils.js';
 
 /**
  * @param {NpcEntity} npc
- * @param {Record<string, string | null>} zoneOwners
  * @returns {string}
  */
 function buildSystemPrompt(npc) {
-    const zoneLines = Object.entries(FARM_ZONES)
-        .map(([name, z]) => `- ${name}: ${z.label}`)
-        .join('\n');
+    const zoneLines = FARM_ZONES.map((z) => `- ${z.name}: ${z.label}`).join('\n');
 
     return `You are ${npc.name}, a villager in a small farming simulation.
 
@@ -65,7 +62,10 @@ function buildStateSnapshot(npc, brain) {
         ? `goal (${brain._currentGoal.x}, ${brain._currentGoal.y}, ${brain._currentGoal.z})`
         : 'no goal';
 
+    const time = Math.round(brain._gameTime);
+
     return `## Current state
+- Time: t${time}
 - Hunger: ${hunger} / ${VITALITY.MAX_HUNGER}
 - Inventory: ${inv}
 - Current task: ${task} — ${goal}`;
