@@ -431,6 +431,26 @@ export function buildVillage() {
 }
 
 /**
+ * Map-authored farm zones for NPC coordination (see danImpl/notes/llm-communication.md).
+ * Zone names and labels are included in LLM system prompts; tile sets drive farming filters.
+ */
+export const FARM_ZONES = {
+    wheat_field_west: {
+        label: 'the left half of the main field, roughly 6 tiles',
+        tiles: [
+            [24, 30], [25, 30], [26, 30], [27, 30],
+            [24, 31], [25, 31],
+        ],
+    },
+    wheat_field_east: {
+        label: 'the right half of the main field, roughly 5 tiles',
+        tiles: [
+            [28, 30], [29, 30], [28, 31], [29, 31],
+        ],
+    },
+};
+
+/**
  * NPC spawn positions (tile centers). Each matches a home placed in {@link buildVillage}.
  * `homeX/homeY` on the NPC come from these coords for wander AI.
  */

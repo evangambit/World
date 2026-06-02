@@ -7,6 +7,8 @@
  */
 import { DanBrain, WanderBrain, NoopNpcBrain } from '../brain/index.js';
 
+/** @typedef {import('../actors/npcSimulation.js').NpcEntity} NpcEntity */
+
 /** @typedef {import('../brain/interface.js').NpcBrain} NpcBrain */
 /** @typedef {'wander' | 'noop' | 'dan'} BrainType */
 
@@ -38,4 +40,24 @@ export function createBrainForType(brainType) {
     if (brainType === 'noop') return new NoopNpcBrain();
     if (brainType === 'dan') return new DanBrain();
     return new WanderBrain();
+}
+
+/**
+ * Wire Dan brains with a shared name → brain registry (for talk_to / conversations).
+ *
+ * @param {NpcEntity[]} npcs
+ * @returns {Map<string, DanBrain>}
+ */
+export function buildDanNpcRegistry(npcs) {
+    /** @type {Map<string, DanBrain>} */
+    const registry = new Map();
+    for (const npc of npcs) {
+        if (npc.brain instanceof DanBrain) {
+            registry.set(npc.name, npc.brain);
+        }
+    }
+    for (const brain of registry.values()) {
+        brain.setNpcRegistry(registry);
+    }
+    return registry;
 }

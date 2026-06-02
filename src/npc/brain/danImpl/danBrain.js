@@ -8,13 +8,19 @@
 import { getNpcTileMemoryStore } from '../../shared/npcMemory.js';
 import { NPC_PERCEPTION_RADIUS } from '../../shared/npcConstants.js';
 import { RealContext, drainHypo } from './danContext.js';
-import { computeCentroid, weightedNewTilesScore } from './tasks/explore.js';
+import { computeCentroid } from './tasks/explore.js';
 import { eatTask } from './tasks/eat.js';
 import { farmTask } from './tasks/farm.js';
 import { exploreTask } from './tasks/explore.js';
+import { talkToTask, walkToTargetOnly } from './tasks/talkTo.js';
 import { createHypotheticalFromMemory } from '../../shared/hypotheticalWorld.js';
 import { Obj, isWheatCropObject } from '../../../world/tileTypes.js';
 import { VITALITY } from '../../../domain/vitality.js';
+import { createActionMemoryStore, appendAction, getLastKnownPosition } from './actionMemory.js';
+import { sanitizeBrainTweak } from './brainTweak.js';
+import { buildThinkPrompt } from './llm/thinkPrompt.js';
+import { callThinkLlm } from './llm/llmClient.js';
+import { isMoveToTileAction, isMoveDirectionAction } from '../../../domain/entityActions.js';
 
 /** @typedef {import('../interface.js').NpcBrain} NpcBrain */
 /** @typedef {import('../interface.js').NpcEntity} NpcEntity */
@@ -39,8 +45,18 @@ const FOOD_NUTRITION = {
 
 /** @typedef {(ctx: DanContext) => Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null>} DanTaskFn */
 
+/** Urgency bonuses for pending talk_to tasks (spec §2.2). */
+const URGENCY_BONUS = {
+    low: 0.01,
+    normal: 0.1,
+    high: 1.0,
+};
+
+/** @typedef {import('./brainTweak.js').PendingTask} PendingTask */
+/** @typedef {import('./brainTweak.js').BrainTweak} BrainTweak */
+
 /** @type {DanTaskFn[]} */
-const TASKS = [eatTask, farmTask, exploreTask];
+const BASE_TASKS = [eatTask, farmTask, exploreTask];
 
 /**
  * Food component of Dan's utility function: -1 / (satiety + stockpile value).
@@ -154,7 +170,7 @@ function utility(ctx, centroid) {
     return foodU + hungerP + explorationU + cropU;
 }
 
-/** @typedef {'eat' | 'farm' | 'explore' | null} DanTaskKind */
+/** @typedef {'eat' | 'farm' | 'explore' | 'talk' | null} DanTaskKind */
 
 /** @implements {NpcBrain} */
 export class DanBrain {
@@ -171,6 +187,27 @@ export class DanBrain {
         this._currentTaskKind = null;
         /** @type {{ x: number, y: number, z: number } | null} */
         this._currentGoal = null;
+        /** @type {Record<string, string | null>} */
+        this.zoneOwners = {};
+        /** @type {PendingTask | null} */
+        this._pendingTask = null;
+        /** @type {boolean} */
+        this._conversing = false;
+        /** @type {boolean} */
+        this._thinking = false;
+        /** @type {import('./actionMemory.js').ActionMemoryStore} */
+        this._actionMemory = createActionMemoryStore();
+        /** @type {Map<string, DanBrain> | null} */
+        this._npcRegistry = null;
+        /** @type {string | null} */
+        this._lastThinkError = null;
+    }
+
+    /**
+     * @param {Map<string, DanBrain>} registry
+     */
+    setNpcRegistry(registry) {
+        this._npcRegistry = registry;
     }
 
     /** @param {NpcEntity} npc */
@@ -190,6 +227,7 @@ export class DanBrain {
     tick(_world, _dt, gameTime, _actionProgress, _visibleTiles, lastActionResult = null) {
         const npc = this._npc;
         if (!npc || !npc.isAlive) return null;
+        if (this._conversing) return null;
         if (npc.resolvingAction) return null;
 
         this._gameTime = gameTime;
@@ -212,12 +250,14 @@ export class DanBrain {
             this._pendingResult = null;
 
             if (step.done) {
+                this._logTaskOutcome(step.value);
                 this._taskGen = null;
                 this._currentTaskKind = null;
                 this._currentGoal = null;
                 continue;
             }
 
+            this._logActionYielded(step.value);
             return step.value;
         }
 
@@ -241,7 +281,115 @@ export class DanBrain {
         if (taskFn === eatTask) return 'eat';
         if (taskFn === farmTask) return 'farm';
         if (taskFn === exploreTask) return 'explore';
+        if (typeof taskFn === 'function' && taskFn._danTalkTask) return 'talk';
         return null;
+    }
+
+    /**
+     * @param {BrainTweak} tweak
+     */
+    applyBrainTweak(tweak) {
+        const npc = this._npc;
+        if (!npc) return;
+        const safe = sanitizeBrainTweak(tweak, npc.name, this._npcRegistry);
+        if (safe.updateZoneOwnership) {
+            Object.assign(this.zoneOwners, safe.updateZoneOwnership);
+        }
+        if (safe.addPendingTask) {
+            this._pendingTask = safe.addPendingTask;
+        }
+    }
+
+    /** Player-triggered async think (spec §1). */
+    async think() {
+        const npc = this._npc;
+        if (!npc || !npc.isAlive || this._thinking) return;
+        this._thinking = true;
+        this._lastThinkError = null;
+        try {
+            const { system, user } = buildThinkPrompt(npc, this);
+            const output = await callThinkLlm(system, user);
+            if (output.thought) {
+                appendAction(this._actionMemory, {
+                    subject: npc.name,
+                    action: 'think',
+                    location: [Math.floor(npc.x), Math.floor(npc.y), npc.z],
+                    tick: this._gameTime,
+                    details: output.thought,
+                });
+            }
+            if (output.brainTweak) {
+                this.applyBrainTweak(output.brainTweak);
+            }
+        } catch (err) {
+            this._lastThinkError = err instanceof Error ? err.message : String(err);
+            console.error('[DanBrain] think failed:', err);
+        } finally {
+            this._thinking = false;
+        }
+    }
+
+    /**
+     * @param {import('../../domain/entityActions.js').EntityAction | null | undefined} action
+     */
+    _logActionYielded(action) {
+        const npc = this._npc;
+        if (!npc || !action) return;
+        if (isMoveToTileAction(action) || isMoveDirectionAction(action)) {
+            const details = isMoveToTileAction(action)
+                ? `→ (${action.tileX}, ${action.tileY})`
+                : `dir (${action.dx}, ${action.dy})`;
+            appendAction(this._actionMemory, {
+                subject: npc.name,
+                action: 'movement',
+                location: [Math.floor(npc.x), Math.floor(npc.y), npc.z],
+                tick: this._gameTime,
+                details,
+            });
+        }
+    }
+
+    /**
+     * @param {ActionExecutionResult | undefined} taskResult
+     */
+    _logTaskOutcome(taskResult) {
+        const npc = this._npc;
+        if (!npc || this._currentTaskKind !== 'farm') return;
+        if (taskResult?.ok) {
+            appendAction(this._actionMemory, {
+                subject: npc.name,
+                action: 'farm_action',
+                location: [Math.floor(npc.x), Math.floor(npc.y), npc.z],
+                tick: this._gameTime,
+                details: this._currentGoal
+                    ? `farm @ (${this._currentGoal.x}, ${this._currentGoal.y})`
+                    : 'farm action',
+            });
+        }
+    }
+
+    /**
+     * Record another NPC's position for talk_to pathing.
+     *
+     * @param {string} name
+     * @param {number} x
+     * @param {number} y
+     * @param {number} z
+     * @param {string} [details]
+     */
+    observeNpc(name, x, y, z, details = 'seen nearby') {
+        if (!name || name === this._npc?.name) return;
+        const last = getLastKnownPosition(this._actionMemory, name);
+        const fx = Math.floor(x);
+        const fy = Math.floor(y);
+        if (last && last[0] === fx && last[1] === fy && last[2] === z) return;
+        appendAction(this._actionMemory, {
+            subject: name,
+            action: 'movement',
+            location: [fx, fy, z],
+            tick: this._gameTime,
+            details,
+        });
     }
 
     /**
@@ -259,11 +407,13 @@ export class DanBrain {
         /** @type {HypotheticalContext | null} */
         let bestHypoCtx = null;
 
-        for (const taskFn of TASKS) {
+        for (const taskFn of BASE_TASKS) {
             const hypo = ctx.hypothetical(memory);
-            // TODO: Consider passing a utility function lambda (using our computed `centroid`) into each `taskFn`.
-            // It might be useful for these tasks to best select sub-tasks.
-            drainHypo(taskFn(hypo));
+            const runTask =
+                taskFn === farmTask
+                    ? () => farmTask(hypo, this.zoneOwners)
+                    : () => taskFn(hypo);
+            drainHypo(runTask());
             const deltaU = utility(hypo, centroid) - initialU;
             if (deltaU > bestDeltaU) {
                 bestDeltaU = deltaU;
@@ -272,9 +422,40 @@ export class DanBrain {
             }
         }
 
+        const pending = this._pendingTask;
+        if (pending?.type === 'talk_to') {
+            const targetPos = getLastKnownPosition(this._actionMemory, pending.target);
+            const hypo = ctx.hypothetical(memory);
+            drainHypo(walkToTargetOnly(hypo, targetPos));
+            const urgencyBonus = URGENCY_BONUS[pending.urgency] ?? URGENCY_BONUS.normal;
+            const deltaU = utility(hypo, centroid) - initialU + urgencyBonus;
+            if (deltaU > bestDeltaU) {
+                bestDeltaU = deltaU;
+                const captured = pending;
+                bestTaskFn = (realCtx) => talkToTask(
+                    realCtx,
+                    captured.target,
+                    captured.message,
+                    targetPos,
+                    this,
+                );
+                bestTaskFn._danTalkTask = true;
+                bestHypoCtx = hypo;
+                this._pendingTask = null;
+            }
+        }
+
         if (!bestTaskFn) return null;
 
-        this._currentTaskKind = this._taskKind(bestTaskFn);
+        /** @type {DanTaskKind} */
+        let taskKind = this._taskKind(bestTaskFn);
+        if (bestTaskFn === farmTask) {
+            const zoneOwners = this.zoneOwners;
+            bestTaskFn = (realCtx) => farmTask(realCtx, zoneOwners);
+            taskKind = 'farm';
+        }
+
+        this._currentTaskKind = taskKind;
         if (bestHypoCtx) {
             this._currentGoal = {
                 x: Math.floor(bestHypoCtx.entity.x),
@@ -299,6 +480,14 @@ export class DanBrain {
 
     /** @returns {{ lines: string[] }} */
     getStatus() {
+        if (this._thinking) return { lines: ['thinking…'] };
+        if (this._conversing) return { lines: ['in conversation'] };
+        if (this._lastThinkError) return { lines: [`think error: ${this._lastThinkError}`] };
+        if (this._pendingTask?.type === 'talk_to') {
+            return {
+                lines: [`pending: talk to ${this._pendingTask.target} (${this._pendingTask.urgency})`],
+            };
+        }
         if (!this._currentTaskKind) return { lines: ['idle'] };
 
         switch (this._currentTaskKind) {
@@ -316,6 +505,8 @@ export class DanBrain {
                     return { lines: [`exploring → (${x}, ${y}, ${z})`] };
                 }
                 return { lines: ['exploring'] };
+            case 'talk':
+                return { lines: ['talking to another villager'] };
             default:
                 return { lines: ['idle'] };
         }

@@ -301,12 +301,14 @@ export class HypotheticalEntity {
             this.y = parent.y;
             this.z = parent.z;
             this.hunger = parent.hunger;
+            this.name = parent.name;
             this.inventory = parent.inventory.map((s) => ({ ...s }));
         } else {
             this.x = entity.x;
             this.y = entity.y;
             this.z = entity.z;
             this.hunger = entity.hunger ?? 0;
+            this.name = entity.name ?? '';
             this.inventory = (entity.inventory ?? []).map((s) => ({ ...s }));
         }
         /** @type {HypotheticalEntity|null} */
