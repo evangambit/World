@@ -439,4 +439,8 @@ export const NPC_DEFAULT_INVENTORY = [{ objType: Obj.UNCOOKED_STEAK, count: 1 }]
 export const VILLAGE_NPC_SPAWNS = [
     // Finn — southwest stone house (6, 28)
     { name: 'Finn', preset: 1, x: 9.5, y: 30.5, z: 0 },
+    // Elara — northwest cottage (6, 12)
+    { name: 'Elara', preset: 2, x: 8.5, y: 15.5, z: 0 },
+    // Mira — west of market square (18, 20)
+    { name: 'Mira', preset: 4, x: 20.5, y: 23.5, z: 0 },
 ];
