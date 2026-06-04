@@ -3,7 +3,6 @@
  */
 import { callConversationLlm } from './llmClient.js';
 import { buildConversationPrompt } from './thinkPrompt.js';
-import { appendAction } from '../actionMemory.js';
 import { sanitizeBrainTweak } from '../brainTweak.js';
 
 /** @typedef {import('../danBrain.js').DanBrain} DanBrain */
@@ -67,8 +66,8 @@ export async function runConversationOrchestrator(initiatorBrain, responderBrain
                 details: output.say,
                 otherPerson: passiveNpc.name,
             };
-            appendAction(activeBrain._actionMemory, entry);
-            appendAction(passiveBrain._actionMemory, { ...entry });
+            activeBrain._actionMemory.append(entry);
+            passiveBrain._actionMemory.append({ ...entry });
 
             if (output.brainTweak) {
                 const tweak = sanitizeBrainTweak(

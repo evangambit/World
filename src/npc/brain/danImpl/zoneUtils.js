@@ -81,7 +81,6 @@ export function buildZoneSummary(memory, zoneOwners, gameTime) {
         let growing = 0;
         let harvestable = 0;
         let bare = 0;
-        const total = zone.tiles.length;
 
         for (const [tx, ty] of zone.tiles) {
             const key = tileKey(tx, ty, 0);
@@ -98,20 +97,24 @@ export function buildZoneSummary(memory, zoneOwners, gameTime) {
             }
         }
 
+        if (explored === 0) continue;
+
         const ownerKnown = Object.hasOwn(zoneOwners, zoneName);
         const owner = ownerKnown ? zoneOwners[zoneName] : 'unknown';
 
-        if (explored === 0 && !ownerKnown) continue;
-
-        /** @type {Record<string, string | number | null>} */
+        /** @type {Record<string, unknown>} */
         const row = {
+            label: zone.label,
             owner: ownerKnown ? owner : 'unknown',
-            explored: `${explored}/${total}`,
+            explored,
         };
         if (explored > 0) {
-            row.growing = growing;
-            row.harvestable = harvestable;
-            row.bare = bare;
+            /** @type {Record<string, number>} */
+            const tiles = {};
+            if (growing > 0) tiles.growing = growing;
+            if (harvestable > 0) tiles.harvestable = harvestable;
+            if (bare > 0) tiles.bare = bare;
+            if (Object.keys(tiles).length > 0) row.tiles = tiles;
         }
         summary[zoneName] = row;
     }

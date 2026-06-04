@@ -1,5 +1,10 @@
 /**
  * ActionMemory — short-term action log for LLM context and target lookup.
+ *
+ * Self movement entries are held in a two-slot buffer (_movementBuffer) rather
+ * than being appended every tick. The buffer is flushed (start + latest) when
+ * a non-movement action occurs, keeping _entries clean without any post-hoc
+ * compression pass.
  */
 
 /** @typedef {'movement' | 'farm_action' | 'say' | 'think' | 'conversation'} ActionEnum */
@@ -14,169 +19,168 @@
  * @property {string} [otherPerson]
  */
 
-/** @typedef {ActionMemoryEntry[]} ActionMemoryStore */
-
 const MAX_SELF_ENTRIES = 20;
-const MOVE_PRUNE_AGE = 200;
-const FARM_PRUNE_AGE = 300;
+const PRUNE_AGE = /** @type {Record<ActionEnum, number>} */ ({
+    movement: 200,
+    farm_action: 300,
+    say: Infinity,
+    think: Infinity,
+    conversation: Infinity,
+});
 
-/**
- * @returns {ActionMemoryStore}
- */
-export function createActionMemoryStore() {
-    return [];
-}
+export class ActionMemory {
+    /** @param {string} selfName */
+    constructor(selfName) {
+        /** @type {string} */
+        this.selfName = selfName;
+        /** @type {ActionMemoryEntry[]} */
+        this._entries = [];
+        /** @type {{ start: ActionMemoryEntry, latest: ActionMemoryEntry } | null} */
+        this._movementBuffer = null;
+    }
 
-/**
- * @param {ActionMemoryStore} store
- * @param {ActionMemoryEntry} entry
- */
-export function appendAction(store, entry) {
-    store.push(entry);
-    pruneMemory(store);
-}
-
-/**
- * @param {ActionMemoryStore} store
- */
-export function pruneMemory(store) {
-    if (store.length === 0) return;
-
-    const latestTick = store[store.length - 1].tick;
-    const keepIndices = new Set();
-
-    for (let i = 0; i < store.length; i++) {
-        const e = store[i];
-        if (e.action === 'conversation' || e.action === 'say' || e.action === 'think') {
-            keepIndices.add(i);
+    /** @param {ActionMemoryEntry} entry */
+    append(entry) {
+        if (entry.action === 'movement' && entry.subject === this.selfName) {
+            if (!this._movementBuffer) {
+                this._movementBuffer = { start: entry, latest: entry };
+            } else {
+                this._movementBuffer.latest = entry;
+            }
+        } else {
+            this._flushMovement();
+            this._entries.push(entry);
+            this._prune();
         }
     }
 
-    /** @type {Map<string, number>} */
-    const latestOtherNpc = new Map();
-    for (let i = store.length - 1; i >= 0; i--) {
-        const e = store[i];
-        if (e.otherPerson) continue;
-        if (!latestOtherNpc.has(e.subject)) {
-            latestOtherNpc.set(e.subject, i);
-            keepIndices.add(i);
+    /** @returns {number} */
+    get length() {
+        const bufLen = !this._movementBuffer ? 0
+            : this._movementBuffer.start === this._movementBuffer.latest ? 1 : 2;
+        return this._entries.length + bufLen;
+    }
+
+    /**
+     * @param {string} npcName
+     * @returns {[number, number, number] | null}
+     */
+    getLastKnownPosition(npcName) {
+        if (npcName === this.selfName && this._movementBuffer) {
+            return this._movementBuffer.latest.location;
         }
-    }
-
-    /** @type {Map<string, number>} */
-    const latestFarmPerLocation = new Map();
-    for (let i = store.length - 1; i >= 0; i--) {
-        const e = store[i];
-        if (e.action !== 'farm_action') continue;
-        const locKey = e.location.join(',');
-        if (!latestFarmPerLocation.has(locKey)) {
-            latestFarmPerLocation.set(locKey, i);
-            keepIndices.add(i);
-        }
-    }
-
-    let selfKept = 0;
-    for (let i = store.length - 1; i >= 0 && selfKept < MAX_SELF_ENTRIES; i--) {
-        const e = store[i];
-        if (e.otherPerson) continue;
-        keepIndices.add(i);
-        selfKept++;
-    }
-
-    const pruned = store.filter((e, i) => {
-        if (keepIndices.has(i)) return true;
-        const age = latestTick - e.tick;
-        if (e.action === 'movement' && age > MOVE_PRUNE_AGE) return false;
-        if (e.action === 'farm_action' && age > FARM_PRUNE_AGE) return false;
-        return age < MOVE_PRUNE_AGE;
-    });
-
-    compressMovementRuns(pruned);
-    store.length = 0;
-    store.push(...pruned);
-}
-
-/**
- * @param {ActionMemoryStore} store
- */
-function compressMovementRuns(store) {
-    /** @type {number[]} */
-    const moveIndices = [];
-    for (let i = 0; i < store.length; i++) {
-        if (store[i].action === 'movement') moveIndices.push(i);
-    }
-    if (moveIndices.length <= 4) return;
-
-    const toDrop = new Set();
-    for (let r = 0; r < moveIndices.length; ) {
-        let rEnd = r;
-        while (rEnd + 1 < moveIndices.length) {
-            const a = store[moveIndices[rEnd]];
-            const b = store[moveIndices[rEnd + 1]];
-            if (b.tick - a.tick > 5) break;
-            rEnd++;
-        }
-        if (rEnd - r >= 3) {
-            for (let k = r + 1; k < rEnd; k++) {
-                toDrop.add(moveIndices[k]);
+        for (let i = this._entries.length - 1; i >= 0; i--) {
+            if (this._entries[i].subject === npcName) {
+                return this._entries[i].location;
             }
         }
-        r = rEnd + 1;
+        return null;
     }
-    if (toDrop.size === 0) return;
 
-    const filtered = store.filter((_, i) => !toDrop.has(i));
-    store.length = 0;
-    store.push(...filtered);
-}
+    /** @returns {ActionMemoryEntry[]} */
+    getConversationEntries() {
+        return this._entries.filter((e) => e.action === 'conversation');
+    }
 
-/**
- * @param {ActionMemoryStore} store
- * @param {string} npcName
- * @returns {[number, number, number] | null}
- */
-export function getLastKnownPosition(store, npcName) {
-    for (let i = store.length - 1; i >= 0; i--) {
-        if (store[i].subject === npcName) {
-            return store[i].location;
+    /**
+     * Build the action-memory slice used in LLM prompts.
+     * Includes any in-progress movement run from the buffer.
+     * @returns {ActionMemoryEntry[]}
+     */
+    getPromptActionSlice() {
+        const all = this._entriesWithBuffer();
+        const conversations = all.filter((e) => e.action === 'conversation');
+        const convSet = new Set(conversations);
+
+        // Most-recent MAX_SELF_ENTRIES self entries, in chronological order.
+        const selfEntries = all
+            .filter((e) => !convSet.has(e) && e.subject === this.selfName)
+            .slice(-MAX_SELF_ENTRIES);
+
+        // Most-recent entry per other NPC.
+        /** @type {Map<string, ActionMemoryEntry>} */
+        const latestOther = new Map();
+        for (let i = all.length - 1; i >= 0; i--) {
+            const e = all[i];
+            if (!convSet.has(e) && e.subject !== this.selfName && !latestOther.has(e.subject)) {
+                latestOther.set(e.subject, e);
+            }
         }
+
+        return [...selfEntries, ...latestOther.values(), ...conversations];
     }
-    return null;
-}
 
-/**
- * @param {ActionMemoryStore} store
- * @returns {ActionMemoryEntry[]}
- */
-export function getConversationEntries(store) {
-    return store.filter((e) => e.action === 'conversation');
-}
-
-/**
- * Build layer-3 action memory slice for prompts.
- *
- * @param {ActionMemoryStore} store
- * @param {string} selfName
- * @returns {ActionMemoryEntry[]}
- */
-export function getPromptActionSlice(store, selfName) {
-    const conversations = getConversationEntries(store);
-    const convSet = new Set(conversations);
-
-    /** @type {Map<string, ActionMemoryEntry>} */
-    const latestOther = new Map();
-    /** @type {ActionMemoryEntry[]} */
-    const selfEntries = [];
-
-    for (let i = store.length - 1; i >= 0; i--) {
-        const e = store[i];
-        if (convSet.has(e)) continue;
-        if (e.subject === selfName) {
-            if (selfEntries.length < MAX_SELF_ENTRIES) selfEntries.push(e);
-        } else if (!latestOther.has(e.subject)) {
-            latestOther.set(e.subject, e);
+    _flushMovement() {
+        if (!this._movementBuffer) return;
+        const { start, latest } = this._movementBuffer;
+        this._movementBuffer = null;
+        if (start === latest) {
+            this._entries.push(start);
+        } else {
+            this._entries.push(start, latest);
         }
     }
 
-    return [...selfEntries.reverse(), ...latestOther.values(), ...conversations];
+    /**
+     * Returns _entries combined with any buffered movement entries.
+     * Used for read-only queries so the buffer is never missed.
+     * @returns {ActionMemoryEntry[]}
+     */
+    _entriesWithBuffer() {
+        if (!this._movementBuffer) return this._entries;
+        const { start, latest } = this._movementBuffer;
+        return start === latest
+            ? [...this._entries, start]
+            : [...this._entries, start, latest];
+    }
+
+    _prune() {
+        const entries = this._entries;
+        if (entries.length === 0) return;
+
+        const latestTick = entries[entries.length - 1].tick;
+        const keepIndices = new Set();
+
+        for (let i = 0; i < entries.length; i++) {
+            const e = entries[i];
+            if (e.action === 'conversation' || e.action === 'say' || e.action === 'think') {
+                keepIndices.add(i);
+            }
+        }
+
+        /** @type {Map<string, number>} */
+        const latestOtherNpc = new Map();
+        for (let i = entries.length - 1; i >= 0; i--) {
+            const e = entries[i];
+            if (e.otherPerson) continue;
+            if (!latestOtherNpc.has(e.subject)) {
+                latestOtherNpc.set(e.subject, i);
+                keepIndices.add(i);
+            }
+        }
+
+        /** @type {Map<string, number>} */
+        const latestFarmPerLocation = new Map();
+        for (let i = entries.length - 1; i >= 0; i--) {
+            const e = entries[i];
+            if (e.action !== 'farm_action') continue;
+            const locKey = e.location.join(',');
+            if (!latestFarmPerLocation.has(locKey)) {
+                latestFarmPerLocation.set(locKey, i);
+                keepIndices.add(i);
+            }
+        }
+
+        let selfKept = 0;
+        for (let i = entries.length - 1; i >= 0 && selfKept < MAX_SELF_ENTRIES; i--) {
+            const e = entries[i];
+            if (e.subject !== this.selfName) continue;
+            keepIndices.add(i);
+            selfKept++;
+        }
+
+        this._entries = entries.filter((e, i) =>
+            keepIndices.has(i) || latestTick - e.tick < PRUNE_AGE[e.action],
+        );
+    }
 }

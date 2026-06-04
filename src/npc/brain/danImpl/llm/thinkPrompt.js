@@ -1,14 +1,11 @@
 /**
  * Assemble four-layer prompts for Dan think and conversation LLM calls.
  */
-import { FARM_ZONES } from '../../../../content/builder.js';
 import { OBJ_NAMES } from '../../../../world/tileTypes.js';
 import { VITALITY } from '../../../../domain/vitality.js';
 import { getNpcTileMemoryStore } from '../../../shared/npcMemory.js';
-import { getPromptActionSlice } from '../actionMemory.js';
 import { buildZoneSummary } from '../zoneUtils.js';
 
-/** @typedef {import('../actionMemory.js').ActionMemoryStore} ActionMemoryStore */
 /** @typedef {import('../../interface.js').NpcEntity} NpcEntity */
 /** @typedef {import('../danBrain.js').DanBrain} DanBrain */
 
@@ -17,17 +14,12 @@ import { buildZoneSummary } from '../zoneUtils.js';
  * @returns {string}
  */
 function buildSystemPrompt(npc) {
-    const zoneLines = FARM_ZONES.map((z) => `- ${z.name}: ${z.label}`).join('\n');
-
     return `You are ${npc.name}, a villager in a small farming simulation.
 
 ## Game mechanics
 - Hunger rises over time; eat bread, steak, or wheat from inventory when hungry.
 - Farm loop: plant wheat seeds on bare dirt, harvest mature wheat, cook wheat at a stove into bread.
 - You can update beliefs about who owns which farm zone, and queue a talk_to task to coordinate with another villager.
-
-## Farm zones (use only these names in updateZoneOwnership)
-${zoneLines}
 
 ## Urgency for addPendingTask talk_to
 - "low": minor coordination (~beats idle only)
@@ -72,12 +64,11 @@ function buildStateSnapshot(npc, brain) {
 }
 
 /**
- * @param {ActionMemoryStore} store
- * @param {string} selfName
+ * @param {import('../actionMemory.js').ActionMemory} memory
  * @returns {string}
  */
-function buildActionMemorySection(store, selfName) {
-    const slice = getPromptActionSlice(store, selfName);
+function buildActionMemorySection(memory) {
+    const slice = memory.getPromptActionSlice();
     if (slice.length === 0) return '## Action memory\n(none yet)';
     const lines = slice.map((e) => {
         const loc = e.location.join(',');
@@ -97,7 +88,7 @@ function buildActionMemorySection(store, selfName) {
 function buildZoneSummarySection(npc, zoneOwners, gameTime) {
     const memory = getNpcTileMemoryStore(npc) ?? new Map();
     const summary = buildZoneSummary(memory, zoneOwners, gameTime);
-    return `## Farm zones (your knowledge)\n${JSON.stringify(summary, null, 2)}`;
+    return `## Zones you have explored (use zone names in updateZoneOwnership)\n${JSON.stringify(summary, null, 2)}`;
 }
 
 /**
@@ -109,7 +100,7 @@ export function buildThinkPrompt(npc, brain) {
     const system = buildSystemPrompt(npc);
     const user = [
         buildStateSnapshot(npc, brain),
-        buildActionMemorySection(brain._actionMemory, npc.name),
+        buildActionMemorySection(brain._actionMemory),
         buildZoneSummarySection(npc, brain.zoneOwners, brain._gameTime),
         '',
         'What do you want to do? Reply with JSON only.',
@@ -140,7 +131,7 @@ Set endConversation true when the conversation should end.`;
 
     const user = [
         buildStateSnapshot(npc, brain),
-        buildActionMemorySection(brain._actionMemory, npc.name),
+        buildActionMemorySection(brain._actionMemory),
         buildZoneSummarySection(npc, brain.zoneOwners, brain._gameTime),
         '',
         '## Conversation transcript',

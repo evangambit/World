@@ -16,7 +16,7 @@ import { talkToTask, walkToTargetOnly } from './tasks/talkTo.js';
 import { createHypotheticalFromMemory } from '../../shared/hypotheticalWorld.js';
 import { Obj, isWheatCropObject } from '../../../world/tileTypes.js';
 import { VITALITY } from '../../../domain/vitality.js';
-import { createActionMemoryStore, appendAction, getLastKnownPosition } from './actionMemory.js';
+import { ActionMemory } from './actionMemory.js';
 import { sanitizeBrainTweak } from './brainTweak.js';
 import { buildThinkPrompt } from './llm/thinkPrompt.js';
 import { callThinkLlm } from './llm/llmClient.js';
@@ -195,8 +195,7 @@ export class DanBrain {
         this._conversing = false;
         /** @type {boolean} */
         this._thinking = false;
-        /** @type {import('./actionMemory.js').ActionMemoryStore} */
-        this._actionMemory = createActionMemoryStore();
+        this._actionMemory = new ActionMemory('');
         /** @type {Map<string, DanBrain> | null} */
         this._npcRegistry = null;
         /** @type {string | null} */
@@ -213,6 +212,7 @@ export class DanBrain {
     /** @param {NpcEntity} npc */
     attach(npc) {
         this._npc = npc;
+        this._actionMemory.selfName = npc.name;
     }
 
     /**
@@ -310,7 +310,7 @@ export class DanBrain {
             const { system, user } = buildThinkPrompt(npc, this);
             const output = await callThinkLlm(system, user);
             if (output.thought) {
-                appendAction(this._actionMemory, {
+                this._actionMemory.append({
                     subject: npc.name,
                     action: 'think',
                     location: [Math.floor(npc.x), Math.floor(npc.y), npc.z],
@@ -339,7 +339,7 @@ export class DanBrain {
             const details = isMoveToTileAction(action)
                 ? `→ (${action.tileX}, ${action.tileY})`
                 : `dir (${action.dx}, ${action.dy})`;
-            appendAction(this._actionMemory, {
+            this._actionMemory.append({
                 subject: npc.name,
                 action: 'movement',
                 location: [Math.floor(npc.x), Math.floor(npc.y), npc.z],
@@ -356,7 +356,7 @@ export class DanBrain {
         const npc = this._npc;
         if (!npc || this._currentTaskKind !== 'farm') return;
         if (taskResult?.ok) {
-            appendAction(this._actionMemory, {
+            this._actionMemory.append({
                 subject: npc.name,
                 action: 'farm_action',
                 location: [Math.floor(npc.x), Math.floor(npc.y), npc.z],
@@ -379,11 +379,11 @@ export class DanBrain {
      */
     observeNpc(name, x, y, z, details = 'seen nearby') {
         if (!name || name === this._npc?.name) return;
-        const last = getLastKnownPosition(this._actionMemory, name);
+        const last = this._actionMemory.getLastKnownPosition(name);
         const fx = Math.floor(x);
         const fy = Math.floor(y);
         if (last && last[0] === fx && last[1] === fy && last[2] === z) return;
-        appendAction(this._actionMemory, {
+        this._actionMemory.append({
             subject: name,
             action: 'movement',
             location: [fx, fy, z],
@@ -424,7 +424,7 @@ export class DanBrain {
 
         const pending = this._pendingTask;
         if (pending?.type === 'talk_to') {
-            const targetPos = getLastKnownPosition(this._actionMemory, pending.target);
+            const targetPos = this._actionMemory.getLastKnownPosition(pending.target);
             const hypo = ctx.hypothetical(memory);
             drainHypo(walkToTargetOnly(hypo, targetPos));
             const urgencyBonus = URGENCY_BONUS[pending.urgency] ?? URGENCY_BONUS.normal;
