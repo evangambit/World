@@ -17,6 +17,8 @@
  * @property {number} tick
  * @property {string} details
  * @property {string} [otherPerson]
+ * @property {number} [endTick] - set only on merged movement entries (start tick in `tick`, end in `endTick`)
+ * @property {[number, number, number]} [endLocation] - current position at `endTick`
  */
 
 const MAX_SELF_ENTRIES = 20;
@@ -90,24 +92,44 @@ export class ActionMemory {
 
     /**
      * Build the action-memory slice used in LLM prompts.
-     * Includes any in-progress movement run from the buffer.
+     *
+     * An in-progress self-movement run is represented as a single merged entry
+     * with `endTick` and `endLocation` set so the prompt can render a compact
+     * tick range (e.g. "t201–t207 movement: (11,23,0)→(27,26,0)").
+     *
      * @returns {ActionMemoryEntry[]}
      */
     getPromptActionSlice() {
-        const all = this._entriesWithBuffer();
-        const conversations = all.filter((e) => e.action === 'conversation');
+        // Build a view of _entries that excludes the raw buffer slots; the
+        // buffer is represented separately as a merged entry (see below).
+        const base = this._entries;
+        const conversations = base.filter((e) => e.action === 'conversation');
         const convSet = new Set(conversations);
 
-        // Most-recent MAX_SELF_ENTRIES self entries, in chronological order.
-        const selfEntries = all
+        // Most-recent MAX_SELF_ENTRIES self entries from _entries only.
+        const selfEntries = base
             .filter((e) => !convSet.has(e) && e.subject === this.selfName)
             .slice(-MAX_SELF_ENTRIES);
+
+        // Merge the buffered movement run into a single entry.
+        if (this._movementBuffer) {
+            const { start, latest } = this._movementBuffer;
+            /** @type {ActionMemoryEntry} */
+            const merged = start === latest
+                ? start
+                : {
+                    ...start,
+                    endTick: latest.tick,
+                    endLocation: latest.location,
+                };
+            selfEntries.push(merged);
+        }
 
         // Most-recent entry per other NPC.
         /** @type {Map<string, ActionMemoryEntry>} */
         const latestOther = new Map();
-        for (let i = all.length - 1; i >= 0; i--) {
-            const e = all[i];
+        for (let i = base.length - 1; i >= 0; i--) {
+            const e = base[i];
             if (!convSet.has(e) && e.subject !== this.selfName && !latestOther.has(e.subject)) {
                 latestOther.set(e.subject, e);
             }

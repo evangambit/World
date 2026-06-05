@@ -71,8 +71,16 @@ function buildActionMemorySection(memory) {
     const slice = memory.getPromptActionSlice();
     if (slice.length === 0) return '## Action memory\n(none yet)';
     const lines = slice.map((e) => {
-        const loc = e.location.join(',');
         const other = e.otherPerson ? ` (with ${e.otherPerson})` : '';
+        if (e.endTick != null && e.endLocation != null) {
+            // Merged movement range: show start→end position and tick span.
+            const t0 = Math.round(e.tick);
+            const t1 = Math.round(e.endTick);
+            const loc0 = e.location.join(',');
+            const loc1 = e.endLocation.join(',');
+            return `- t${t0}–t${t1} ${e.subject} ${e.action}: (${loc0})→(${loc1})${other}`;
+        }
+        const loc = e.location.join(',');
         const t = Math.round(e.tick);
         return `- t${t} ${e.subject} ${e.action} @(${loc}): ${e.details}${other}`;
     });

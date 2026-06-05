@@ -35,7 +35,7 @@ function otherMovEntry(tick, name, x, y) {
 }
 
 describe('ActionMemory', () => {
-    it('compresses a self movement run to start+latest even when other-NPC entries are interleaved', () => {
+    it('compresses a self movement run to a single merged entry even when other-NPC entries are interleaved', () => {
         const mem = new ActionMemory('Elara');
 
         // Simulate 10 movement steps, each followed by an observeNpc call for
@@ -48,11 +48,14 @@ describe('ActionMemory', () => {
         const slice = mem.getPromptActionSlice();
         const selfMoves = slice.filter((e) => e.subject === 'Elara' && e.action === 'movement');
 
-        // Buffer holds start + latest → at most 2 self movement entries in the slice.
-        assert.ok(
-            selfMoves.length <= 2,
-            `Expected ≤2 self movement entries in prompt slice, got ${selfMoves.length}`,
-        );
+        // Buffer is merged into one entry with endTick/endLocation set.
+        assert.equal(selfMoves.length, 1, 'Expected exactly 1 merged self movement entry in the slice');
+
+        const merged = selfMoves[0];
+        assert.equal(merged.tick, 200, 'tick should be the start tick');
+        assert.equal(merged.endTick, 209, 'endTick should be the latest tick');
+        assert.deepEqual(merged.location, [10, 20, 0], 'location should be the start position');
+        assert.deepEqual(merged.endLocation, [19, 20, 0], 'endLocation should be the latest position');
     });
 
     it('flushes the movement buffer when a self non-movement entry is appended', () => {
