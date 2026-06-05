@@ -48,7 +48,13 @@ export class ActionMemory {
                 this._movementBuffer.latest = entry;
             }
         } else {
-            this._flushMovement();
+            // Only flush the self-movement buffer when a meaningful self action
+            // interrupts movement (think, farm_action, conversation, etc.).
+            // Observations of other NPCs must not flush it — observeNpc is called
+            // every frame and would otherwise nullify the two-slot compression.
+            if (entry.subject === this.selfName) {
+                this._flushMovement();
+            }
             this._entries.push(entry);
             this._prune();
         }
