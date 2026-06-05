@@ -7,7 +7,7 @@
  * seen from that position, divided by path cost. This favours filling gaps
  * near the centroid of known territory over extending distant tentacles.
  */
-import { findPath } from '../../shared/walkToLocation.js';
+import { findPath, getHeldBuildingKeys } from '../../shared/walkToLocation.js';
 import { NPC_PERCEPTION_RADIUS } from '../../../shared/npcConstants.js';
 import { getNpcTileMemoryStore } from '../../../shared/npcMemory.js';
 
@@ -144,6 +144,7 @@ export function getBestExploreResult(npc, hypoWorld) {
 
     const memory = getNpcTileMemoryStore(npc);
     const centroid = memory ? computeCentroid(memory, pz) : { x: px, y: py };
+    const heldBuildingKeys = getHeldBuildingKeys(npc);
 
     let bestGoal = null;
     let bestScore = 0;
@@ -152,7 +153,7 @@ export function getBestExploreResult(npc, hypoWorld) {
         const goal = findFrontierGoal(hypoWorld, px, py, pz, dx, dy);
         if (!goal) continue;
 
-        const path = findPath(hypoWorld, px, py, pz, goal.x, goal.y, goal.z);
+        const path = findPath(hypoWorld, px, py, pz, goal.x, goal.y, goal.z, undefined, heldBuildingKeys);
         if (!path || path.length < 2) continue;
 
         const tileScore = weightedNewTilesScore(

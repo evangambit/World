@@ -5,7 +5,7 @@
  * primitives differ between real (yield EntityActions) and hypothetical
  * (A* teleport + instant apply) modes.
  */
-import { walkToLocation, findPath } from '../shared/walkToLocation.js';
+import { walkToLocation, findPath, getHeldBuildingKeys } from '../shared/walkToLocation.js';
 import { HypotheticalEntity } from '../../shared/hypotheticalWorld.js';
 import { NPC_PERCEPTION_RADIUS } from '../../shared/npcConstants.js';
 
@@ -128,6 +128,7 @@ export class HypotheticalContext {
      * @returns {Generator<never, ActionExecutionResult, unknown>}
      */
     *walkTo(target) {
+        const heldBuildingKeys = getHeldBuildingKeys(this._hypoEntity);
         const path = findPath(
             this._hypoWorld,
             Math.floor(this._hypoEntity.x),
@@ -136,6 +137,8 @@ export class HypotheticalContext {
             target.x,
             target.y,
             target.z,
+            undefined,
+            heldBuildingKeys,
         );
         if (!path) {
             return { ok: false, message: 'No path to target tile' };

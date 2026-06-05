@@ -2,8 +2,9 @@
  * Shared brain locomotion — tile-by-tile walks via entity actions.
  * Pathfinding runs on HypotheticalWorld (remembered tiles only).
  */
-import { moveToTileAction } from '../../../domain/entityActions.js';
+import { moveToTileAction, toggleDoorLockAction } from '../../../domain/entityActions.js';
 import { HypotheticalWorld } from '../../shared/hypotheticalWorld.js';
+import { Obj, T, isTileWalkable } from '../../../world/tileTypes.js';
 
 /** @typedef {import('../../../actors/entity.js').Entity} Entity */
 /** @typedef {import('../../../domain/entityActions.js').EntityAction} EntityAction */
@@ -15,6 +16,42 @@ import { HypotheticalWorld } from '../../shared/hypotheticalWorld.js';
  * @property {() => HypotheticalWorld} [getWorld] - fresh view for replanning (e.g. updated tile memory)
  * @property {number} [maxReplans] - cap replans when the route keeps breaking (default 32)
  */
+
+/**
+ * Returns the set of building IDs for which the entity holds a key.
+ * @param {{ inventory?: { objType: number, count: number, buildingId?: number }[] }} entity
+ * @returns {Set<number>}
+ */
+export function getHeldBuildingKeys(entity) {
+    const keys = new Set();
+    for (const stack of entity.inventory ?? []) {
+        if (stack.objType === Obj.KEY && stack.count > 0 && stack.buildingId != null) {
+            keys.add(stack.buildingId);
+        }
+    }
+    return keys;
+}
+
+/**
+ * Whether a tile can be stepped on, optionally treating locked doors as passable
+ * when the entity holds the matching building key.
+ * @param {HypotheticalWorld} world
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ * @param {Set<number>} [heldBuildingKeys]
+ * @returns {boolean}
+ */
+function isPassable(world, x, y, z, heldBuildingKeys) {
+    const tile = world.getTile(x, y, z);
+    if (!tile) return false;
+    if (tile.terrain === T.DOOR && tile.doorLocked) {
+        if (!heldBuildingKeys || tile.buildingId == null || !heldBuildingKeys.has(tile.buildingId)) {
+            return false;
+        }
+    }
+    return isTileWalkable(tile.terrain, tile.obj);
+}
 
 const DEFAULT_MAX_REPLANS = 32;
 
@@ -73,9 +110,10 @@ class MinHeap {
  * @param {number} x
  * @param {number} y
  * @param {number} z
+ * @param {Set<number>} [heldBuildingKeys]
  * @returns {TileCoord[]}
  */
-function getWalkableNeighbors(world, x, y, z) {
+function getWalkableNeighbors(world, x, y, z, heldBuildingKeys) {
     const neighbors = [];
     for (const [dx, dy] of [
         [1, 0],
@@ -85,14 +123,14 @@ function getWalkableNeighbors(world, x, y, z) {
     ]) {
         const nx = x + dx;
         const ny = y + dy;
-        if (world.isWalkable(nx, ny, z)) {
+        if (isPassable(world, nx, ny, z, heldBuildingKeys)) {
             neighbors.push({ x: nx, y: ny, z });
         }
     }
     const tile = world.getTile(x, y, z);
     if (tile?.transition) {
         const { tx, ty, tz } = tile.transition;
-        if (world.isWalkable(tx, ty, tz)) {
+        if (isPassable(world, tx, ty, tz, heldBuildingKeys)) {
             neighbors.push({ x: tx, y: ty, z: tz });
         }
     }
@@ -108,9 +146,10 @@ function getWalkableNeighbors(world, x, y, z) {
  * @param {number} gy
  * @param {number} gz
  * @param {number} [maxNodes]
+ * @param {Set<number>} [heldBuildingKeys] - building IDs whose locked doors can be traversed
  * @returns {TileCoord[] | null}
  */
-export function findPath(world, sx, sy, sz, gx, gy, gz, maxNodes = 2000) {
+export function findPath(world, sx, sy, sz, gx, gy, gz, maxNodes = 2000, heldBuildingKeys) {
     const key = (x, y, z) => `${x},${y},${z}`;
     const startKey = key(sx, sy, sz);
     const goalKey = key(gx, gy, gz);
@@ -148,7 +187,7 @@ export function findPath(world, sx, sy, sz, gx, gy, gz, maxNodes = 2000) {
 
         const { x, y, z } = coords.get(ck);
         const currentG = gScore.get(ck);
-        const neighbors = getWalkableNeighbors(world, x, y, z);
+        const neighbors = getWalkableNeighbors(world, x, y, z, heldBuildingKeys);
 
         for (const nb of neighbors) {
             const nk = key(nb.x, nb.y, nb.z);
@@ -171,11 +210,12 @@ export function findPath(world, sx, sy, sz, gx, gy, gz, maxNodes = 2000) {
  * @param {HypotheticalWorld} world
  * @param {TileCoord[]} path
  * @param {number} fromIndex
+ * @param {Set<number>} [heldBuildingKeys]
  */
-function isRemainingPathAccessible(world, path, fromIndex) {
+function isRemainingPathAccessible(world, path, fromIndex, heldBuildingKeys) {
     for (let i = fromIndex; i < path.length; i++) {
         const step = path[i];
-        if (!world.isWalkable(step.x, step.y, step.z)) return false;
+        if (!isPassable(world, step.x, step.y, step.z, heldBuildingKeys)) return false;
     }
     return true;
 }
@@ -184,8 +224,9 @@ function isRemainingPathAccessible(world, path, fromIndex) {
  * @param {Entity} entity
  * @param {HypotheticalWorld} world
  * @param {TileCoord} target
+ * @param {Set<number>} [heldBuildingKeys]
  */
-function planPathFromEntity(entity, world, target) {
+function planPathFromEntity(entity, world, target, heldBuildingKeys) {
     return findPath(
         world,
         Math.floor(entity.x),
@@ -194,6 +235,8 @@ function planPathFromEntity(entity, world, target) {
         target.x,
         target.y,
         target.z,
+        undefined,
+        heldBuildingKeys,
     );
 }
 
@@ -213,8 +256,9 @@ function planPathFromEntity(entity, world, target) {
 export function* walkToLocation(entity, world, target, options = {}) {
     const getWorld = options.getWorld ?? (() => world);
     const maxReplans = options.maxReplans ?? DEFAULT_MAX_REPLANS;
+    const heldBuildingKeys = getHeldBuildingKeys(entity);
 
-    let path = planPathFromEntity(entity, getWorld(), target);
+    let path = planPathFromEntity(entity, getWorld(), target, heldBuildingKeys);
     if (!path) {
         return { ok: false, message: 'No path to target tile' };
     }
@@ -233,12 +277,12 @@ export function* walkToLocation(entity, world, target, options = {}) {
         }
 
         const view = getWorld();
-        if (!isRemainingPathAccessible(view, path, pathIndex)) {
+        if (!isRemainingPathAccessible(view, path, pathIndex, heldBuildingKeys)) {
             if (replans >= maxReplans) {
                 return { ok: false, message: 'Path blocked and replan limit reached' };
             }
             replans++;
-            path = planPathFromEntity(entity, view, target);
+            path = planPathFromEntity(entity, view, target, heldBuildingKeys);
             if (!path || path.length < 2) {
                 return { ok: false, message: 'No path to target tile' };
             }
@@ -246,11 +290,28 @@ export function* walkToLocation(entity, world, target, options = {}) {
             continue;
         }
 
+        // When the next step is a locked door and the entity holds the matching key,
+        // unlock it first. Execution resumes next tick after perception has refreshed
+        // the door's state, so the subsequent move will see it as walkable.
+        const stepTile = view.getTile(step.x, step.y, step.z);
+        if (stepTile?.terrain === T.DOOR && stepTile.doorLocked &&
+            stepTile.buildingId != null && heldBuildingKeys.has(stepTile.buildingId)) {
+            const unlockResult = yield toggleDoorLockAction(entity);
+            if (unlockResult && !unlockResult.ok) {
+                if (replans >= maxReplans) return unlockResult;
+                replans++;
+                path = planPathFromEntity(entity, getWorld(), target, heldBuildingKeys);
+                if (!path || path.length < 2) return unlockResult;
+                pathIndex = 1;
+            }
+            continue;
+        }
+
         const result = yield moveToTileAction(entity, step.x, step.y, step.z);
         if (result && !result.ok) {
             if (replans >= maxReplans) return result;
             replans++;
-            path = planPathFromEntity(entity, getWorld(), target);
+            path = planPathFromEntity(entity, getWorld(), target, heldBuildingKeys);
             if (!path || path.length < 2) return result;
             pathIndex = 1;
             continue;
