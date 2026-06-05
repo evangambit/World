@@ -57,12 +57,14 @@ Tasks are generator functions taking a `DanContext`. They never branch on "am I 
 
 - `yield* ctx.walkTo(target)` — move to a tile
 - `yield* ctx.applyAction(action)` — perform a world interaction
+- `ctx.getLastKnownPosition(name)` — look up another NPC's last observed position
 
 | | RealContext | HypotheticalContext |
 |---|-------------|---------------------|
 | `walkTo` | Yields `moveToTileAction` steps via `walkToLocation` | A* path, teleport entity, accumulate `newTilesSeen` |
 | `applyAction` | Yields the action; engine runs it | Calls `action.apply(hypoWorld)` synchronously |
 | `newTilesSeen` | Always empty | Set of `"x,y,z"` keys newly visible along walked paths |
+| `getLastKnownPosition` | Live query against `ActionMemory` (updated each frame) | Snapshot from planning time |
 
 `RealContext.hypothetical(memory)` clones the NPC into a `HypotheticalContext` backed by `createHypotheticalFromMemory(memory)`. Task selection drains each candidate task through this hypo context with `drainHypo()`, which asserts no actions are yielded.
 
@@ -118,7 +120,7 @@ Finds the best of eight directional **frontier goals** (last known walkable tile
 
 Queued via `addPendingTask` (from the LLM). Execution:
 
-1. Walks to the last known position of the target NPC (from `ActionMemory`).
+1. Calls `ctx.getLastKnownPosition(targetName)` at walk time (live in real mode, snapshotted in hypo mode) and walks there.
 2. Waits (up to 120 ticks of idle yield) for the target to come within `CONVERSATION_RADIUS = 3`.
 3. Fires `runConversationOrchestrator(initiator, responder, openingMessage)` as a detached async task and returns immediately, leaving `_conversing = true` on both brains.
 
