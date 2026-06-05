@@ -241,7 +241,7 @@ export class DanBrain {
                 const memory = getNpcTileMemoryStore(npc);
                 if (!memory || memory.size === 0) return null;
 
-                const ctx = new RealContext(npc, this._makeGetWorld(), () => this._gameTime);
+                const ctx = new RealContext(npc, this._makeGetWorld(), () => this._gameTime, (name) => this._actionMemory.getLastKnownPosition(name));
                 this._taskGen = this._chooseTask(ctx, memory);
                 if (!this._taskGen) return null;
             }
@@ -424,9 +424,8 @@ export class DanBrain {
 
         const pending = this._pendingTask;
         if (pending?.type === 'talk_to') {
-            const targetPos = this._actionMemory.getLastKnownPosition(pending.target);
             const hypo = ctx.hypothetical(memory);
-            drainHypo(walkToTargetOnly(hypo, targetPos));
+            drainHypo(walkToTargetOnly(hypo, pending.target));
             const urgencyBonus = URGENCY_BONUS[pending.urgency] ?? URGENCY_BONUS.normal;
             const deltaU = utility(hypo, centroid) - initialU + urgencyBonus;
             if (deltaU > bestDeltaU) {
@@ -436,7 +435,6 @@ export class DanBrain {
                     realCtx,
                     captured.target,
                     captured.message,
-                    targetPos,
                     this,
                 );
                 bestTaskFn._danTalkTask = true;

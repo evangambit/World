@@ -29,11 +29,13 @@ export class RealContext {
      * @param {NpcEntity} npc
      * @param {() => HypotheticalWorld} getWorld
      * @param {() => number} getGameTime
+     * @param {(name: string) => TileCoord | null} getNpcPosition
      */
-    constructor(npc, getWorld, getGameTime) {
+    constructor(npc, getWorld, getGameTime, getNpcPosition) {
         this._npc = npc;
         this._getWorld = getWorld;
         this._getGameTime = getGameTime;
+        this._getNpcPosition = getNpcPosition;
     }
 
     /** @returns {NpcEntity} */
@@ -54,6 +56,15 @@ export class RealContext {
     /** @returns {Set<string>} Always empty — real execution doesn't accumulate hypothetical tiles. */
     get newTilesSeen() {
         return EMPTY_SET;
+    }
+
+    /**
+     * Returns the last known position of another NPC, as recorded by ActionMemory.
+     * @param {string} name
+     * @returns {TileCoord | null}
+     */
+    getLastKnownPosition(name) {
+        return this._getNpcPosition(name);
     }
 
     /**
@@ -80,7 +91,7 @@ export class RealContext {
      * @returns {HypotheticalContext}
      */
     hypothetical(memory) {
-        return new HypotheticalContext(this._npc, this._getWorld(), this._getGameTime(), memory);
+        return new HypotheticalContext(this._npc, this._getWorld(), this._getGameTime(), memory, null, this._getNpcPosition);
     }
 }
 
@@ -92,13 +103,15 @@ export class HypotheticalContext {
      * @param {number} gameTime
      * @param {Map<string, TileMemoryEntry>} memory - used to identify tiles not yet seen
      * @param {import('../../shared/hypotheticalWorld.js').HypotheticalEntity} [hypoEntity]
+     * @param {(name: string) => TileCoord | null} [getNpcPosition]
      */
-    constructor(npc, hypoWorld, gameTime, memory, hypoEntity = null) {
+    constructor(npc, hypoWorld, gameTime, memory, hypoEntity = null, getNpcPosition = null) {
         this._npc = npc;
         this._hypoWorld = hypoWorld;
         this._hypoEntity = hypoEntity ?? new HypotheticalEntity(npc);
         this._gameTime = gameTime;
         this._memory = memory ?? new Map();
+        this._getNpcPosition = getNpcPosition ?? (() => null);
         /** @type {Set<string>} Tiles newly visible along walked paths (not in memory at task start). */
         this._newTilesSeen = new Set();
     }
@@ -106,6 +119,15 @@ export class HypotheticalContext {
     /** @returns {Set<string>} */
     get newTilesSeen() {
         return this._newTilesSeen;
+    }
+
+    /**
+     * Returns the last known position of another NPC (snapshotted at planning time).
+     * @param {string} name
+     * @returns {TileCoord | null}
+     */
+    getLastKnownPosition(name) {
+        return this._getNpcPosition(name);
     }
 
     /** @returns {HypotheticalEntity} */
@@ -184,6 +206,7 @@ export class HypotheticalContext {
             this._gameTime,
             this._memory,
             this._hypoEntity.branch(),
+            this._getNpcPosition,
         );
     }
 }

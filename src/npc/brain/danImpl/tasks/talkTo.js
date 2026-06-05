@@ -6,7 +6,6 @@ import { runConversationOrchestrator } from '../llm/conversationOrchestrator.js'
 /** @typedef {import('../danContext.js').DanContext} DanContext */
 /** @typedef {import('../../../../domain/entityActions.js').EntityAction} EntityAction */
 /** @typedef {{ ok: boolean, message?: string }} ActionExecutionResult */
-/** @typedef {{ x: number, y: number, z: number } | null} TileCoord */
 
 export const CONVERSATION_RADIUS = 3;
 
@@ -14,10 +13,11 @@ export const CONVERSATION_RADIUS = 3;
  * Hypothetical walk-only segment for utility estimation.
  *
  * @param {DanContext} ctx
- * @param {TileCoord} targetPos
+ * @param {string} targetName
  * @returns {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null>}
  */
-export function* walkToTargetOnly(ctx, targetPos) {
+export function* walkToTargetOnly(ctx, targetName) {
+    const targetPos = ctx.getLastKnownPosition(targetName);
     if (!targetPos) return { ok: true };
     return yield* ctx.walkTo(targetPos);
 }
@@ -51,11 +51,11 @@ function resolveTargetBrain(brain, targetName) {
  * @param {DanContext} ctx
  * @param {string} targetName
  * @param {string} openingMessage
- * @param {TileCoord} targetPos
  * @param {import('../danBrain.js').DanBrain} brain
  * @returns {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null>}
  */
-export function* talkToTask(ctx, targetName, openingMessage, targetPos, brain) {
+export function* talkToTask(ctx, targetName, openingMessage, brain) {
+    const targetPos = ctx.getLastKnownPosition(targetName);
     if (targetPos) {
         const walkResult = yield* ctx.walkTo(targetPos);
         if (!walkResult.ok) return walkResult;
