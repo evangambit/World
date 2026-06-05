@@ -8,7 +8,12 @@ import { Entity } from './actors/entity.js';
 import { updatePlayerFromInput } from './client/playerController.js';
 import { tickSimulation } from './simulation/tickSimulation.js';
 import { NPC } from './actors/npc.js';
-import { resolveBrainType, createBrainForType } from './npc/shared/npcBrainRuntime.js';
+import {
+    resolveBrainType,
+    createBrainForType,
+    buildDanNpcRegistry,
+} from './npc/shared/npcBrainRuntime.js';
+import { DanBrain } from './npc/brain/danImpl/danBrain.js';
 import { buildVillage, VILLAGE_NPC_SPAWNS, NPC_DEFAULT_INVENTORY } from './content/builder.js';
 import {
     Obj,
@@ -81,6 +86,8 @@ class Game {
         this.npcPanelEl = document.getElementById('npc-panel');
         this.npcPanelNameEl = document.getElementById('npc-panel-name');
         this.npcPanelPlanEl = document.getElementById('npc-panel-plan');
+        this.npcThinkBtnEl = document.getElementById('npc-think-btn');
+        this.npcThinkBtnEl?.addEventListener('click', () => this._triggerSelectedNpcThink());
         /** Whether the game is paused */
         this.paused = false;
         /** Transient UI message (e.g. door feedback) */
@@ -111,6 +118,7 @@ class Game {
             const npc = new NPC(def.x, def.y, def.z, def.preset, def.name, inventory, { brain });
             this.npcs.push(npc);
         }
+        buildDanNpcRegistry(this.npcs);
 
         // Handle resize
         this._resize();
@@ -480,6 +488,30 @@ class Game {
         this._syncInventoryUI();
     }
 
+    _triggerSelectedNpcThink() {
+        const npc = this.selectedNpc;
+        if (!npc?.brain || typeof npc.brain.think !== 'function') {
+            this._showGameMessage('Select a Dan NPC and press T to think');
+            return;
+        }
+        npc.brain.think().then(() => this._syncNpcPanel());
+        this._showGameMessage(`${npc.name} is thinking…`);
+        this._syncNpcPanel();
+    }
+
+    _observeNearbyNpcsForDanBrains() {
+        const radius = 12;
+        for (const observer of this.npcs) {
+            if (!(observer.brain instanceof DanBrain) || !observer.isAlive) continue;
+            for (const other of this.npcs) {
+                if (other === observer || !other.isAlive || observer.z !== other.z) continue;
+                const dist = Math.hypot(observer.x - other.x, observer.y - other.y);
+                if (dist > radius) continue;
+                observer.brain.observeNpc(other.name, other.x, other.y, other.z);
+            }
+        }
+    }
+
     _syncNpcPanel() {
         const panel = this.npcPanelEl;
         if (!panel || !this.npcPanelNameEl || !this.npcPanelPlanEl) return;
@@ -487,10 +519,16 @@ class Game {
         const npc = this.selectedNpc;
         if (!npc) {
             panel.classList.add('hidden');
+            if (this.npcThinkBtnEl) this.npcThinkBtnEl.classList.add('hidden');
             return;
         }
 
         panel.classList.remove('hidden');
+        if (this.npcThinkBtnEl) {
+            const canThink = npc.brain instanceof DanBrain;
+            this.npcThinkBtnEl.classList.toggle('hidden', !canThink);
+            this.npcThinkBtnEl.disabled = !!(npc.brain instanceof DanBrain && npc.brain._thinking);
+        }
         this.npcPanelNameEl.textContent = npc.name;
         const status = npc.brain?.getStatus?.() ?? { lines: ['Idle'] };
         const inv = npc.inventory ?? [];
@@ -586,6 +624,10 @@ class Game {
             }
         }
 
+        if (!this.paused && this.input.isPressed('t')) {
+            this._triggerSelectedNpcThink();
+        }
+
         if (!this.paused && this.input.isPressed('e') && !this.openContainer) {
             if (this.player.timedAction.isBusy()) {
                 this._interruptPlayerWork();
@@ -605,6 +647,8 @@ class Game {
                 dt: simDt,
                 npcs: this.npcs,
             }));
+
+            this._observeNearbyNpcsForDanBrains();
 
             this.camera.follow(this.player.x, this.player.y, simDt);
 

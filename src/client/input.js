@@ -17,7 +17,7 @@ function normalizeKey(key) {
 
 const GAME_KEYS = new Set([
     ...MOVEMENT_KEYS,
-    'e', ' ', 'escape',
+    'e', 't', ' ', 'escape',
 ]);
 
 /** Keyboard input manager — tracks key states per frame. */

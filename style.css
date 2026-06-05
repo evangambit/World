@@ -123,6 +123,27 @@ html, body {
     margin-bottom: 6px;
 }
 
+#npc-think-btn {
+    font-family: "Press Start 2P", monospace;
+    font-size: 0.38rem;
+    margin-bottom: 6px;
+    padding: 4px 6px;
+    color: #e0d8c0;
+    background: rgba(42, 90, 138, 0.5);
+    border: 1px solid rgba(196, 162, 101, 0.45);
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+#npc-think-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+#npc-think-btn.hidden {
+    display: none;
+}
+
 #npc-panel-plan {
     margin: 0;
     font-family: "Press Start 2P", monospace;
