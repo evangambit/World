@@ -1,7 +1,7 @@
 /**
- * Farm zone helpers — tile membership, owned-zone filtering, LLM zone summaries.
+ * Farm zone helpers — tile membership and LLM zone summaries.
  */
-import { FARM_ZONES, FARM_ZONES_BY_NAME, TILE_TO_ZONE } from '../../../content/builder.js';
+import { FARM_ZONES } from '../../../content/builder.js';
 import { T, isWheatCropObject } from '../../../world/tileTypes.js';
 import { isWheatMature } from '../../../domain/crops.js';
 
@@ -18,60 +18,13 @@ export function tileKey(x, y, z = 0) {
 }
 
 /**
- * @param {string} zoneName
- * @returns {boolean}
- */
-export function isFarmZoneName(zoneName) {
-    return FARM_ZONES_BY_NAME.has(zoneName);
-}
-
-/**
- * @param {number} x
- * @param {number} y
- * @param {number} z
- * @returns {string | null}
- */
-export function zoneNameForTile(x, y, z) {
-    return TILE_TO_ZONE.get(tileKey(x, y, z)) ?? null;
-}
-
-/**
- * Hard-filter tile set for farming: tiles in zones this NPC owns.
- * Returns null when the NPC owns no zones (farm anywhere).
- *
- * @param {Record<string, string | null>} zoneOwners
- * @param {string} npcName
- * @returns {Set<string> | null}
- */
-export function getOwnedTileSet(zoneOwners, npcName) {
-    /** @type {string[]} */
-    const ownedZones = [];
-    for (const [zone, owner] of Object.entries(zoneOwners)) {
-        if (owner === npcName && isFarmZoneName(zone)) {
-            ownedZones.push(zone);
-        }
-    }
-    if (ownedZones.length === 0) return null;
-
-    const tiles = new Set();
-    for (const zoneName of ownedZones) {
-        const zone = FARM_ZONES_BY_NAME.get(zoneName);
-        for (const [tx, ty] of zone.tiles) {
-            tiles.add(tileKey(tx, ty, 0));
-        }
-    }
-    return tiles;
-}
-
-/**
  * Derive compact zone summary for LLM prompts (spec §1.1 layer 4).
  *
  * @param {Map<string, TileMemoryEntry>} memory
- * @param {Record<string, string | null>} zoneOwners
  * @param {number} gameTime
  * @returns {Record<string, object>}
  */
-export function buildZoneSummary(memory, zoneOwners, gameTime) {
+export function buildZoneSummary(memory, gameTime) {
     /** @type {Record<string, object>} */
     const summary = {};
 
@@ -99,13 +52,9 @@ export function buildZoneSummary(memory, zoneOwners, gameTime) {
 
         if (explored === 0) continue;
 
-        const ownerKnown = Object.hasOwn(zoneOwners, zoneName);
-        const owner = ownerKnown ? zoneOwners[zoneName] : 'unknown';
-
         /** @type {Record<string, unknown>} */
         const row = {
             label: zone.label,
-            owner: ownerKnown ? owner : 'unknown',
             explored,
         };
         if (explored > 0) {

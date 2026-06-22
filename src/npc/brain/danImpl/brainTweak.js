@@ -1,7 +1,7 @@
 /**
  * BrainTweak — structured mutations from LLM think/conversation responses.
  */
-import { FARM_ZONES_BY_NAME, VILLAGE_NPC_SPAWNS } from '../../../content/builder.js';
+import { VILLAGE_NPC_SPAWNS } from '../../../content/builder.js';
 
 /** @typedef {'low' | 'normal' | 'high'} TalkUrgency */
 
@@ -15,7 +15,6 @@ import { FARM_ZONES_BY_NAME, VILLAGE_NPC_SPAWNS } from '../../../content/builder
 
 /**
  * @typedef {Object} BrainTweak
- * @property {Record<string, string | null>} [updateZoneOwnership]
  * @property {PendingTask} [addPendingTask]
  */
 
@@ -30,18 +29,6 @@ const KNOWN_NPC_NAMES = new Set(VILLAGE_NPC_SPAWNS.map((s) => s.name));
 export function sanitizeBrainTweak(tweak, selfName, npcRegistry) {
     /** @type {BrainTweak} */
     const out = {};
-
-    if (tweak.updateZoneOwnership) {
-        /** @type {Record<string, string | null>} */
-        const patch = {};
-        for (const [zone, owner] of Object.entries(tweak.updateZoneOwnership)) {
-            if (!FARM_ZONES_BY_NAME.has(zone)) continue;
-            if (owner !== null && typeof owner !== 'string') continue;
-            if (owner !== null && !KNOWN_NPC_NAMES.has(owner)) continue;
-            patch[zone] = owner;
-        }
-        if (Object.keys(patch).length > 0) out.updateZoneOwnership = patch;
-    }
 
     if (tweak.addPendingTask) {
         const pt = tweak.addPendingTask;

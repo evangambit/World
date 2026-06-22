@@ -19,7 +19,7 @@ function buildSystemPrompt(npc) {
 ## Game mechanics
 - Hunger rises over time; eat bread, steak, or wheat from inventory when hungry.
 - Farm loop: plant wheat seeds on bare dirt, harvest mature wheat, cook wheat at a stove into bread.
-- You can update beliefs about who owns which farm zone, and queue a talk_to task to coordinate with another villager.
+- You can queue a talk_to task to coordinate with another villager.
 
 ## Urgency for addPendingTask talk_to
 - "low": minor coordination (~beats idle only)
@@ -31,7 +31,6 @@ Reply with a single JSON object only (no markdown):
 {
   "thought": "optional private reasoning, logged to memory",
   "brainTweak": {
-    "updateZoneOwnership": { "zone_name": "NPC name or null" },
     "addPendingTask": { "type": "talk_to", "target": "Name", "message": "opening topic", "urgency": "normal" }
   }
 }
@@ -89,14 +88,13 @@ function buildActionMemorySection(memory) {
 
 /**
  * @param {NpcEntity} npc
- * @param {Record<string, string | null>} zoneOwners
  * @param {number} gameTime
  * @returns {string}
  */
-function buildZoneSummarySection(npc, zoneOwners, gameTime) {
+function buildZoneSummarySection(npc, gameTime) {
     const memory = getNpcTileMemoryStore(npc) ?? new Map();
-    const summary = buildZoneSummary(memory, zoneOwners, gameTime);
-    return `## Zones you have explored (use zone names in updateZoneOwnership)\n${JSON.stringify(summary, null, 2)}`;
+    const summary = buildZoneSummary(memory, gameTime);
+    return `## Zones you have explored\n${JSON.stringify(summary, null, 2)}`;
 }
 
 /**
@@ -109,7 +107,7 @@ export function buildThinkPrompt(npc, brain) {
     const user = [
         buildStateSnapshot(npc, brain),
         buildActionMemorySection(brain._actionMemory),
-        buildZoneSummarySection(npc, brain.zoneOwners, brain._gameTime),
+        buildZoneSummarySection(npc, brain._gameTime),
         '',
         'What do you want to do? Reply with JSON only.',
     ].join('\n\n');
@@ -140,7 +138,7 @@ Set endConversation true when the conversation should end.`;
     const user = [
         buildStateSnapshot(npc, brain),
         buildActionMemorySection(brain._actionMemory),
-        buildZoneSummarySection(npc, brain.zoneOwners, brain._gameTime),
+        buildZoneSummarySection(npc, brain._gameTime),
         '',
         '## Conversation transcript',
         transcript.length ? transcript.join('\n') : '(conversation starting)',

@@ -187,8 +187,6 @@ export class DanBrain {
         this._currentTaskKind = null;
         /** @type {{ x: number, y: number, z: number } | null} */
         this._currentGoal = null;
-        /** @type {Record<string, string | null>} */
-        this.zoneOwners = {};
         /** @type {PendingTask | null} */
         this._pendingTask = null;
         /** @type {boolean} */
@@ -292,9 +290,6 @@ export class DanBrain {
         const npc = this._npc;
         if (!npc) return;
         const safe = sanitizeBrainTweak(tweak, npc.name, this._npcRegistry);
-        if (safe.updateZoneOwnership) {
-            Object.assign(this.zoneOwners, safe.updateZoneOwnership);
-        }
         if (safe.addPendingTask) {
             this._pendingTask = safe.addPendingTask;
         }
@@ -409,11 +404,7 @@ export class DanBrain {
 
         for (const taskFn of BASE_TASKS) {
             const hypo = ctx.hypothetical(memory);
-            const runTask =
-                taskFn === farmTask
-                    ? () => farmTask(hypo, this.zoneOwners)
-                    : () => taskFn(hypo);
-            drainHypo(runTask());
+            drainHypo(taskFn(hypo));
             const deltaU = utility(hypo, centroid) - initialU;
             if (deltaU > bestDeltaU) {
                 bestDeltaU = deltaU;
@@ -445,15 +436,7 @@ export class DanBrain {
 
         if (!bestTaskFn) return null;
 
-        /** @type {DanTaskKind} */
-        let taskKind = this._taskKind(bestTaskFn);
-        if (bestTaskFn === farmTask) {
-            const zoneOwners = this.zoneOwners;
-            bestTaskFn = (realCtx) => farmTask(realCtx, zoneOwners);
-            taskKind = 'farm';
-        }
-
-        this._currentTaskKind = taskKind;
+        this._currentTaskKind = this._taskKind(bestTaskFn);
         if (bestHypoCtx) {
             this._currentGoal = {
                 x: Math.floor(bestHypoCtx.entity.x),
