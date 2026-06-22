@@ -1,6 +1,6 @@
 # World
 
-A small tile-based village sim: shared world rules, player input, and NPC task/plan AI.
+A small tile-based village sim: shared world rules, player input, and NPC brains.
 
 ## Source layout
 
@@ -26,21 +26,10 @@ src/
     entity.js             # Shared body (movement, inventory, vitality)
     timedActionRunner.js  # Runs timed actions on an entity (blocks movement)
     npcSimulation.js      # NPC vitality/travel/death; brains return actions
-    npc.js                # Full NPC (sim + task/plan brain)
-  npc/                    # NPC control (scheduling, plans, memory — see npc/README.md)
-    shared/               # Tile memory, object tags, chunk describe, brain runtime
-    brain/                # Brain interface + wander / noop impls
-    llm/                  # LLM planner + prompts (task brain)
-      npcPlanner.js       # Planner contract and plan JSON validation
-      npcPrompt.js        # System/user prompt builders
-      npcActionCatalog.js # Machine-readable plan DSL (kept in sync with runner)
-      createLlmPlanner.js # Factory wiring prompt → provider → plan
-      plannerRuntime.js   # Resolves LLM provider config (env vars / localStorage)
-      llmResponseCache.js # Disk cache for LLM responses
-      mockPlanner.js      # Default dev/test planner (returns built-in plan when hungry)
-      extractJson.js      # Pulls JSON object from raw or fenced model output
-      llmTypes.js         # Shared LLM message/role types (used by all providers)
-      providers/          # OpenAI-compatible and OpenRouter backends
+    npc.js                # Full NPC (sim + pluggable brain)
+  npc/                    # NPC control (scheduling, memory — see npc/README.md)
+    shared/               # Tile memory, hypothetical world, brain runtime
+    brain/                # Brain interface + wander / noop / dan impls
   content/                # Maps and spawns (data, not rules)
     builder.js
   architecture/           # Import-boundary tests (logic vs client)
@@ -70,12 +59,12 @@ Imports use explicit paths (e.g. `../domain/entityActions.js`). Entry point: `in
 
 5. **Control / presentation** — How an actor *chooses* to invoke actions:
    - **Player:** `src/main.js` + `src/client/playerController.js` — clicks, keys, inventory/container panels, messages.
-   - **NPC:** `src/npc/` — pluggable brain (`NpcTaskBrain` / `NoopNpcBrain`), queued tasks, async travel, declarative plans (`seq` / `sel`), object tags, **tile memory** and plan location refs (`rememberLocationsOfNearby`). Details: [`src/npc/README.md`](src/npc/README.md).
+   - **NPC:** `src/npc/` — pluggable brain (`WanderBrain`, `DanBrain`, `NoopNpcBrain`), **tile memory**, utility task selection (Dan). Details: [`src/npc/README.md`](src/npc/README.md).
 
 6. **Content** (`src/content/`) — Maps, buildings, spawns. Not gameplay rules.
 
 ```text
-  [ Player input / NPC plans ]
+  [ Player input / NPC brains ]
             │
             ▼
      entityActions  ◄── single source of truth for "did it work?"
@@ -98,17 +87,17 @@ Imports use explicit paths (e.g. `../domain/entityActions.js`). Entry point: `in
 | Step | Player | NPC |
 |------|--------|-----|
 | Define the effect | `entityActions.*` (or domain module) | *same* |
-| Trigger it | `main.js` (click / key → action) | Plan leaf, task primitive, or `enqueue` → *same* action |
+| Trigger it | `main.js` (click / key → action) | Brain task → *same* action |
 | Feedback | UI messages, panels | Plan failure logs; no duplicate game rules |
 
-Do **not** put world-changing logic in `main.js` or `npcPlanRunner.js` except to call `entityActions` (or to schedule movement before an action).
+Do **not** put world-changing logic in `main.js` except to call `entityActions` (or to schedule movement before an action).
 
 ### What belongs where
 
 - **`domain/entityActions.js`** — Adjacency checks, door key rules, drop placement, container transfer. Returns success/failure (and optional messages for UI).
 - **`domain/timedActions.js`** — Registry for actions that take real time (e.g. clearing grass). Both player and NPC runners call these; add new timed effects here.
 - **`main.js`** — *When* the player tries (clicked tile, pressed E), *what* to show (open chest panel, toast). Opening a container UI is presentation; moving items uses `takeFromContainer` / `stashToContainer`.
-- **`npc/`** — *When* and *in what order* (go to tile, then door; find stove, then cook). Plans use **object tags** (`npcObjectTags.js`) and **memory refs** (`rememberLocationsOfNearby(stove)` in plan `ref` fields) so JSON stays abstract; leaves resolve tags and call the same actions as the player. See [`src/npc/README.md`](src/npc/README.md).
+- **`npc/`** — *When* and *in what order* an NPC acts. Dan's tasks (eat, farm, explore, talk) call the same `entityActions` as the player. See [`src/npc/README.md`](src/npc/README.md).
 
 ### Adding a new capability (checklist)
 
@@ -116,51 +105,34 @@ Do **not** put world-changing logic in `main.js` or `npcPlanRunner.js` except to
 2. Add pure logic in a domain module if it is inventory-only and actor-agnostic.
 3. If the action takes time, add an entry to `domain/timedActions.js`; otherwise add **`entityActions.yourAction(entity, world, …)`** with all placement, adjacency, and permission checks.
 4. **Player:** hook input in `main.js` → call the action → refresh UI.
-5. **NPC:** add a plan leaf type (and/or `runYourAction` in `npcTaskPrimitives.js`) that calls the **same** function; the brain should emit movement actions per tick when repositioning is needed.
-6. If NPCs need to refer to a place or thing abstractly, add an object tag and/or a memory ref query; do not reimplement the effect in the plan runner.
+5. **NPC:** add or extend a Dan task (or new brain behavior) that calls the **same** function; the brain should emit movement actions per tick when repositioning is needed.
 
 ### Movement/action execution
 
-Player and NPC now share the same action execution primitives (`moveDirectionAction`, `tickEntityAction`, `runEntityAction`). Brains still choose *which* action to run, but world effects and action semantics come from the same action layer.
-
-### Plans vs tasks
-
-- **Tasks** (`goTo`, `find`) — imperative queue, good for simple scripts and spawn behavior.
-- **Plans** (`seq`, `sel`, leaves like `eat`, `door`, `take`, `explore`) — composable behavior; still must bottom out in `entityActions`.
-
-When a plan step needs a remembered place (stove, chest), use **`ref`: `rememberLocationsOfNearby(tag)`** — not hard-coded coordinates. The NPC must have perceived that tile first. For finding objects over a large area, use an **`explore`** step (`npcExplore.js`), which walks a grid of waypoints and retries `find` at each stop.
+Player and NPC share the same action execution primitives (`moveDirectionAction`, `tickEntityAction`, `runEntityAction`). Brains choose *which* action to run; world effects come from the same action layer.
 
 ### NPC brain
 
 Each NPC has a pluggable **brain** (`npc/brain/`):
 
-- **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there.
-- **`NoopNpcBrain`** — no cognition (body-only tests).
+- **`WanderBrain`** (default) — random walk near home; uses tile memory for pathfinding
+- **`NoopNpcBrain`** — no cognition (body-only tests)
+- **`DanBrain`** — utility-driven eat / farm / explore / talk; optional LLM think and conversation ([architecture](src/npc/brain/danImpl/ARCHITECTURE.md))
 
-Select at runtime with `?brain=task` (default), `?brain=wander` or `?brain=noop` (see `npcBrainRuntime.js`).
+Select at runtime with `?brain=wander` (default), `?brain=noop`, or `?brain=dan` (see `npc/shared/npcBrainRuntime.js`).
 
-Per-frame simulation order (see `tickSimulation.js`):
+Per-frame simulation order (see `actors/npcSimulation.js`):
 
-1. NPC vitality update and in-flight travel/timed-action progression
-2. `npc.brain?.tick` to choose next action (when not already resolving one)
+1. Vitality update
+2. Perception (`tickNpcPerception`) — fills tile memory
+3. `npc.brain?.tick` — choose next action (skipped while `resolvingAction`)
+4. Timed-action progression if busy
 
-Perception runs **before** the task runner so newly seen tiles can influence travel and plans on the same frame. Full brain/memory/plan details: [`src/npc/README.md`](src/npc/README.md).
-
-### LLM planning
-
-`npc/llm/` contains an optional LLM-backed planner that produces plan JSON at runtime:
-
-- **`npcPrompt.js`** — builds system and user prompts (tile chunk descriptions, plan history, surroundings).
-- **`npcActionCatalog.js`** — machine-readable plan DSL; kept in sync with `npcPlanRunner.js`.
-- **`createLlmPlanner.js`** — factory that wires prompt → provider → validated plan.
-- **`plannerRuntime.js`** — resolves LLM provider config from env vars (Node) or URL params / localStorage (browser).
-- **`providers/`** — OpenAI-compatible and OpenRouter backends.
-
-The planner is wired in via `NpcTaskBrain`'s `planner` option. `createDefaultTaskBrain` uses `mockPlanner` as the default when no planner is supplied; pass `planner: null` to disable LLM planning entirely. The brain falls back to templates when the planner returns `null`.
+Full brain and memory details: [`src/npc/README.md`](src/npc/README.md).
 
 ### NPC tile memory (summary)
 
-NPCs record tiles within **5 tiles** (Chebyshev) on their current floor each frame (`tileMemory`: snapshot + `seenAt`). Failed pathfinding marks a tile **`reachable: false`** until the tile's remembered **state** changes. Plan `goto` / `take` / `stash` / `action` steps can use `rememberLocationsOfNearby(stove)` to walk to the nearest **reachable** remembered match, retargeting if a closer one is seen while traveling. Full behavior: [`src/npc/README.md`](src/npc/README.md).
+NPCs record tiles within **5 tiles** (Chebyshev) on their current floor each frame (snapshot + `seenAt`). Off-map voids within range are stored once as impassable `WALL_STONE`. Optional `reachable: false` skips tiles in pathfinding and Dan's farm scan; cleared when the remembered tile **state** changes. Full behavior: [`src/npc/README.md`](src/npc/README.md).
 
 ### Tests
 
@@ -171,15 +143,13 @@ Test files live next to the module they cover:
 | Test file | Covers |
 |---|---|
 | `domain/crops.test.mjs` | Wheat growth and harvest |
+| `domain/entityActions.test.mjs` | Shared actor ↔ world interactions |
 | `npc/shared/npcMemory.test.mjs` | Perception, snapshots, reachability reset |
-| `npc/brain/taskImpl/npcMemoryTravel.test.mjs` | Travel, retargeting, skipping unreachable tiles |
-| `npc/npcPlanRefs.test.mjs` | `rememberLocationsOfNearby` ref resolution |
-| `npc/npcPlanRunner.test.mjs` | seq/sel execution and failure |
-| `npc/npcPlanHistory.test.mjs` | Rolling plan log |
-| `npc/npcPlanDescribe.test.mjs` | Plan step descriptions |
-| `npc/npcExplore.test.mjs` | Wide-area waypoint search |
+| `npc/shared/hypotheticalWorld.test.mjs` | Hypothetical world from tile memory |
 | `npc/shared/tileChunkDescribe.test.mjs` | Chunk snapshot and diff strings |
-| `npc/llm/*.test.mjs` | Prompt building, plan parsing, response cache |
+| `npc/brain/shared/walkToLocation.test.mjs` | NPC pathfinding |
+| `npc/brain/danImpl/actionMemory.test.mjs` | Dan action log buffering |
+| `npc/brain/danImpl/danBrain.integration.test.mjs` | Dan tick loop and task selection |
 | `architecture/importLayers.test.mjs` | Layer boundary enforcement |
 
 For new rules, add a `*.test.mjs` next to the module under test.
@@ -208,14 +178,9 @@ Allowed direction: `main.js` → `client/` + logic layers; `client/` → logic l
 | `main.js` | Player input and UI |
 | `npc/brain/` | Pluggable NPC brain interface + implementations |
 | `npc/shared/npcBrainRuntime.js` | Resolves `?brain=` URL param to a brain instance |
-| `npc/brain/taskImpl/` | Task queue, plans, explore, memory-ref travel |
-| `npc/npcPlanRunner.js` | Plan execution (calls entity actions) |
-| `npc/npcTaskPrimitives.js` | Low-level NPC steps (travel, find, door, drop, …) |
-| `npc/npcExplore.js` | Wide-area search (`explore` plan step) |
-| `npc/shared/` | Tile memory, object tags, chunk describe (shared across brains) |
-| `npc/npcPlanRefs.js` | `rememberLocationsOfNearby(tag)` → tile list |
-| `npc/npcMemoryTravel.js` | Adaptive pathing to memory refs |
-| `npc/llm/npcPrompt.js` | LLM system/user prompt builders |
-| `npc/llm/npcActionCatalog.js` | Machine-readable plan DSL |
-| `npc/llm/createLlmPlanner.js` | LLM planner factory |
-| `npc/README.md` | NPC memory, refs, plans, LLM (detail) |
+| `npc/brain/danImpl/` | Dan utility brain, LLM think/conversation |
+| `npc/shared/npcMemory.js` | Tile memory from perception |
+| `npc/shared/hypotheticalWorld.js` | Copy-on-write world overlay for planning |
+| `npc/shared/tileChunkDescribe.js` | Chunk summaries (tests; `tileStatesEqual` used by memory) |
+| `npc/README.md` | NPC brains and tile memory (detail) |
+| `npc/brain/danImpl/ARCHITECTURE.md` | Dan brain architecture (detail) |
