@@ -12,7 +12,6 @@ import {
 } from '../../../../domain/entityActions.js';
 import { isWheatMature } from '../../../../domain/crops.js';
 import { Obj, T, isStoveObject, isWheatCropObject } from '../../../../world/tileTypes.js';
-import { getOwnedTileSet } from '../zoneUtils.js';
 
 /** @typedef {import('../danContext.js').DanContext} DanContext */
 /** @typedef {import('../../../shared/hypotheticalWorld.js').HypotheticalWorld} HypotheticalWorld */
@@ -91,12 +90,10 @@ function findWalkableNeighbor(hypoWorld, tx, ty, tz) {
  * @param {{ x: number, y: number, z: number, name?: string, inventory?: { objType: number, count: number }[] }} entity
  * @param {HypotheticalWorld} hypoWorld
  * @param {number} gameTime
- * @param {Record<string, string | null>} [zoneOwners]
  * @returns {FarmTarget | null}
  */
-export function chooseBestFarmTarget(entity, hypoWorld, gameTime, zoneOwners = {}) {
+export function chooseBestFarmTarget(entity, hypoWorld, gameTime) {
     const pz = entity.z;
-    const ownedTiles = getOwnedTileSet(zoneOwners, entity.name ?? '');
 
     const wheatCount = inventoryCount(entity, Obj.WHEAT);
     const seedCount = inventoryCount(entity, Obj.WHEAT_SEED);
@@ -136,7 +133,6 @@ export function chooseBestFarmTarget(entity, hypoWorld, gameTime, zoneOwners = {
         const ty = Number(parts[1]);
         const tz = Number(parts[2]);
         if (tz !== pz) return;
-        if (ownedTiles && !ownedTiles.has(key)) return;
 
         if (isWheatCropObject(tile.obj) && isWheatMature(tile, gameTime)) {
             const neighbor = findWalkableNeighbor(hypoWorld, tx, ty, tz);
@@ -178,12 +174,11 @@ function actionForTarget(entity, target, gameTime) {
 
 /**
  * @param {DanContext} ctx
- * @param {Record<string, string | null>} [zoneOwners]
  * @returns {Generator<EntityAction, ActionExecutionResult, ActionExecutionResult | null>}
  */
-export function* farmTask(ctx, zoneOwners = {}) {
+export function* farmTask(ctx) {
     for (let step = 0; step < MAX_FARM_STEPS; step++) {
-        const target = chooseBestFarmTarget(ctx.entity, ctx.world, ctx.gameTime, zoneOwners);
+        const target = chooseBestFarmTarget(ctx.entity, ctx.world, ctx.gameTime);
         if (!target) {
             return { ok: true };
         }

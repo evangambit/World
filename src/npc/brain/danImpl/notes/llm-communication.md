@@ -1,6 +1,6 @@
 # LLM Communication — Tech Spec
 
-This document covers the design for user-triggered LLM "think" calls, NPC-to-NPC conversations, and the brain state structures needed for coordination (zone ownership, task queuing).
+This document covers the design for user-triggered LLM "think" calls, NPC-to-NPC conversations, and the brain state structures needed for coordination (task queuing).
 
 ---
 
@@ -33,32 +33,24 @@ The prompt is assembled from four layers:
 
 **Layer 4 — Tile memory summary (derived, not raw)**
 
-The raw tile memory map is not passed to the LLM. Instead, a structured summary is derived at call time. This is also the **single canonical place where zone ownership appears in the prompt** — `zoneOwners` is not passed separately.
+The raw tile memory map is not passed to the LLM. Instead, a structured summary is derived at call time from explored farm zones.
 
-A zone is included if the NPC has explored it (`explored > 0`) **or** has an entry for it in `zoneOwners` (learned via conversation). Zones absent from both are omitted entirely.
+A zone is included only if the NPC has explored it (`explored > 0`). Zones never visited are omitted entirely.
 
 ```js
 for each zone in FARM_ZONES:
-  count tiles from tile memory → { explored, total, growing, harvestable, bare }
-  look up owner from zoneOwners → NPC name | null | "unknown"
-  include if explored > 0 OR owner !== "unknown"
+  count tiles from tile memory → { explored, growing, harvestable, bare }
+  include if explored > 0
 ```
 
 The result is a compact JSON object embedded in the prompt:
 
 ```json
 {
-  "wheat_field_west": { "owner": "Alice", "explored": "6/6", "growing": 3, "harvestable": 1, "bare": 2 },
-  "wheat_field_east": { "owner": "Bob",   "explored": "0/5" },
-  "north_plot":       { "owner": "unknown", "explored": "3/8", "growing": 1, "harvestable": 0, "bare": 2 }
+  "wheat_field_west": { "label": "the left half of the main field", "explored": 6, "tiles": { "growing": 3, "harvestable": 1, "bare": 2 } },
+  "north_plot":       { "label": "the north garden", "explored": 3, "tiles": { "growing": 1, "bare": 2 } }
 }
 ```
-
-- `wheat_field_west` — explored and owned by this NPC (full crop data)
-- `wheat_field_east` — ownership known via conversation, but never visited (no crop data)
-- `north_plot` — explored but ownership never discussed (`"unknown"`)
-
-`owner` values: NPC name, `null` (explicitly unowned), or `"unknown"` (absent from `zoneOwners`).
 
 Dirt tiles outside any `FARM_ZONE` are not reported. On the current map this shouldn't arise; revisit if the map gains informal farmable areas.
 
@@ -69,7 +61,7 @@ The **entire LLM response is a JSON object** conforming to this schema. There is
 ```ts
 interface ThinkOutput {
   thought?: string;          // logged to ActionMemory as type=think
-  brainTweak?: BrainTweak;   // optional state mutation (see §4)
+  brainTweak?: BrainTweak;   // optional state mutation (see §3)
 }
 ```
 
@@ -140,7 +132,7 @@ interface ConversationTurnOutput {
 
 The turn ping-pongs: initiator speaks, responder speaks, initiator speaks, ... A `MAX_CONVERSATION_TURNS` cap (e.g. 10) prevents infinite loops. Either party can set `endConversation: true` to stop.
 
-Each turn's `brainTweak` is applied to that NPC's brain as soon as the orchestrator processes the turn response — not deferred to conversation end. This allows zone ownership to be updated mid-conversation and reflected in subsequent turns' context.
+Each turn's `brainTweak` is applied to that NPC's brain as soon as the orchestrator processes the turn response — not deferred to conversation end.
 
 **Synchronization:** Conversations are handled by a single async orchestrator function that runs outside the tick loop (the same pattern as think calls). When `talkToTask` reaches the conversation phase, it fires the orchestrator and sets `_conversing = true` on both NPC brains. While `_conversing` is true, both NPCs' `tick()` returns null — they are frozen for the duration of the conversation. When the orchestrator completes, it clears `_conversing` on both brains and both NPCs resume normal task selection via `_chooseTask()`.
 
@@ -156,61 +148,12 @@ Three-way coordination is deferred. For now, A talks to B, then separately A tal
 
 ---
 
-## 3. Zone Ownership
-
-Each NPC brain holds a `zoneOwners` map as persistent state — their **belief** about who owns each zone:
-
-```ts
-// key   = zone name (must be a key of FARM_ZONES)
-// value = NPC name who owns it, or null = explicitly unowned
-// absent key = ownership unknown / never discussed
-type ZoneOwners = Record<string, string | null>;
-```
-
-Two NPCs' `zoneOwners` maps can be inconsistent; conversations are what bring them into agreement.
-
-### 3.1 Zones are map-authored, not LLM-generated
-
-Zones are defined at map-build time alongside the world layout in `builder.js`. Each zone has a human-readable name and an explicit tile set. The LLM **only picks from this fixed menu** — it never invents zone boundaries or reasons about coordinates.
-
-```js
-// Defined alongside buildVillage() in builder.js
-export const FARM_ZONES = {
-  wheat_field_west: { label: "the left half of the main field, roughly 6 tiles", tiles: [[24,30],[25,30],[26,30],[27,30],[24,31],[25,31]] },
-  wheat_field_east: { label: "the right half of the main field, roughly 5 tiles", tiles: [[28,30],[29,30],[28,31],[29,31],[30,31]] },
-  // ...
-};
-```
-
-Zone names and their `label` strings are included in the NPC system prompt, giving the LLM enough context to reason about them in conversation without needing to understand coordinates.
-
-### 3.2 Why not LLM-generated zone boundaries?
-
-Generating zone boundaries dynamically requires the LLM to reason about spatial coordinates, produce consistent references that other NPCs can interpret, and stay grounded in the actual tile layout — all things LLMs do poorly. This is a hard open problem that we are explicitly deferring. Map-authored zones are the right answer at current scale (one village, one wheat field, three NPCs).
-
-> **Future work:** If the map becomes procedural or farmable areas are discovered at runtime, zone boundaries will need to be computed algorithmically (e.g. Voronoi partition of known dirt tiles by NPC home position) rather than authored. The LLM's role would remain zone *selection / negotiation*, not zone *definition*. The `zoneOwners` map is already forward-compatible with this — only the zone registry source changes.
-
-### 3.3 Effect on `farmTask`
-
-When `zoneOwners` contains zones owned by this NPC (i.e. `zoneOwners[zone] === thisNpcName`), `chooseBestFarmTarget()` applies a **hard filter**: candidate tiles not in any owned zone are excluded before scoring. The NPC simply never walks to tiles outside its zones.
-
-When the NPC owns no zones (no entries in `zoneOwners` map to their name), they farm anywhere — current behavior, preserved as the default.
-
-**Conflict detection:** The LLM context always includes the full `zoneOwners` map. If ActionMemory shows another NPC farming a zone this NPC owns, the think call surfaces the conflict and the LLM can initiate a `talk_to` task to renegotiate.
-
----
-
-## 4. Brain Tweak Format
+## 3. Brain Tweak Format
 
 `BrainTweak` is an optional field in `ThinkOutput` and `ConversationTurnOutput`. The brain's tweak interpreter applies it safely at the next task boundary.
 
 ```ts
 interface BrainTweak {
-  // Update zone ownership beliefs — a partial patch merged into zoneOwners.
-  // Values must be NPC names, null (explicitly unowned), or absent (no change).
-  // Zone name keys must be keys of FARM_ZONES.
-  updateZoneOwnership?: Record<string, string | null>;
-
   // Queue a talk_to task for the next _chooseTask() call
   addPendingTask?: PendingTask;
 }
@@ -224,11 +167,29 @@ type PendingTask = {
 ```
 
 **Safety constraints:**
-- `updateZoneOwnership` values must be NPC names, `null`, or absent; zone name keys must be keys of `FARM_ZONES`
 - `addPendingTask` target must be a known NPC name
 - The interpreter ignores unknown keys
 
 > **Future work:** As the set of brain mutations grows, replacing `BrainTweak` with LLM tool / function calls is the natural evolution. Tool calls give each operation a typed schema, allow optional invocation without a wrapper object, and separate reasoning text from structured actions. Deferring until the structured JSON approach proves limiting.
+
+---
+
+## 4. Farm Zones (map-authored)
+
+Zones are defined at map-build time alongside the world layout in `builder.js`. Each zone has a human-readable name and an explicit tile set. Zone summaries in LLM prompts group crop status by these named regions.
+
+```js
+// Defined alongside buildVillage() in builder.js
+export const FARM_ZONES = {
+  wheat_field_west: { label: "the left half of the main field, roughly 6 tiles", tiles: [[24,30],[25,30],[26,30],[27,30],[24,31],[25,31]] },
+  wheat_field_east: { label: "the right half of the main field, roughly 5 tiles", tiles: [[28,30],[29,30],[28,31],[29,31],[30,31]] },
+  // ...
+};
+```
+
+Zone names and their `label` strings are included in the NPC system prompt, giving the LLM enough context to reason about them in conversation without needing to understand coordinates.
+
+> **Future work:** If the map becomes procedural or farmable areas are discovered at runtime, zone boundaries will need to be computed algorithmically (e.g. Voronoi partition of known dirt tiles by NPC home position) rather than authored. Only the zone registry source changes.
 
 ---
 
@@ -258,5 +219,4 @@ interface ActionMemory {
 ## 6. Open Questions
 
 - **ActionMemory query tool:** Should NPCs have a tool call that lets the LLM query ActionMemory by NPC, time range, or action type? Useful for large histories, deferred for now.
-- **Coordination trigger:** What causes the LLM to decide to initiate coordination? Current answer: the LLM sees a conflict in its context (e.g., another NPC farming its zone) and decides autonomously. No hardcoded trigger.
-- **Zone ownership with no zone set:** If an NPC has no `ownedZone`, they farm anywhere (default behavior). Should unowned zones be visible in the system prompt so the LLM can proactively claim one during a think call, before any conflict arises?
+- **Coordination trigger:** What causes the LLM to decide to initiate coordination? Current answer: the LLM sees relevant context in ActionMemory (e.g., another NPC farming nearby) and decides autonomously. No hardcoded trigger.

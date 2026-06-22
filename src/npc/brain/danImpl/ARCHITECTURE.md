@@ -11,7 +11,7 @@ danImpl/
   danBrain.js            — tick loop, utility function, task selection, LLM glue
   danContext.js          — RealContext / HypotheticalContext, drainHypo()
   actionMemory.js        — short-term action log; feeds LLM prompts
-  brainTweak.js          — structured mutations from LLM responses (zone ownership, pending tasks)
+  brainTweak.js          — structured mutations from LLM responses (pending tasks)
   zoneUtils.js           — zone/tile lookup helpers; builds zone summary for prompts
   tasks/
     eat.js               — consume best available food
@@ -106,7 +106,7 @@ Picks the best edible item in inventory (bread → steak → wheat priority) and
 
 Internal loop (up to `MAX_FARM_STEPS`):
 
-1. `chooseBestFarmTarget()` scans remembered tiles for harvest (weight 3), cook (weight 2), plant (weight 1) opportunities. Respects zone ownership — only targets tiles in zones owned by this NPC (or any zone when no ownership is set).
+1. `chooseBestFarmTarget()` scans remembered tiles for harvest (weight 3), cook (weight 2), plant (weight 1) opportunities.
 2. Scores each as `weight / Chebyshev distance` to the NPC.
 3. Walks to the walk target, performs one action, repeats until nothing remains.
 
@@ -150,12 +150,11 @@ Both think and conversation responses may include a `brainTweak` object:
 
 ```json
 {
-  "updateZoneOwnership": { "field_northwest": "Elara" },
   "addPendingTask": { "type": "talk_to", "target": "Finn", "message": "...", "urgency": "normal" }
 }
 ```
 
-`sanitizeBrainTweak()` validates zone names against `FARM_ZONES_BY_NAME`, NPC names against `VILLAGE_NPC_SPAWNS`, and target existence in the live NPC registry before applying.
+`sanitizeBrainTweak()` validates NPC names against `VILLAGE_NPC_SPAWNS`, and target existence in the live NPC registry before applying.
 
 ## ActionMemory
 
@@ -198,4 +197,3 @@ Hypothetical `walkTo` treats tiles absent from **memory** as unseen for explorat
 - `cropUtility` weight and mature-vs-all crop counting need calibration.
 - `eatTask` still has `HUNGER_EAT_THRESHOLD` exported but selection is utility-driven, not threshold-gated.
 - Think is player-triggered only; auto-think on a timer or event would let Dan act on LLM decisions without manual prompting.
-- Zone ownership is per-brain only — there is no broadcast mechanism so two NPCs can claim the same zone without conflict resolution.
