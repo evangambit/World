@@ -1,6 +1,8 @@
 # Dan Brain — Architecture
 
-Dan is a utility-driven NPC brain that plans by hypothetically running the same task code used at execution time. Enable with `?brain=dan` (see `npcBrainRuntime.js`).
+Dan is a utility-driven NPC brain that plans by hypothetically running the same task code used at execution time. Enable with `?brain=dan` (see `shared/npcBrainRuntime.js`). Other brains: see [`../../README.md`](../../README.md).
+
+After spawn, `main.js` calls `buildDanNpcRegistry(npcs)` so `talk_to` and conversations can resolve NPC names to brain instances.
 
 For the underlying theory (utility math, hypothetical overlays, design rationale), see [notes/index.md](./notes/index.md).
 
@@ -41,7 +43,7 @@ Shared dependencies outside `danImpl/`:
 
 Each frame, `DanBrain.tick()`:
 
-1. Returns `null` if mid-action (`resolvingAction`), in a conversation (`_conversing`), or dead.
+1. Returns `null` if dead, mid-action (`resolvingAction`), in a conversation (`_conversing`), or tile memory is still empty.
 2. Stores the incoming `lastActionResult` for delivery to the task generator next step.
 3. Resumes the current task generator, or starts a new one via `_chooseTask()` when idle.
 4. On each yielded `EntityAction`, calls `_logActionYielded()` (records movement to `ActionMemory`) and returns the action to the simulation.
@@ -92,7 +94,7 @@ The winning hypo context's final position is stored for status display (`farming
 | **foodUtility** | `-1 / (satiety + inventory nutrition)` — rewards food security and satiety |
 | **hungerPenalty** | Quadratic penalty for `hunger > 40` — makes eating have positive ΔU (the pure food term alone treats satiety and inventory as substitutes, so ΔU(eat) = 0) |
 | **explorationUtility** | `EXPLORE_WEIGHT × Σ min(1/dist, 1)` over `ctx.newTilesSeen`, dist to centroid — only tiles newly seen along walked paths count |
-| **cropUtility** | `-0.2 / max(1, foodTotalSatiety + cropCount)` — nudges Dan to maintain a crop pipeline |
+| **cropUtility** | `-0.2 / max(1, −1/foodUtility + cropCount)` — nudges Dan to maintain a crop pipeline (`−1/foodUtility` is satiety plus inventory nutrition) |
 
 Exploration is path-based, not position-based: farming through known territory does not inflate explore ΔU, and idling does not score exploration from the current tile alone.
 
@@ -122,13 +124,15 @@ Queued via `addPendingTask` (from the LLM). Execution:
 
 1. Calls `ctx.getLastKnownPosition(targetName)` at walk time (live in real mode, snapshotted in hypo mode) and walks there.
 2. Waits (up to 120 ticks of idle yield) for the target to come within `CONVERSATION_RADIUS = 3`.
-3. Fires `runConversationOrchestrator(initiator, responder, openingMessage)` as a detached async task and returns immediately, leaving `_conversing = true` on both brains.
+3. Fires `runConversationOrchestrator(initiator, responder, openingMessage)` as a detached async task and returns immediately. The orchestrator sets `_conversing = true` on both brains synchronously at start; both stay blocked until the conversation ends.
 
 ## LLM integration
 
 ### Think
 
-Player-triggered via the NPC panel. `DanBrain.think()`:
+Player-triggered via the NPC panel. `DanBrain.think()` runs async and does **not** block `tick()` (only `_conversing` and `resolvingAction` do). `getStatus()` surfaces `thinking…`, task goals, pending talk, and errors.
+
+`DanBrain.think()`:
 
 1. Builds a four-part prompt (`buildThinkPrompt`): system persona, current state snapshot, action memory, zone summary.
 2. Calls `callThinkLlm` (OpenRouter or mock).
@@ -190,6 +194,12 @@ Critically, `observeNpc()` — called every frame for nearby NPCs — does **not
 `tickNpcPerception()` records tiles within `NPC_PERCEPTION_RADIUS`. Coordinates with no world tile (off-map void) are written once as synthetic `WALL_STONE` entries with `reachable: false`. Dan learns boundaries through sight, not omniscience — this prevents endless re-exploration of map edges.
 
 Hypothetical `walkTo` treats tiles absent from **memory** as unseen for exploration scoring; void tiles in memory are known and impassable.
+
+## Tests
+
+- `actionMemory.test.mjs` — movement buffer, prompt slice, pruning
+- `danBrain.integration.test.mjs` — tick loop, utility selection, farming
+- `../shared/walkToLocation.test.mjs` — shared pathfinding used by real and hypo modes
 
 ## Known gaps / future work
 

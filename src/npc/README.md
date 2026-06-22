@@ -1,36 +1,40 @@
 # NPC control
 
-Scheduling, declarative plans, and **tile memory** — not world rules. World interactions still go through `domain/entityActions.js`.
+Scheduling and **tile memory** — not world rules. World interactions still go through `domain/entityActions.js`.
 
 ## Brain (`npc.brain`)
 
-Each NPC may have a pluggable **brain** (`brain/`):
+Each NPC has a pluggable **brain** (`brain/`):
 
-- **`NpcTaskBrain`** (default for `NPC` class) — perception + task/plan queue with optional LLM planner
-- **`WanderBrain`** — no memory or plans; periodically picks a random walkable tile near home and walks there
+- **`WanderBrain`** (default for `NPC` class) — picks a random walkable tile near home and walks there; uses tile memory for pathfinding only
 - **`NoopNpcBrain`** — no cognition (body-only tests)
+- **`DanBrain`** — utility-driven task selection with hypothetical planning and optional LLM think/conversation ([architecture](./brain/danImpl/ARCHITECTURE.md))
 
-Select at runtime with `?brain=wander` (default) or `?brain=noop` (see `shared/npcBrainRuntime.js`).
+Select at runtime with `?brain=wander` (default), `?brain=noop`, or `?brain=dan` (see `shared/npcBrainRuntime.js`).
+
+When using Dan brains, `main.js` calls `buildDanNpcRegistry(npcs)` so `talk_to` tasks and conversations can resolve NPC names.
 
 Layout:
 
 ```
-shared/              # tile memory, object tags, chunk describe, test helpers, brain runtime
+shared/              # tile memory, hypothetical world, chunk describe, test helpers, brain runtime
 brain/
   interface.js, tileStore.js, attach.js, index.js
+  shared/walkToLocation.js
   noopImpl/noopBrain.js
   wanderImpl/wanderBrain.js
-  taskImpl/          # plans, tasks, memory-ref travel, explore
-llm/                 # planner (task brain)
+  danImpl/             # utility brain (see danImpl/ARCHITECTURE.md)
 ```
+
+`tileStore.js` is a legacy no-op hook; memory storage lives in `shared/npcMemory.js`.
 
 Attach explicitly for test entities:
 
 ```js
 import { createNpcEntity } from '../actors/npcSimulation.js';
-import { createTaskBrain } from './brain/index.js';
+import { DanBrain } from './brain/index.js';
 
-const npc = createNpcEntity(0, 0, 0, { brain: createTaskBrain() });
+const npc = createNpcEntity(0, 0, 0, { brain: new DanBrain() });
 ```
 
 Swap implementations via constructor:
@@ -39,35 +43,37 @@ Swap implementations via constructor:
 new NPC(x, y, z, preset, name, inv, { brain: myCustomBrain });
 ```
 
-`npc.tasks` is available when the brain exposes it (task brain). Each `npc.brain.tick(...)` receives `visibleTiles` for this frame; long-lived reads still use `npcMemory` helpers (`getNpcTileMemory`, `forEachNpcObservedTile`, etc.).
+Each `npc.brain.tick(...)` receives `visibleTiles` for this frame. Long-lived reads use `npcMemory` helpers (`getNpcTileMemory`, `getNpcTileMemoryStore`, `forEachNpcObservedTile`, etc.).
 
 ## Simulation order (per NPC, each frame)
 
-`tickSimulation` runs:
+`tickSimulation` calls `npc.tick` (`actors/npcSimulation.js`), which runs:
 
-1. Vitality update + in-flight travel/timed-action progression  
-2. Perception snapshot (`tickNpcPerception`) updates memory + returns current `visibleTiles`  
-3. `npc.brain.tick` receives `visibleTiles` and can run tasks/plans (e.g. `syncMemoryRefTravelGoal`)
+1. Vitality update (death check)
+2. Perception snapshot (`tickNpcPerception`) — updates memory, returns current `visibleTiles`
+3. `npc.brain.tick` — receives `visibleTiles` and `lastActionResult`; skipped while `resolvingAction`
+4. In-flight timed-action progression (`timedAction.tick`) if busy
 
-Perception runs **before** the task runner so newly seen tiles can influence travel and plans on the same frame.
+Perception runs **before** the brain so newly seen tiles can influence pathfinding and planning on the same frame.
 
 ## Tile memory
 
-**Module:** `npcMemory.js`  
-**Storage:** internal `npcMemory` store keyed by NPC; `tickNpcPerception` writes, `getNpcTileMemory(npc, …)` reads
+**Module:** `shared/npcMemory.js`  
+**Constant:** `NPC_PERCEPTION_RADIUS` in `shared/npcConstants.js` (default 5)  
+**Storage:** internal store keyed by NPC; `tickNpcPerception` writes, `getNpcTileMemory(npc, …)` reads
+
+Memory is created lazily on first perception write (all NPCs, regardless of brain type).
 
 ### Perception
 
-Each frame, on the NPC’s current floor (`npc.z`), every tile within **5 tiles** (Chebyshev distance) that exists in the world is recorded:
+Each frame, on the NPC's current floor (`npc.z`), every tile within **5 tiles** (Chebyshev distance) in the perception square is considered:
 
 ```ts
 { seenAt: gameTime, state: TileData snapshot, reachable?: boolean }
 ```
 
-- **`state`** is a copy of the live tile (`snapshotTileState`) so later world edits do not change memory until the tile is seen again.  
-- Empty cells (no tile in the world) are not stored.
-
-Initialized when a task brain attaches.
+- **`state`** is a copy of the live tile (`snapshotTileState`) so later world edits do not change memory until the tile is seen again.
+- **Off-map void** (no tile in the world, but within perception range) is recorded **once** as synthetic `WALL_STONE` with `reachable: false`, so NPCs learn map boundaries through sight.
 
 ### Reachability (`reachable`)
 
@@ -75,104 +81,38 @@ Optional flag on each memory entry:
 
 | Value | Meaning |
 |--------|---------|
-| *(omitted)* | Unknown — pathfinding may be attempted |
-| `true` | NPC has successfully reached this tile (or pathing succeeded) |
-| `false` | No path found — skip when choosing travel targets |
+| *(omitted)* | Unknown — `isTileMemoryReachable` treats this as pathable |
+| `true` | Explicitly marked reachable (`markTileReachable`) |
+| `false` | Impassable or pathing failed — skip when choosing targets |
 
-**Set `false` when:**
+**Set `false` when:** a void tile is first perceived, or code calls `markTileUnreachable`.
 
-- `findPath` finds no route while selecting a memory-ref target  
-- memory-ref travel/pathfinding fails for that tile  
-
-**Set `true` when:**
-
-- Memory-ref travel completes at the tile  
-
-**Cleared (back to unknown) when:**
-
-- The tile is re-perceived and **`state` changed** (e.g. door unlocked, object replaced) — same snapshot keeps the previous `reachable` value  
+**Cleared (back to unknown) when:** the tile is re-perceived and **`state` changed** (e.g. door unlocked, object replaced). Same snapshot keeps the previous `reachable` value.
 
 Helpers: `markTileUnreachable`, `markTileReachable`, `isTileMemoryReachable`.
 
+Dan's `farmTask` skips tiles with `reachable === false` when scanning the hypothetical world.
+
+### How brains use memory
+
+| Brain | Uses tile memory |
+|-------|------------------|
+| **Wander** | Builds a hypothetical world from memory for pathfinding; idles until memory is non-empty |
+| **Dan** | Requires non-empty memory before acting; hypothetical planning and farming scan memory-backed tiles |
+| **Noop** | Perception still runs; brain ignores memory |
+
 ### Tests
 
-- `npcMemory.test.mjs` — perception, snapshots, reachability reset on state change  
-- `npcMemoryTravel.test.mjs` — travel, retargeting, skipping unreachable tiles  
+- `shared/npcMemory.test.mjs` — perception, snapshots, void tiles, reachability reset on state change
+- `shared/hypotheticalWorld.test.mjs` — copy-on-write world from memory
+- `brain/shared/walkToLocation.test.mjs` — pathfinding
+- `brain/danImpl/actionMemory.test.mjs` — action log buffering
+- `brain/danImpl/danBrain.integration.test.mjs` — Dan tick loop and task selection
 
 Run: `npm test`
 
-## Plan location refs
+## Chunk descriptions (debug / tests)
 
-**Module:** `npcPlanRefs.js`
+**Module:** `shared/tileChunkDescribe.js`
 
-Plans no longer use a top-level `bindings` object. Steps use **`ref`** strings on `goto`, `take`, `stash`, and `action`.
-
-### `rememberLocationsOfNearby(objectTag)`
-
-Syntax: `rememberLocationsOfNearby(stove)` (object tag from `npcObjectTags.js`, e.g. `stove`, `chest`).
-
-Returns all remembered tiles on the NPC’s floor whose **snapshot** matches the tag (tile `obj` and other visible tile state).
-
-**Travel behavior** (`npcMemoryTravel.js`):
-
-1. Pick the **reachable** remembered match with the shortest path from the NPC’s current tile.  
-2. Walk there (`travelNpcToMemoryRef`).  
-3. Each frame after perception, **retarget** if another remembered match has a **strictly shorter** remaining path (or shorter full path if not walking yet).  
-4. Skip entries with `reachable === false`.  
-5. If every remembered match is unreachable, the step fails (`no reachable remembered target`).
-
-Example plan step:
-
-```json
-{ "type": "goto", "ref": "rememberLocationsOfNearby(stove)" }
-```
-
-Literal coordinates still work: `{ "type": "goto", "x": 3, "y": 4, "z": 0 }`.
-
-### Object tags
-
-**Module:** `npcObjectTags.js` — abstract names in plan JSON (`edible_food`, `stove`, …) mapped to world/inventory type ids.
-
-## Wide-area search (`explore`)
-
-**Module:** `npcExplore.js`
-
-`find` only scans live tiles within a fixed radius of the NPC’s **current** position. **`explore`** is for genuine search over a region:
-
-1. **`runFind`** at perception range (default 5 tiles).  
-2. Travel to **remembered** pickable tiles matching the object tag (still on the ground).  
-3. Visit a **grid of walkable waypoints** (same spacing as perception) inside a Chebyshev disk around **`anchor`**: `home` (default) or `self`.  
-4. Repeat until something is picked up or **`maxVisits`** (default capped at 64) is exhausted.
-
-Example:
-
-```json
-{ "type": "explore", "object": "edible_food", "radius": 20, "anchor": "home", "pickup": true }
-```
-
-Use **`find`** for a quick grab near the NPC; use **`explore`** after `goto` to a stove (or when wandering) to sweep the homestead.
-
-## Plans vs tasks
-
-- **Tasks** (`npcTasks.js`) — `goTo`, `find`, `timedAction`; imperative queue.  
-- **Plans** (`npcPlanRunner.js`) — `seq` / `sel` and leaves (`eat`, `cook`, `door`, `take`, `explore`, …); must call `entityActions` (or primitives that do).  
-
-Templates: `npcPlanTemplates.js` (e.g. `EAT_FOOD_PLAN` uses `rememberLocationsOfNearby(stove)`).
-
-LLM planners: `llm/` — prompts in `npcPrompt.js`, catalog in `llm/npcActionCatalog.js`.
-
-## Chunk descriptions (LLM context)
-
-**Module:** `tileChunkDescribe.js`  
-**Constant:** `WORLD_CHUNK_SIZE` in `world/worldConstants.js` (default 5×5 tiles per chunk).
-
-- **`describeChunkSnapshot`** — e.g. `Chunk (3, 5): 15 dirt tiles, 10 wall stone tiles. 5/25 unseen tiles.`
-- **`diffChunk` / `describeChunkDiff`** — call explicitly when you have before/after memory; not run each frame.
-- Planner user prompts include a **## Surroundings** section (memory + world for empty vs unseen) when a real `World3D` is passed to `buildPlannerMessages`.
-
-## Adding a stove (or similar) to plans
-
-1. Add or extend tag in `npcObjectTags.js` if needed.  
-2. Use `rememberLocationsOfNearby(your_tag)` in `ref` fields.  
-3. Ensure NPCs can **see** the tile (wander near it) so perception fills memory.  
-4. Add tests next to `npcMemory.js` / `npcMemoryTravel.js` for non-obvious behavior.
+Exports English chunk summaries (`describeChunkSnapshot`, `describeChunkDiff`) and `tileStatesEqual` (used by `npcMemory.js` for snapshot comparison). Not wired into any live brain prompt — Dan's LLM context uses `danImpl/zoneUtils.js` instead.
