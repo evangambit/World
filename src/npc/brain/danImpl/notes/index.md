@@ -4,6 +4,22 @@
 
 > **Note on Engine Refactor:** The game engine is currently being refactored by Morgan. The high-level ideas in this document should remain mostly valid, and the required tweaks shouldn't require significant changes to the proposed AI architecture. However, this specification must be revisited once the engine refactor is done.
 
+## Implementation (DanBrain)
+
+The running code lives under `danImpl/` and diverges from the pseudocode below in predictable ways:
+
+| Theory concept | Current code |
+|----------------|--------------|
+| `WorldModel` / tile memory | `shared/npcMemory.js` + `shared/hypotheticalWorld.js` |
+| `RealContext` / `HypotheticalContext` | `danContext.js` — leaf primitives are `walkTo` / `applyAction`, not per-action `move`/`harvest` |
+| `Scheduler` + stateless brain | `DanBrain.tick()` holds `_taskGen`; `_chooseTask()` re-plans when the generator completes |
+| Utility on hypo world model | `danBrain.js` — food, hunger penalty, path-based exploration, crop count |
+| Preemption / periodic replan | Not implemented — replan only on task completion |
+| LLM think / talk_to | `llm/` + `brainTweak.js` — see [llm-communication.md](./llm-communication.md) |
+| Brain holds no persistent state (spec) | Dan also persists `ActionMemory`, `_pendingTask`, and conversation flags on `DanBrain` |
+
+See [ARCHITECTURE.md](../ARCHITECTURE.md) for file layout, tick loop, and test pointers.
+
 ## Overview
 
 This document specifies an AI system for grid-based, tick-driven game NPCs. The system is built around three principles:
