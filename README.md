@@ -2,6 +2,14 @@
 
 A small tile-based village sim: shared world rules, player input, and NPC brains.
 
+## How to run
+
+```
+cd World
+python3 -m http.server 8080
+# Navigate to http://localhost:8080/?brain=dan&llm=openrouter&apiKey=YOUR_KEY
+```
+
 ## Source layout
 
 ```text
