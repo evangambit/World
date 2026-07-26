@@ -15,6 +15,10 @@ unique one.
 (contrast Entries 2–3, where the same blow-up is sacred). Read `u'`-at-0 together with the
 Floor flag.
 
+**Implementation (Dan).** `danBrain.explorationUtility()` uses `min(1/dist, 1)` per newly
+seen tile (α = 1) relative to the memory centroid, scaled by `EXPLORE_WEIGHT = 0.0005`.
+`exploreTask` scores frontier goals as weighted new tiles from the goal divided by path length.
+
 **Mechanism (transferable).** Equal-count shape-invariance ⇒ per-tile value transforms
 affinely under scaling: `v(kd) = A(k)v(d) + B(k)`. Complete solution set is TWO families:
 - `v(d) = c·d^{−α} + e` (power law, offset allowed), and

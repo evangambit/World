@@ -28,7 +28,7 @@ brain/
 
 `tileStore.js` is a legacy no-op hook; memory storage lives in `shared/npcMemory.js`.
 
-Attach explicitly for test entities:
+Attach explicitly for test entities (or use `attachNpcBrain(npc, brain)` from `brain/attach.js`):
 
 ```js
 import { createNpcEntity } from '../actors/npcSimulation.js';
@@ -51,7 +51,7 @@ Each `npc.brain.tick(...)` receives `visibleTiles` for this frame. Long-lived re
 
 1. Vitality update (death check)
 2. Perception snapshot (`tickNpcPerception`) — updates memory, returns current `visibleTiles`
-3. `npc.brain.tick` — receives `visibleTiles` and `lastActionResult`; skipped while `resolvingAction`
+3. `npc.brain.tick` — receives `visibleTiles` and `lastActionResult`; Dan and Wander return `null` while `resolvingAction` (Noop always returns `null`)
 4. In-flight timed-action progression (`timedAction.tick`) if busy
 
 Perception runs **before** the brain so newly seen tiles can influence pathfinding and planning on the same frame.
@@ -110,6 +110,21 @@ Dan's `farmTask` skips tiles with `reachable === false` when scanning the hypoth
 - `brain/danImpl/danBrain.integration.test.mjs` — Dan tick loop and task selection
 
 Run: `npm test`
+
+## Dan LLM (optional)
+
+With `?brain=dan`, the NPC panel exposes a **Think** button (`DanBrain.think()`). LLM calls run async and do not block the tick loop.
+
+Configure via URL params (see `brain/danImpl/llm/llmConfig.js`):
+
+| Param | Default | Purpose |
+|--------|---------|---------|
+| `llm` | `mock` | `mock`, `openrouter`, or `openai` |
+| `apiKey` | (localStorage `world_llm_api_key`) | API key; without one, mock responses are used |
+| `model` | provider default | Override model id |
+| `llmLog` | on | Set `0` to silence browser console logging |
+
+Full think/conversation flow: [brain/danImpl/notes/llm-communication.md](./brain/danImpl/notes/llm-communication.md).
 
 ## Chunk descriptions (debug / tests)
 

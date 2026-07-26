@@ -48,3 +48,8 @@ at all.
 
 **Transfers / breaks.** The floor-singularity intuition transfers to any genuine ruin
 problem. The `−1/y` batch shape transfers nowhere (EOQ artifact). γ=2 transfers nowhere.
+
+**Implementation (Dan).** `foodUtility()` uses `−1 / (satiety + inventory nutrition)` on the
+hypo entity. Because satiety and inventory are perfect substitutes in that term, `ΔU(eat) = 0`
+without a separate hunger signal. `hungerPenalty()` (quadratic above hunger 40) is the current
+pragmatic stand-in for health/death in utility — see comments in `danBrain.js`.

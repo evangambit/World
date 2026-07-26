@@ -22,8 +22,8 @@ danImpl/
     talkTo.js            — walk to another NPC and start a conversation
   llm/
     thinkPrompt.js       — assemble system + user prompts for think and conversation calls
-    llmClient.js         — callThinkLlm / callConversationLlm (OpenRouter or mock)
-    llmConfig.js         — API key / model resolution from URL params
+    llmClient.js         — callThinkLlm / callConversationLlm (OpenRouter, OpenAI, or mock)
+    llmConfig.js         — API key / model / logging from URL params (`llm`, `apiKey`, `model`, `llmLog`)
     conversationOrchestrator.js — async ping-pong LLM turns between two NPCs
     extractJson.js       — strip markdown fences and parse JSON from LLM output
   notes/                 — theory (index.md + utility_functions/)
@@ -80,8 +80,8 @@ On each replan, `_chooseTask()`:
    - Branches a fresh `HypotheticalContext`.
    - Runs the task to completion with `drainHypo()`.
    - Computes `ΔU = utility(hypo) − initialU`.
-4. If a `talk_to` pending task exists, scores it the same way (walk-only hypo) and adds an urgency bonus (`low` = 0.01, `normal` = 0.1, `high` = 1.0).
-5. Starts the task with the largest positive `ΔU`, or idles if none beat zero.
+4. If a `talk_to` pending task exists, scores it the same way via `walkToTargetOnly()` (hypo simulates only the walk; conversation is not simulated) and adds an urgency bonus (`low` = 0.01, `normal` = 0.1, `high` = 1.0).
+5. Starts the task with the largest positive `ΔU`, or idles if none beat zero. Clears `_pendingTask` only when `talk_to` wins; otherwise the pending task is retried on the next replan.
 
 The winning hypo context's final position is stored for status display (`farming → (x, y, z)`, etc.).
 
@@ -94,7 +94,7 @@ The winning hypo context's final position is stored for status display (`farming
 | **foodUtility** | `-1 / (satiety + inventory nutrition)` — rewards food security and satiety |
 | **hungerPenalty** | Quadratic penalty for `hunger > 40` — makes eating have positive ΔU (the pure food term alone treats satiety and inventory as substitutes, so ΔU(eat) = 0) |
 | **explorationUtility** | `EXPLORE_WEIGHT × Σ min(1/dist, 1)` over `ctx.newTilesSeen`, dist to centroid — only tiles newly seen along walked paths count |
-| **cropUtility** | `-0.2 / max(1, −1/foodUtility + cropCount)` — nudges Dan to maintain a crop pipeline (`−1/foodUtility` is satiety plus inventory nutrition) |
+| **cropUtility** | `-0.2 / max(1, foodTotalSatiety + cropCount)` where `foodTotalSatiety = satiety + inventory nutrition` and `cropCount` is every remembered wheat crop tile (mature or growing) |
 
 Exploration is path-based, not position-based: farming through known territory does not inflate explore ΔU, and idling does not score exploration from the current tile alone.
 
@@ -120,24 +120,28 @@ Finds the best of eight directional **frontier goals** (last known walkable tile
 
 ### `talkToTask`
 
-Queued via `addPendingTask` (from the LLM). Execution:
+Queued via `addPendingTask` (from the LLM). Signature: `talkToTask(ctx, targetName, openingMessage, brain)` — the `DanBrain` instance supplies the NPC registry for resolving the target.
 
-1. Calls `ctx.getLastKnownPosition(targetName)` at walk time (live in real mode, snapshotted in hypo mode) and walks there.
+Execution:
+
+1. Calls `ctx.getLastKnownPosition(targetName)` at walk time (live in real mode, snapshotted in hypo mode) and walks there if a position is known.
 2. Waits (up to 120 ticks of idle yield) for the target to come within `CONVERSATION_RADIUS = 3`.
 3. Fires `runConversationOrchestrator(initiator, responder, openingMessage)` as a detached async task and returns immediately. The orchestrator sets `_conversing = true` on both brains synchronously at start; both stay blocked until the conversation ends.
 
 ## LLM integration
 
+Configure providers via URL params (`llm`, `apiKey`, `model`, `llmLog`) — see `llm/llmConfig.js`. Defaults to mock responses when no API key is set.
+
 ### Think
 
-Player-triggered via the NPC panel. `DanBrain.think()` runs async and does **not** block `tick()` (only `_conversing` and `resolvingAction` do). `getStatus()` surfaces `thinking…`, task goals, pending talk, and errors.
+Player-triggered via the NPC panel. `DanBrain.think()` runs async and does **not** block `tick()` (`_thinking` only prevents concurrent think calls; `_conversing` and `resolvingAction` block ticks). `getStatus()` surfaces `thinking…`, task goals, pending talk, and errors.
 
-`DanBrain.think()`:
+`DanBrain.think()` (guarded by `_thinking` to prevent concurrent calls):
 
 1. Builds a four-part prompt (`buildThinkPrompt`): system persona, current state snapshot, action memory, zone summary.
-2. Calls `callThinkLlm` (OpenRouter or mock).
+2. Calls `callThinkLlm` (OpenRouter, OpenAI, or mock — see `resolveDanLlmConfig()`).
 3. If the response has a `thought`, appends it to `ActionMemory` as a `'think'` entry — this also flushes the movement buffer, preserving chronological order.
-4. If the response has a `brainTweak`, applies it via `applyBrainTweak()`.
+4. If the response has a `brainTweak`, applies it immediately via `applyBrainTweak()` (e.g. sets `_pendingTask`); the pending task competes at the next `_chooseTask()` replan, not mid-task.
 
 ### Conversation
 
